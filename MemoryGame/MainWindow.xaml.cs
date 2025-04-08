@@ -4,28 +4,36 @@ using MemoryGame.ViewModels;
 
 namespace MemoryGame {
     public partial class MainWindow : Window {
-        private UserProfile _currentUser;
+        private readonly MainViewModel _viewModel;
 
-        public MainWindow(UserProfile user) {
+        // Default parameterless constructor
+        public MainWindow() {
             InitializeComponent();
-
-            // Make sure user isn't null
-            _currentUser = user ?? new UserProfile { Username = "Guest" };
-
-            // Update the window title to show the current user
-            this.Title = $"Memory Game - {_currentUser.Username}";
-
-            try {
-                // Set the DataContext to the MainViewModel
-                DataContext = new MainViewModel();
-            }
-            catch (Exception ex) {
-                MessageBox.Show($"Error initializing main window: {ex.Message}",
-                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
         }
 
+        // Constructor that takes MainViewModel
+        public MainWindow(MainViewModel viewModel) {
+            InitializeComponent();
+            _viewModel = viewModel;
+            DataContext = _viewModel;
 
-        // Rest of your MainWindow code...
+            // Subscribe to events
+            _viewModel.LoginRequested += OnLoginRequested;
+
+            // Handle window closing
+            this.Closing += MainWindow_Closing;
+        }
+
+        private void OnLoginRequested(object sender, EventArgs e) {
+            // Close the current window when login is requested (for logout)
+            this.Close();
+        }
+
+        private void MainWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e) {
+            // Unsubscribe from events to prevent memory leaks
+            if (_viewModel != null) {
+                _viewModel.LoginRequested -= OnLoginRequested;
+            }
+        }
     }
 }
