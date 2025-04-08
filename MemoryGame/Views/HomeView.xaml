@@ -6,19 +6,21 @@
              xmlns:local="clr-namespace:MemoryGame.Views"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <Grid Background="#ecf0f1">
+    <Grid Background="{StaticResource PrimaryBackground}">
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-            <TextBlock Text="Memory Game" FontSize="48" FontWeight="Bold" Foreground="#2c3e50" Margin="0,0,0,30"/>
-            <TextBlock Text="Exercise your memory with this fun matching game!" FontSize="20" 
-                       Foreground="#7f8c8d" TextAlignment="Center" Margin="20,0,20,50"/>
+            <TextBlock Text="MEMORY GAME" FontSize="52" Style="{StaticResource TitleTextStyle}" Margin="0,0,0,40"/>
 
-            <Button Command="{Binding StartGameCommand}" Content="Start Game" Width="200" Height="50" 
-                    Background="#2ecc71" Foreground="White" FontSize="20" BorderThickness="0">
-                <Button.Resources>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="25"/>
-                    </Style>
-                </Button.Resources>
+            <TextBlock Text="Test your memory with this matching card game!" 
+                       FontSize="20" Foreground="{StaticResource TextSecondary}" 
+                       TextAlignment="Center" Margin="20,0,20,60"/>
+
+            <Button Command="{Binding StartGameCommand}" Content="START GAME" 
+                    Width="220" Height="60" FontSize="22"
+                    Style="{StaticResource PrimaryButtonStyle}">
+                <Button.Effect>
+                    <DropShadowEffect ShadowDepth="2" Direction="330" 
+                                      Color="#4cff00" Opacity="0.5" BlurRadius="10"/>
+                </Button.Effect>
             </Button>
         </StackPanel>
     </Grid>

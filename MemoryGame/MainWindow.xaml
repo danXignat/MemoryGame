@@ -8,8 +8,11 @@
         xmlns:viewModels="clr-namespace:MemoryGame.ViewModels"
         mc:Ignorable="d"
         Title="Memory Game" Height="600" Width="800"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        Background="{StaticResource PrimaryBackground}">
+
     <Window.Resources>
+        <!-- View DataTemplates -->
         <DataTemplate DataType="{x:Type viewModels:HomeViewModel}">
             <views:HomeView />
         </DataTemplate>
@@ -31,40 +34,26 @@
         </Grid.RowDefinitions>
 
         <!-- Navigation Menu -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Background="#2c3e50" HorizontalAlignment="Stretch">
-            <Button Command="{Binding NavigateHomeCommand}" Content="Home" Width="100" Height="40" 
-                    Margin="10,5" Background="#3498db" Foreground="White" BorderThickness="0">
-                <Button.Resources>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="5"/>
-                    </Style>
-                </Button.Resources>
-            </Button>
-            <Button Command="{Binding NavigateGameCommand}" Content="Play Game" Width="100" Height="40" 
-                    Margin="5" Background="#3498db" Foreground="White" BorderThickness="0">
-                <Button.Resources>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="5"/>
-                    </Style>
-                </Button.Resources>
-            </Button>
-            <Button Command="{Binding NavigateScoresCommand}" Content="High Scores" Width="100" Height="40" 
-                    Margin="5" Background="#3498db" Foreground="White" BorderThickness="0">
-                <Button.Resources>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="5"/>
-                    </Style>
-                </Button.Resources>
-            </Button>
-            <Button Command="{Binding NavigateSettingsCommand}" Content="Settings" Width="100" Height="40" 
-                    Margin="5" Background="#3498db" Foreground="White" BorderThickness="0">
-                <Button.Resources>
-                    <Style TargetType="Border">
-                        <Setter Property="CornerRadius" Value="5"/>
-                    </Style>
-                </Button.Resources>
-            </Button>
-        </StackPanel>
+        <Border Grid.Row="0" Background="{StaticResource SecondaryBackground}" 
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" Margin="10,5">
+                <Button Command="{Binding NavigateHomeCommand}" 
+                        Content="HOME" 
+                        Style="{StaticResource NavButtonStyle}"/>
+
+                <Button Command="{Binding NavigateGameCommand}" 
+                        Content="PLAY" 
+                        Style="{StaticResource NavButtonStyle}"/>
+
+                <Button Command="{Binding NavigateScoresCommand}" 
+                        Content="SCORES" 
+                        Style="{StaticResource NavButtonStyle}"/>
+
+                <Button Command="{Binding NavigateSettingsCommand}" 
+                        Content="SETTINGS" 
+                        Style="{StaticResource NavButtonStyle}"/>
+            </StackPanel>
+        </Border>
 
         <!-- Content -->
         <ContentControl Grid.Row="1" Content="{Binding CurrentViewModel}" />

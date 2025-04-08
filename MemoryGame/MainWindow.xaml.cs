@@ -1,23 +1,31 @@
-﻿using MemoryGame.ViewModels;
-using System.Text;
+﻿using System;
 using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using MemoryGame.ViewModels;
 
 namespace MemoryGame {
-    /// <summary>
-    /// Interaction logic for MainWindow.xaml
-    /// </summary>
     public partial class MainWindow : Window {
-        public MainWindow() {
+        private UserProfile _currentUser;
+
+        public MainWindow(UserProfile user) {
             InitializeComponent();
-            DataContext = new MainViewModel();
+
+            // Make sure user isn't null
+            _currentUser = user ?? new UserProfile { Username = "Guest" };
+
+            // Update the window title to show the current user
+            this.Title = $"Memory Game - {_currentUser.Username}";
+
+            try {
+                // Set the DataContext to the MainViewModel
+                DataContext = new MainViewModel();
+            }
+            catch (Exception ex) {
+                MessageBox.Show($"Error initializing main window: {ex.Message}",
+                    "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
+
+        // Rest of your MainWindow code...
     }
 }

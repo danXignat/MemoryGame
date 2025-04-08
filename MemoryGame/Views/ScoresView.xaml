@@ -6,26 +6,72 @@
              xmlns:local="clr-namespace:MemoryGame.Views"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <Grid Background="#f9f9f9">
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="500">
-            <TextBlock Text="High Scores" FontSize="36" FontWeight="Bold" Foreground="#2c3e50" Margin="0,0,0,30"/>
+    <Grid Background="{StaticResource PrimaryBackground}">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="550">
+            <TextBlock Text="HIGH SCORES" Style="{StaticResource TitleTextStyle}"/>
 
-            <!-- Placeholder for high scores table -->
-            <Border BorderBrush="#dcdde1" BorderThickness="1" CornerRadius="5">
-                <ListView Height="300" BorderThickness="0">
+            <Border BorderBrush="{StaticResource AccentColor}" BorderThickness="2" CornerRadius="10">
+                <ListView Background="Transparent" BorderThickness="0" 
+                          ItemsSource="{Binding HighScores}" Height="300">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Style.Triggers>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter Property="Background" Value="#3a3a3a"/>
+                                </Trigger>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="#2c2c2c"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ListView.ItemContainerStyle>
+
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="Rank" Width="80"/>
-                            <GridViewColumn Header="Player" Width="220"/>
-                            <GridViewColumn Header="Score" Width="100"/>
-                            <GridViewColumn Header="Date" Width="100"/>
+                            <GridViewColumn Header="RANK" Width="80">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Rank}" Foreground="{StaticResource TextPrimary}" 
+                                                   HorizontalAlignment="Center" FontWeight="Bold"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                            <GridViewColumn Header="PLAYER" Width="220">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding PlayerName}" Foreground="{StaticResource TextPrimary}"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                            <GridViewColumn Header="SCORE" Width="100">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Score}" Foreground="{StaticResource AccentColor}" 
+                                                   HorizontalAlignment="Right" FontWeight="Bold"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                            <GridViewColumn Header="DATE" Width="120">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Date}" Foreground="{StaticResource TextSecondary}" 
+                                                   HorizontalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
                         </GridView>
                     </ListView.View>
-                    <ListViewItem>
-                        <TextBlock Text="No scores yet. Play a game to set a record!"/>
-                    </ListViewItem>
                 </ListView>
             </Border>
+
+            <Button Content="Reset Scores" Width="150" Height="35" Margin="0,20,0,0"
+                    Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Center"/>
         </StackPanel>
     </Grid>
 </UserControl>
