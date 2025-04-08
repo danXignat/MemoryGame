@@ -1,27 +1,120 @@
 <UserControl x:Class="MemoryGame.Views.HomeView"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:MemoryGame.Views"
-             mc:Ignorable="d" 
+             xmlns:converters="clr-namespace:MemoryGame.Converters"
+             mc:Ignorable="d"
              d:DesignHeight="450" d:DesignWidth="800">
-    <Grid Background="{StaticResource PrimaryBackground}">
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
-            <TextBlock Text="MEMORY GAME" FontSize="52" Style="{StaticResource TitleTextStyle}" Margin="0,0,0,40"/>
+	<Grid Background="{StaticResource PrimaryBackground}">
+		<Grid.ColumnDefinitions>
+			<ColumnDefinition Width="*"/>
+			<ColumnDefinition Width="300"/>
+		</Grid.ColumnDefinitions>
 
-            <TextBlock Text="Test your memory with this matching card game!" 
-                       FontSize="20" Foreground="{StaticResource TextSecondary}" 
-                       TextAlignment="Center" Margin="20,0,20,60"/>
+		<!-- Left side - Welcome and User Info -->
+		<Grid Grid.Column="0">
+			<StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+				<TextBlock Text="MEMORY GAME" FontSize="52" Style="{StaticResource TitleTextStyle}" Margin="0,0,0,40"/>
 
-            <Button Command="{Binding StartGameCommand}" Content="START GAME" 
-                    Width="220" Height="60" FontSize="22"
-                    Style="{StaticResource PrimaryButtonStyle}">
-                <Button.Effect>
-                    <DropShadowEffect ShadowDepth="2" Direction="330" 
-                                      Color="#4cff00" Opacity="0.5" BlurRadius="10"/>
-                </Button.Effect>
-            </Button>
-        </StackPanel>
-    </Grid>
+				<!-- User welcome section -->
+				<StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,20">
+					<Border Width="100" Height="100" BorderThickness="3"
+                            BorderBrush="{StaticResource AccentColor}" CornerRadius="50"
+                            Visibility="{Binding IsUserLoggedIn, Converter={StaticResource BooleanToVisibilityConverter}}">
+						<Border.Effect>
+							<DropShadowEffect ShadowDepth="1" Direction="330"
+                                              Color="#4cff00" Opacity="0.5" BlurRadius="5"/>
+						</Border.Effect>
+						<Border.Background>
+							<ImageBrush ImageSource="{Binding CurrentUser.PicturePath}" Stretch="UniformToFill"/>
+						</Border.Background>
+					</Border>
+
+					<StackPanel VerticalAlignment="Center" Margin="20,0,0,0">
+						<TextBlock Text="Welcome" FontSize="24" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding IsUserLoggedIn, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+						<TextBlock Text="{Binding CurrentUser.Username}" FontSize="32" Foreground="{StaticResource AccentColor}"
+                                   FontWeight="Bold"
+                                   Visibility="{Binding IsUserLoggedIn, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+						<TextBlock Text="Please log in to play" FontSize="20" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding IsUserLoggedIn, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+					</StackPanel>
+				</StackPanel>
+
+				<TextBlock Text="Test your memory with this matching card game!"
+                           FontSize="20" Foreground="{StaticResource TextSecondary}"
+                           TextAlignment="Center" Margin="20,0,20,60"/>
+
+				<Button Command="{Binding StartGameCommand}" Content="START GAME"
+                        Width="220" Height="60" FontSize="22"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        IsEnabled="{Binding IsUserLoggedIn}">
+					<Button.Effect>
+						<DropShadowEffect ShadowDepth="2" Direction="330"
+                                          Color="#4cff00" Opacity="0.5" BlurRadius="10"/>
+					</Button.Effect>
+				</Button>
+			</StackPanel>
+		</Grid>
+
+		<!-- Right side - User Scores -->
+		<Border Grid.Column="1" Background="{StaticResource SecondaryBackground}"
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="1,0,0,0">
+			<Grid>
+				<Grid.RowDefinitions>
+					<RowDefinition Height="Auto"/>
+					<RowDefinition Height="*"/>
+				</Grid.RowDefinitions>
+
+				<TextBlock Grid.Row="0" Text="{Binding CurrentUser.Username, StringFormat='{}{0}''S SCORES'}"
+                           FontSize="24" Style="{StaticResource SubheaderTextStyle}"
+                           Margin="20,30,20,10" HorizontalAlignment="Center"
+                           Visibility="{Binding IsUserLoggedIn, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+
+				<ScrollViewer Grid.Row="1" Margin="10,0,10,20"
+                              Visibility="{Binding IsUserLoggedIn, Converter={StaticResource BooleanToVisibilityConverter}}">
+					<ItemsControl ItemsSource="{Binding UserScores}">
+						<ItemsControl.ItemTemplate>
+							<DataTemplate>
+								<Border Margin="0,5" Padding="10" Background="{StaticResource PrimaryBackground}"
+                                        BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
+                                        CornerRadius="5">
+									<Grid>
+										<Grid.ColumnDefinitions>
+											<ColumnDefinition Width="Auto"/>
+											<ColumnDefinition Width="*"/>
+											<ColumnDefinition Width="Auto"/>
+										</Grid.ColumnDefinitions>
+
+										<TextBlock Grid.Column="0" Text="{Binding Date, StringFormat='{}{0:MM/dd/yyyy}'}"
+                                                   Foreground="{StaticResource TextSecondary}"/>
+										<TextBlock Grid.Column="1" Text="{Binding Difficulty}"
+                                                   Foreground="{StaticResource TextPrimary}"
+                                                   HorizontalAlignment="Center"/>
+										<TextBlock Grid.Column="2" Text="{Binding Score}"
+                                                   Foreground="{StaticResource AccentColor}"
+                                                   FontWeight="Bold"/>
+									</Grid>
+								</Border>
+							</DataTemplate>
+						</ItemsControl.ItemTemplate>
+					</ItemsControl>
+				</ScrollViewer>
+
+				<!-- Message when no scores or not logged in -->
+				<TextBlock Grid.Row="1" Text="Log in to view your scores"
+                           Foreground="{StaticResource TextSecondary}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           Visibility="{Binding IsUserLoggedIn, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+
+				<TextBlock Grid.Row="1" Text="No scores yet. Start playing to record your first score!"
+                           Foreground="{StaticResource TextSecondary}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap"
+                           TextAlignment="Center" Margin="20,0"
+                           Visibility="{Binding HasNoScores, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+			</Grid>
+		</Border>
+	</Grid>
 </UserControl>

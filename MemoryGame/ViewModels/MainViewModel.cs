@@ -9,6 +9,7 @@ namespace MemoryGame.ViewModels {
         private ViewModelBase _currentViewModel;
         private UserProfile _currentUser;
         private readonly NavigationService _navigationService;
+
         public NavigationService NavigationService => _navigationService;
 
         public ViewModelBase CurrentViewModel {
@@ -20,9 +21,12 @@ namespace MemoryGame.ViewModels {
             get => _currentUser;
             set {
                 if (SetProperty(ref _currentUser, value)) {
-                    // Update the user in GameViewModel
+                    // Update the user in all ViewModels that need it
                     if (GameViewModel != null) {
                         GameViewModel.CurrentUser = value;
+                    }
+                    if (HomeViewModel != null) {
+                        HomeViewModel.CurrentUser = value;
                     }
 
                     OnPropertyChanged(nameof(WindowTitle));
@@ -30,7 +34,7 @@ namespace MemoryGame.ViewModels {
             }
         }
 
-        public string WindowTitle => $"Memory Game - {CurrentUser?.Username ?? "Guest"}";
+        public string WindowTitle => $"Memory Game AA - {CurrentUser?.Username ?? "Guest"}";
 
         // Navigation Commands
         public ICommand NavigateHomeCommand { get; }
@@ -38,18 +42,17 @@ namespace MemoryGame.ViewModels {
         public ICommand NavigateScoresCommand { get; }
         public ICommand NavigateSettingsCommand { get; }
         public ICommand ShowLoginCommand { get; }
-        public ICommand LogoutCommand { get; }
+        public ICommand ExitApplicationCommand { get; }
 
         // View Models
         public HomeViewModel HomeViewModel { get; private set; }
         public GameViewModel GameViewModel { get; private set; }
         public ScoresViewModel ScoresViewModel { get; private set; }
-        public SettingsViewModel SettingsViewModel { get; private set; }
+        public AboutViewModel AboutViewModel { get; private set; }
         public LoginViewModel LoginViewModel { get; private set; }
 
-        public event EventHandler LoginRequested;
-        public event EventHandler<UserProfile> UserLoggedIn;
-        public event EventHandler GameClosed;
+        public event EventHandler RequestClose;
+
         public MainViewModel() {
             // Initialize navigation service
             _navigationService = new NavigationService(this);
@@ -58,40 +61,36 @@ namespace MemoryGame.ViewModels {
             HomeViewModel = new HomeViewModel(_navigationService);
             GameViewModel = new GameViewModel(_navigationService);
             ScoresViewModel = new ScoresViewModel(_navigationService);
-            SettingsViewModel = new SettingsViewModel(_navigationService);
+            AboutViewModel = new AboutViewModel(_navigationService);
             LoginViewModel = new LoginViewModel(_navigationService);
-
-            // Set default view
-            CurrentViewModel = HomeViewModel;
 
             // Initialize commands
             NavigateHomeCommand = new RelayCommand(p => _navigationService.NavigateTo(HomeViewModel));
-            NavigateGameCommand = new RelayCommand(p => _navigationService.NavigateTo(GameViewModel),
-                p => CurrentUser != null); // Only allow game navigation if user is logged in
+            NavigateGameCommand = new RelayCommand(p => _navigationService.NavigateTo(GameViewModel), p => CurrentUser != null);
             NavigateScoresCommand = new RelayCommand(p => _navigationService.NavigateTo(ScoresViewModel));
-            NavigateSettingsCommand = new RelayCommand(p => _navigationService.NavigateTo(SettingsViewModel));
-            ShowLoginCommand = new RelayCommand(p => LoginRequested?.Invoke(this, EventArgs.Empty));
-            LogoutCommand = new RelayCommand(Logout, p => CurrentUser != null);
+            NavigateSettingsCommand = new RelayCommand(p => _navigationService.NavigateTo(AboutViewModel));
+            ShowLoginCommand = new RelayCommand(p => LogoutUser());
+            ExitApplicationCommand = new RelayCommand(p => RequestClose?.Invoke(this, EventArgs.Empty));
+
+            LoginViewModel.PlayRequested += (s, e) => {
+                CurrentUser = LoginViewModel.SelectedUser;
+                _navigationService.ShowMainWindow();
+
+                // Navigate to HomeViewModel after login
+                _navigationService.NavigateTo(HomeViewModel);
+            };
+
+            CurrentViewModel = HomeViewModel;
         }
 
-        public void SetLoggedInUser(UserProfile user) {
-            CurrentUser = user;
-            UserLoggedIn?.Invoke(this, user);
-
-            // If we're on the home page, go to the game page
-            if (CurrentViewModel == HomeViewModel) {
-                _navigationService.NavigateTo(GameViewModel);
-            }
-        }
-        public void OnGameClosed() {
-            CurrentUser = null; // Reset the current user
-            _navigationService.NavigateTo(HomeViewModel); // Navigate back to home
-            GameClosed?.Invoke(this, EventArgs.Empty); // Fire the event
-        }
-        private void Logout(object parameter) {
+        private void LogoutUser() {
             CurrentUser = null;
-            // Navigate to home when logged out
-            _navigationService.NavigateTo(HomeViewModel);
+            _navigationService.HideMainWindow();
+            _navigationService.ShowLoginWindow();
+        }
+
+        public void HandleMainWindowClosing() {
+            _navigationService.ShowLoginWindow();
         }
     }
 }

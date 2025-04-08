@@ -5,6 +5,13 @@ using System.Linq;
 using MemoryGame.Models;
 
 namespace MemoryGame.Services {
+    public class ScoreRecord {
+        public string Username { get; set; }
+        public DateTime Date { get; set; }
+        public string Difficulty { get; set; }
+        public int Score { get; set; }
+        public TimeSpan Time { get; set; }
+    }
     public class UserService {
         private const string UserDataFile = "users.dat";
 

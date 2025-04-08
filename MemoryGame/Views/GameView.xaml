@@ -7,72 +7,200 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid Background="{StaticResource PrimaryBackground}">
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="200"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
 
-        <!-- Game Status -->
-        <Border Grid.Row="0" Background="{StaticResource SecondaryBackground}" 
-                BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
-            <Grid Margin="20,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
+        <!-- Left Panel with Game Options -->
+        <Border Grid.Column="0" Background="{StaticResource SecondaryBackground}" 
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,1,0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-                <TextBlock Grid.Column="0" Text="{Binding GameStatus}" 
-                           Foreground="{StaticResource AccentColor}" FontSize="18"/>
+                <!-- User Info -->
+                <Border Grid.Row="0" BorderBrush="{StaticResource BorderColor}" 
+                        BorderThickness="0,0,0,1" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="Player:" FontSize="14" 
+                                   Foreground="{StaticResource TextSecondary}" 
+                                   Margin="0,0,0,5"/>
+                        <TextBlock Text="{Binding CurrentUser.Username}" 
+                                   FontSize="18" 
+                                   Foreground="{StaticResource AccentColor}" 
+                                   FontWeight="Bold"/>
+                    </StackPanel>
+                </Border>
 
-                <TextBlock Grid.Column="1" Text="Score: " Foreground="{StaticResource TextSecondary}" 
-                           FontSize="18" Margin="0,0,5,0"/>
-                <TextBlock Grid.Column="1" Text="{Binding Score}" Foreground="{StaticResource AccentColor}" 
-                           FontSize="18" FontWeight="Bold" Margin="65,0,20,0"/>
+                <!-- Game Options -->
+                <StackPanel Grid.Row="1" Margin="15,20">
+                    <TextBlock Text="GAME OPTIONS" FontSize="16" 
+                               Foreground="{StaticResource TextPrimary}" 
+                               FontWeight="SemiBold" 
+                               Margin="0,0,0,15"/>
 
-                <TextBlock Grid.Column="2" Text="Attempts: " Foreground="{StaticResource TextSecondary}" 
-                           FontSize="18" Margin="0,0,5,0"/>
-                <TextBlock Grid.Column="2" Text="{Binding Attempts}" Foreground="{StaticResource AccentColor}" 
-                           FontSize="18" FontWeight="Bold" Margin="85,0,0,0"/>
+                    <!-- Category Selection -->
+                    <TextBlock Text="Category:" Margin="0,0,0,5" 
+                               Foreground="{StaticResource TextSecondary}"/>
+                    <ComboBox Style="{StaticResource CustomComboBoxStyle}" 
+                              ItemsSource="{Binding GameCategories}" 
+                              SelectedItem="{Binding SelectedCategory}"
+                              Margin="0,0,0,20">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- Difficulty Selection -->
+                    <TextBlock Text="Difficulty:" Margin="0,0,0,5" 
+                               Foreground="{StaticResource TextSecondary}"/>
+                    <ComboBox Style="{StaticResource CustomComboBoxStyle}" 
+                              ItemsSource="{Binding DifficultyLevels}" 
+                              SelectedItem="{Binding SelectedDifficulty}"
+                              Margin="0,0,0,20">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <!-- Game Control Buttons -->
+                    <Button Content="New Game" 
+                            Command="{Binding NewGameCommand}"
+                            Style="{StaticResource PrimaryButtonStyle}"
+                            Height="40" Margin="0,5,0,10"/>
+
+                    <Button Content="Save Game" 
+                            Command="{Binding SaveGameCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Height="40" Margin="0,5,0,10"/>
+
+                    <Button Content="Load Game" 
+                            Command="{Binding LoadGameCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Height="40" Margin="0,5,0,10"/>
+
+                    <Button Content="Return to Menu" 
+                            Command="{Binding ReturnToMenuCommand}"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Height="40" Margin="0,5,0,0"/>
+                </StackPanel>
+
+                <!-- Score Info -->
+                <Border Grid.Row="2" BorderBrush="{StaticResource BorderColor}" 
+                        BorderThickness="0,1,0,0" Padding="15">
+                    <StackPanel>
+                        <TextBlock Text="CURRENT GAME" FontSize="14" 
+                                   Foreground="{StaticResource TextSecondary}" 
+                                   Margin="0,0,0,10"/>
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="Score:" 
+                                       Foreground="{StaticResource TextSecondary}"/>
+                            <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Score}" 
+                                       Foreground="{StaticResource AccentColor}" 
+                                       FontWeight="Bold" 
+                                       HorizontalAlignment="Right"/>
+
+                            <TextBlock Grid.Row="1" Grid.Column="0" Text="Attempts:" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       Margin="0,5,0,0"/>
+                            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding Attempts}" 
+                                       Foreground="{StaticResource AccentColor}" 
+                                       FontWeight="Bold" 
+                                       HorizontalAlignment="Right" 
+                                       Margin="0,5,0,0"/>
+
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Time:" 
+                                       Foreground="{StaticResource TextSecondary}" 
+                                       Margin="0,5,0,0"/>
+                            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding GameTime}" 
+                                       Foreground="{StaticResource AccentColor}" 
+                                       FontWeight="Bold" 
+                                       HorizontalAlignment="Right" 
+                                       Margin="0,5,0,0"/>
+                        </Grid>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Border>
 
-        <!-- Game Board -->
-        <Grid Grid.Row="1" Margin="20">
-            <Border BorderBrush="{StaticResource BorderColor}" BorderThickness="2" CornerRadius="10">
-                <Grid>
-                    <!-- Here you would add the card grid -->
-                    <UniformGrid Rows="4" Columns="4" Margin="20">
-                        <!-- This is just a placeholder. In a real implementation, you would bind to a collection of card items -->
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                        <Button Style="{StaticResource CardButtonStyle}"/>
-                    </UniformGrid>
+        <!-- Game Content -->
+        <Grid Grid.Column="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Game Status -->
+            <Border Grid.Row="0" Background="{StaticResource SecondaryBackground}" 
+                    BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1">
+                <Grid Margin="20,10">
+                    <TextBlock Text="{Binding GameStatus}" 
+                               Foreground="{StaticResource AccentColor}" 
+                               FontSize="18" 
+                               HorizontalAlignment="Center"/>
                 </Grid>
             </Border>
+
+            <!-- Game Board -->
+            <Grid Grid.Row="1" Margin="20">
+                <Border BorderBrush="{StaticResource BorderColor}" 
+                        BorderThickness="2" 
+                        CornerRadius="10">
+                    <Grid>
+                        <!-- Card Grid -->
+                        <ItemsControl ItemsSource="{Binding Cards}" Margin="15">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <UniformGrid Rows="{Binding GridRows}" 
+                                                 Columns="{Binding GridColumns}"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Style="{StaticResource CardButtonStyle}" 
+                                            Command="{Binding DataContext.FlipCardCommand, 
+                                                      RelativeSource={RelativeSource AncestorType=ItemsControl}}" 
+                                            CommandParameter="{Binding}">
+                                        <Grid>
+                                            <Border Background="{StaticResource SecondaryBackground}"
+                                                    Visibility="{Binding IsFlipped, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                                                <TextBlock Text="?" 
+                                                           FontSize="24" 
+                                                           FontWeight="Bold" 
+                                                           Foreground="{StaticResource AccentColor}" 
+                                                           HorizontalAlignment="Center" 
+                                                           VerticalAlignment="Center"/>
+                                            </Border>
+                                            <Border Visibility="{Binding IsFlipped, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                                <Image Source="{Binding ImagePath}" Stretch="Uniform" Margin="5"/>
+                                            </Border>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
-
-        <!-- Controls -->
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,20">
-            <Button Content="New Game" Width="120" Height="35" Margin="10,0"
-                    Style="{StaticResource SecondaryButtonStyle}"/>
-
-            <Button Content="Return to Menu" Width="120" Height="35" Margin="10,0"
-                    Style="{StaticResource SecondaryButtonStyle}"/>
-        </StackPanel>
     </Grid>
 </UserControl>

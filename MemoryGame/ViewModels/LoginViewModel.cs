@@ -16,6 +16,7 @@ namespace MemoryGame.ViewModels {
         private UserProfile _selectedUser;
         private BitmapImage _currentUserImage;
         private int _currentPictureIndex;
+        private List<string> AvailablePictures { get; }
 
         #region Properties
 
@@ -56,34 +57,26 @@ namespace MemoryGame.ViewModels {
         public ICommand DeleteUserCommand { get; }
         public ICommand CancelCommand { get; }
 
-        private void PlayGame(object parameter) {
-            if (SelectedUser != null) {
-                // Just trigger close requested - let the App.xaml.cs handle showing the main window
-                CloseRequested?.Invoke(this, EventArgs.Empty);
-            }
-        }
-
         #endregion
 
         public event EventHandler CloseRequested;
-
-        private List<string> AvailablePictures { get; }
+        public event EventHandler PlayRequested;
 
         public LoginViewModel(NavigationService navigationService = null, UserService userService = null) {
-            _userService = userService ?? new UserService();
-            _navigationService = navigationService;
+            _userService        = userService ?? new UserService();
+            _navigationService  = navigationService;
 
             // Load resources
             AvailablePictures = _userService.GetAvailablePictures();
             LoadUsers();
 
             // Initialize commands
-            PlayCommand = new RelayCommand(PlayGame, param => CanPlay);
-            NextPictureCommand = new RelayCommand(NextPicture, param => CanChangePicture);
-            PreviousPictureCommand = new RelayCommand(PreviousPicture, param => CanChangePicture);
-            NewUserCommand = new RelayCommand(CreateNewUser);
-            DeleteUserCommand = new RelayCommand(DeleteUser, param => CanDeleteUser);
-            CancelCommand = new RelayCommand(param => CloseRequested?.Invoke(this, EventArgs.Empty));
+            PlayCommand             = new RelayCommand(param => PlayRequested?.Invoke(this, EventArgs.Empty), param => CanPlay);
+            NextPictureCommand      = new RelayCommand(NextPicture, param => CanChangePicture);
+            PreviousPictureCommand  = new RelayCommand(PreviousPicture, param => CanChangePicture);
+            NewUserCommand          = new RelayCommand(CreateNewUser);
+            DeleteUserCommand       = new RelayCommand(DeleteUser, param => CanDeleteUser);
+            CancelCommand           = new RelayCommand(param => CloseRequested?.Invoke(this, EventArgs.Empty));
         }
 
         private void LoadUsers() {
@@ -119,7 +112,6 @@ namespace MemoryGame.ViewModels {
                 CurrentUserImage = bitmap;
             }
             catch (Exception) {
-                // If there's an error loading the image, use the default
                 if (AvailablePictures.Count > 0) {
                     SelectedUser.PicturePath = AvailablePictures[0];
                     try {

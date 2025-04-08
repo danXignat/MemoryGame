@@ -7,69 +7,58 @@ namespace MemoryGame {
     public partial class App : Application {
         public MainViewModel MainViewModel { get; private set; }
         private MainWindow _mainWindow;
+        private LoginWindow _loginWindow;
 
         protected override void OnStartup(StartupEventArgs e) {
             base.OnStartup(e);
 
-            // Initialize main view model
+            // Create and set up the MainViewModel
             MainViewModel = new MainViewModel();
 
-            // Subscribe to login request event
-            MainViewModel.LoginRequested += OnLoginRequested;
-            MainViewModel.GameClosed += OnGameClosed;
+            MainViewModel.NavigationService.RegisterWindowActions(
+                showMainWindowAction: ShowMainWindow,
+                showLoginWindowAction: ShowLoginWindow
+            );
 
-            // Start with showing login window
-            ShowLoginWindow();  
+            // Subscribe to the RequestClose event
+            MainViewModel.RequestClose += (s, args) => Shutdown();
+
+            // Create the login window
+            _loginWindow = new LoginWindow(MainViewModel);
+
+            // Show the login window to start the application
+            _loginWindow.Show();
         }
 
-        // Method to show login window
-        public void ShowLoginWindow() {
-            LoginWindow loginWindow = new LoginWindow(MainViewModel);
-            bool? loginResult = loginWindow.ShowDialog();
+        // Method to show/hide the main window
+        private void ShowMainWindow(bool show) {
+            if (show) {
+                // Create the main window if it doesn't exist
+                if (_mainWindow == null) {
+                    _mainWindow = new MainWindow(MainViewModel);
+                    _mainWindow.Closed += (s, e) => {
+                        _mainWindow = null;
+                        MainViewModel.HandleMainWindowClosing();
+                    };
+                }
 
-            // Only show the main window if login was successful
-            if (loginResult == true && MainViewModel.CurrentUser != null) {
-                ShowMainWindow();
+                // Hide login window and show main window
+                _loginWindow.Hide();
+                _mainWindow.Show();
             }
-            else if (loginWindow.IsClosingCompletely) {
-                // If X button on login was clicked, shut down
-                Shutdown();
+            else {
+                // Hide the main window if it exists
+                _mainWindow?.Hide();
             }
-            // If cancel was pressed, do nothing (window will close but app stays running)
         }
 
-        // Method to show main window
-        private void ShowMainWindow() {
-            // Create main window if it doesn't exist
-            if (_mainWindow == null) {
-                _mainWindow = new MainWindow(MainViewModel);
-                _mainWindow.Closed += MainWindow_Closed;
-            }
-
-            _mainWindow.Show();
-            _mainWindow.Activate(); // Make sure it's in front
-        }
-
-        private void MainWindow_Closed(object sender, EventArgs e) {
-            _mainWindow = null; // Clear reference
-
-            // When main window is closed, show login window again
-            ShowLoginWindow();
-        }
-
-        private void OnLoginRequested(object sender, EventArgs e) {
-            ShowLoginWindow();
-        }
-
-        private void OnGameClosed(object sender, EventArgs e) {
-            // If the main window exists, close it
-            if (_mainWindow != null) {
-                _mainWindow.Close();
-                _mainWindow = null;
+        // Method to show the login window
+        private void ShowLoginWindow() {
+            if (_loginWindow == null) {
+                _loginWindow = new LoginWindow(MainViewModel);
             }
 
-            // Show login window
-            ShowLoginWindow();
+            _loginWindow.Show();
         }
     }
 }
