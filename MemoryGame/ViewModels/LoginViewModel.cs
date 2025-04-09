@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Windows;
@@ -10,7 +11,7 @@ using MemoryGame.Services;
 
 namespace MemoryGame.ViewModels {
     public class LoginViewModel : ViewModelBase {
-        private readonly UserService _userService;
+        private readonly UserManagementService _userService;
         private readonly NavigationService _navigationService;
         private ObservableCollection<UserProfile> _users;
         private UserProfile _selectedUser;
@@ -29,6 +30,10 @@ namespace MemoryGame.ViewModels {
             get => _selectedUser;
             set {
                 if (SetProperty(ref _selectedUser, value)) {
+                    if (value != null) {
+                        _userService.SelectUser(value.Username);
+                    }
+
                     UpdatePictureDisplay();
                     OnPropertyChanged(nameof(CanPlay));
                     OnPropertyChanged(nameof(CanDeleteUser));
@@ -62,21 +67,21 @@ namespace MemoryGame.ViewModels {
         public event EventHandler CloseRequested;
         public event EventHandler PlayRequested;
 
-        public LoginViewModel(NavigationService navigationService = null, UserService userService = null) {
-            _userService        = userService ?? new UserService();
-            _navigationService  = navigationService;
+        public LoginViewModel(NavigationService navigationService = null, UserManagementService userService = null) {
+            _userService = userService ?? new UserManagementService();
+            _navigationService = navigationService;
 
             // Load resources
             AvailablePictures = _userService.GetAvailablePictures();
             LoadUsers();
 
             // Initialize commands
-            PlayCommand             = new RelayCommand(param => PlayRequested?.Invoke(this, EventArgs.Empty), param => CanPlay);
-            NextPictureCommand      = new RelayCommand(NextPicture, param => CanChangePicture);
-            PreviousPictureCommand  = new RelayCommand(PreviousPicture, param => CanChangePicture);
-            NewUserCommand          = new RelayCommand(CreateNewUser);
-            DeleteUserCommand       = new RelayCommand(DeleteUser, param => CanDeleteUser);
-            CancelCommand           = new RelayCommand(param => CloseRequested?.Invoke(this, EventArgs.Empty));
+            PlayCommand = new RelayCommand(param => PlayRequested?.Invoke(this, EventArgs.Empty), param => CanPlay);
+            NextPictureCommand = new RelayCommand(NextPicture, param => CanChangePicture);
+            PreviousPictureCommand = new RelayCommand(PreviousPicture, param => CanChangePicture);
+            NewUserCommand = new RelayCommand(CreateNewUser);
+            DeleteUserCommand = new RelayCommand(DeleteUser, param => CanDeleteUser);
+            CancelCommand = new RelayCommand(param => CloseRequested?.Invoke(this, EventArgs.Empty));
         }
 
         private void LoadUsers() {
@@ -131,6 +136,7 @@ namespace MemoryGame.ViewModels {
                 if (_currentPictureIndex >= AvailablePictures.Count) _currentPictureIndex = 0;
 
                 SelectedUser.PicturePath = AvailablePictures[_currentPictureIndex];
+                _userService.UpdateUserPicture(SelectedUser.PicturePath);
                 UpdatePictureDisplay();
                 SaveUsers();
             }
@@ -142,35 +148,31 @@ namespace MemoryGame.ViewModels {
                 if (_currentPictureIndex < 0) _currentPictureIndex = AvailablePictures.Count - 1;
 
                 SelectedUser.PicturePath = AvailablePictures[_currentPictureIndex];
+                _userService.UpdateUserPicture(SelectedUser.PicturePath);
                 UpdatePictureDisplay();
                 SaveUsers();
             }
         }
 
         private void CreateNewUser(object parameter) {
-            // In a real MVVM application, you would use a dialog service here
-            // For simplicity, we'll keep using the dialog directly
             NewUserDialog dialog = new NewUserDialog();
             if (dialog.ShowDialog() == true) {
                 string newUsername = dialog.Username;
 
-                // Check if the username already exists
                 if (Users.Any(u => u.Username.Equals(newUsername, StringComparison.OrdinalIgnoreCase))) {
                     MessageBox.Show("A user with this name already exists.", "Error",
                         MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
 
-                // Create new user with default picture
-                UserProfile newUser = new UserProfile
-                {
-                    Username = newUsername,
-                    PicturePath = AvailablePictures.Count > 0 ? AvailablePictures[0] : string.Empty
-                };
+                string defaultPicture = AvailablePictures.Count > 0 ? AvailablePictures[0] : string.Empty;
+                UserProfile newUser = _userService.CreateUser(newUsername, defaultPicture);
 
-                Users.Add(newUser);
-                SelectedUser = newUser;
-                SaveUsers();
+                if (newUser != null) {
+                    Users.Add(newUser);
+                    SelectedUser = newUser;
+                    SaveUsers();
+                }
             }
         }
 
@@ -184,7 +186,15 @@ namespace MemoryGame.ViewModels {
                     MessageBoxImage.Question);
 
                 if (result == MessageBoxResult.Yes) {
+                    string username = SelectedUser.Username;
+
+                    // First remove from local collection
                     Users.Remove(SelectedUser);
+
+                    // Then delete from service
+                    _userService.DeleteUser(username);
+
+                    // Update the user data file
                     SaveUsers();
 
                     // Select first user if available

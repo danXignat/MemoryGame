@@ -1,0 +1,56 @@
+<Window x:Class="MemoryGame.Views.GameSizeView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Game Size" Height="240" Width="300"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        Background="{StaticResource PrimaryBackground}"
+        ShowInTaskbar="False">
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <!-- Rows Input -->
+        <TextBlock Grid.Row="0" Grid.Column="0" Text="Number of Rows:" Margin="0,0,10,5"
+                   VerticalAlignment="Center" 
+                   Foreground="{StaticResource TextPrimary}"/>
+        <TextBox Grid.Row="0" Grid.Column="1" x:Name="txtRows" Margin="0,0,0,10" Padding="8,5"
+                 Background="{StaticResource SecondaryBackground}"
+                 Foreground="{StaticResource TextPrimary}"
+                 BorderBrush="{StaticResource AccentColor}"
+                 CaretBrush="{StaticResource AccentColor}"/>
+        <!-- Columns Input -->
+        <TextBlock Grid.Row="1" Grid.Column="0" Text="Number of Columns:" Margin="0,0,10,5"
+                   VerticalAlignment="Center"
+                   Foreground="{StaticResource TextPrimary}"/>
+        <TextBox Grid.Row="1" Grid.Column="1" x:Name="txtColumns" Margin="0,0,0,15" Padding="8,5"
+                 Background="{StaticResource SecondaryBackground}"
+                 Foreground="{StaticResource TextPrimary}"
+                 BorderBrush="{StaticResource AccentColor}"
+                 CaretBrush="{StaticResource AccentColor}"/>
+        <!-- Optional note/guidance -->
+        <TextBlock Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" 
+                   Text="Note: Total cells (rows × columns) should be an even number."
+                   TextWrapping="Wrap" Margin="0,0,0,15"
+                   Foreground="{StaticResource TextSecondary}"
+                   FontStyle="Italic"/>
+        <!-- Buttons -->
+        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" 
+                    Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button x:Name="btnApply" Content="Apply" Width="80" Margin="0,0,10,0"
+                    Click="btnApply_Click" IsDefault="True"
+                    Style="{StaticResource PrimaryButtonStyle}"/>
+            <Button x:Name="btnCancel" Content="Cancel" Width="80"
+                    Click="btnCancel_Click" IsCancel="True"
+                    Style="{StaticResource SecondaryButtonStyle}"/>
+        </StackPanel>
+    </Grid>
+</Window>

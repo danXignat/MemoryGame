@@ -19,6 +19,7 @@ namespace MemoryGame.Services {
             }
             else if (viewModel is GameViewModel gameViewModel) {
                 gameViewModel.CurrentUser = _mainViewModel.CurrentUser;
+                gameViewModel.StartNewGame();
             }
 
             _mainViewModel.CurrentViewModel = viewModel;

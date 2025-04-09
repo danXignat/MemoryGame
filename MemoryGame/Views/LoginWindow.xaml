@@ -9,120 +9,120 @@
         WindowStartupLocation="CenterScreen"
         Background="{StaticResource PrimaryBackground}"
         ResizeMode="NoResize">
-	<Border Padding="20" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
-		<Grid>
-			<Grid.RowDefinitions>
-				<RowDefinition Height="Auto"/>
-				<RowDefinition Height="*"/>
-				<RowDefinition Height="Auto"/>
-			</Grid.RowDefinitions>
+    <Border Padding="20" Background="{StaticResource PrimaryBackground}" BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
 
-			<!-- Header -->
-			<TextBlock Grid.Row="0" Text="Welcome! Enjoy this game!"
+            <!-- Header -->
+            <TextBlock Grid.Row="0" Text="Welcome! Enjoy this game!"
                        HorizontalAlignment="Center" FontSize="28"
                        FontWeight="Bold" Margin="0,0,0,20"
                        Foreground="{StaticResource AccentColor}">
-				<TextBlock.Effect>
-					<DropShadowEffect ShadowDepth="2" Direction="330"
+                <TextBlock.Effect>
+                    <DropShadowEffect ShadowDepth="2" Direction="330"
                                      Color="#4cff00" Opacity="0.5" BlurRadius="8"/>
-				</TextBlock.Effect>
-			</TextBlock>
+                </TextBlock.Effect>
+            </TextBlock>
 
-			<!-- Main Content -->
-			<Grid Grid.Row="1">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="Auto"/>
-				</Grid.ColumnDefinitions>
+            <!-- Main Content -->
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-				<!-- User List -->
-				<Border Grid.Column="0" BorderBrush="{StaticResource AccentColor}" BorderThickness="2"
+                <!-- User List -->
+                <Border Grid.Column="0" BorderBrush="{StaticResource AccentColor}" BorderThickness="2"
                         CornerRadius="5" Margin="0,0,10,0" Background="{StaticResource SecondaryBackground}">
-					<ListBox ItemsSource="{Binding Users}"
+                    <ListBox ItemsSource="{Binding Users}"
                              SelectedItem="{Binding SelectedUser}"
                              Background="Transparent" BorderThickness="0">
-						<ListBox.ItemContainerStyle>
-							<Style TargetType="ListBoxItem">
-								<Setter Property="Padding" Value="10,8"/>
-								<Setter Property="Background" Value="Transparent"/>
-								<Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
-								<Style.Triggers>
-									<Trigger Property="IsSelected" Value="True">
-										<Setter Property="Background" Value="#3a3a3a"/>
-										<Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
-									</Trigger>
-									<Trigger Property="IsMouseOver" Value="True">
-										<Setter Property="Background" Value="#2c2c2c"/>
-									</Trigger>
-								</Style.Triggers>
-							</Style>
-						</ListBox.ItemContainerStyle>
-						<ListBox.ItemTemplate>
-							<DataTemplate>
-								<TextBlock Text="{Binding Username}" Foreground="{StaticResource TextPrimary}"
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="10,8"/>
+                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+                                <Style.Triggers>
+                                    <Trigger Property="IsSelected" Value="True">
+                                        <Setter Property="Background" Value="#3a3a3a"/>
+                                        <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+                                    </Trigger>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="Background" Value="#2c2c2c"/>
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Username}" Foreground="{StaticResource TextPrimary}"
                                            FontSize="14"/>
-							</DataTemplate>
-						</ListBox.ItemTemplate>
-					</ListBox>
-				</Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Border>
 
-				<!-- User Picture Section -->
-				<Grid Grid.Column="1" Width="150">
-					<Grid.RowDefinitions>
-						<RowDefinition Height="*"/>
-						<RowDefinition Height="Auto"/>
-					</Grid.RowDefinitions>
+                <!-- User Picture Section -->
+                <Grid Grid.Column="1" Width="150">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-					<!-- Profile Picture -->
-					<Border Grid.Row="0" BorderBrush="{StaticResource AccentColor}" BorderThickness="2"
+                    <!-- Profile Picture -->
+                    <Border Grid.Row="0" BorderBrush="{StaticResource AccentColor}" BorderThickness="2"
                             Background="{StaticResource SecondaryBackground}" CornerRadius="5" Margin="0,0,0,10">
-						<Image Source="{Binding CurrentUserImage}" Stretch="Uniform" Margin="8"/>
-					</Border>
+                        <Image Source="{Binding CurrentUserImage}" Stretch="Uniform" Margin="8"/>
+                    </Border>
 
-					<!-- Picture Navigation -->
-					<Grid Grid.Row="1">
-						<Grid.ColumnDefinitions>
-							<ColumnDefinition Width="*"/>
-							<ColumnDefinition Width="*"/>
-						</Grid.ColumnDefinitions>
-						<Button Grid.Column="0" Content="&lt;&lt;"
+                    <!-- Picture Navigation -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="&lt;&lt;"
                                 Margin="0,0,5,0" Padding="5"
                                 Command="{Binding PreviousPictureCommand}"
                                 Style="{StaticResource SecondaryButtonStyle}"/>
-						<Button Grid.Column="1" Content="&gt;&gt;"
+                        <Button Grid.Column="1" Content="&gt;&gt;"
                                 Margin="5,0,0,0" Padding="5"
                                 Command="{Binding NextPictureCommand}"
                                 Style="{StaticResource SecondaryButtonStyle}"/>
-					</Grid>
-				</Grid>
-			</Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
 
-			<!-- Bottom Buttons -->
-			<Grid Grid.Row="2" Margin="0,15,0,0">
-				<Grid.ColumnDefinitions>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-					<ColumnDefinition Width="*"/>
-				</Grid.ColumnDefinitions>
+            <!-- Bottom Buttons -->
+            <Grid Grid.Row="2" Margin="0,15,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
 
-				<Button Grid.Column="0" Content="New User"
+                <Button Grid.Column="0" Content="New User"
                         Margin="0,0,5,0" Padding="10,5"
                         Command="{Binding NewUserCommand}"
                         Style="{StaticResource SecondaryButtonStyle}"/>
-				<Button Grid.Column="1" Content="Delete User"
+                <Button Grid.Column="1" Content="Delete User"
                         Margin="5,0" Padding="10,5"
                         Command="{Binding DeleteUserCommand}"
                         Style="{StaticResource SecondaryButtonStyle}"/>
-				<Button Grid.Column="2" Content="Play"
+                <Button Grid.Column="2" Content="Play"
                         Margin="5,0" Padding="10,5"
                         Command="{Binding PlayCommand}"
                         Style="{StaticResource PrimaryButtonStyle}"/>
-				<Button Grid.Column="3" Content="Cancel"
+                <Button Grid.Column="3" Content="Cancel"
                         Margin="5,0,0,0" Padding="10,5"
                         Command="{Binding CancelCommand}"
                         Style="{StaticResource SecondaryButtonStyle}"/>
-			</Grid>
-		</Grid>
-	</Border>
+            </Grid>
+        </Grid>
+    </Border>
 </Window>

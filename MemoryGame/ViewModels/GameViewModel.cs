@@ -1,29 +1,38 @@
 ﻿using MemoryGame.Commands;
 using MemoryGame.Models;
 using MemoryGame.Services;
-using System;
+using MemoryGame.Views;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
+using System.Windows;
 using System.Windows.Input;
 
 namespace MemoryGame.ViewModels {
     public class GameViewModel : ViewModelBase {
-        private readonly NavigationService _navigationService;
+        private readonly GameService _gameService;
+        private readonly GameModel _gameModel;
+        private readonly UserManagementService _userService;
+
         private UserProfile _currentUser;
         private int _score;
         private int _attempts;
         private string _gameStatus;
         private string _gameTime;
         private ObservableCollection<CardViewModel> _cards;
-        private int _gridRows;
-        private int _gridColumns;
         private string _selectedCategory;
         private string _selectedDifficulty;
+        private int _gridRows;
+        private int _gridColumns;
+
+        private CardViewModel _firstCard = null;
 
         public UserProfile CurrentUser {
             get => _currentUser;
-            set => SetProperty(ref _currentUser, value);
+            set {
+                if (SetProperty(ref _currentUser, value)) {
+                    _gameModel.CurrentUser = value;
+                }
+            }
         }
 
         public int Score {
@@ -51,6 +60,30 @@ namespace MemoryGame.ViewModels {
             set => SetProperty(ref _cards, value);
         }
 
+        public string SelectedCategory {
+            get => _selectedCategory;
+            set {
+                if (SetProperty(ref _selectedCategory, value)) {
+                    _gameModel.SelectedCategory = value;
+                }
+            }
+        }
+
+        public string SelectedDifficulty {
+            get => _selectedDifficulty;
+            set {
+                if (SetProperty(ref _selectedDifficulty, value)) {
+                    _gameModel.SelectedDifficulty = value;
+                    if (value == "Custom") {
+                        ShowCustomSettingDialog();
+                    }
+                    else if (!string.IsNullOrEmpty(value)) {
+                        StartNewGame();
+                    }
+                }
+            }
+        }
+
         public int GridRows {
             get => _gridRows;
             set => SetProperty(ref _gridRows, value);
@@ -61,183 +94,290 @@ namespace MemoryGame.ViewModels {
             set => SetProperty(ref _gridColumns, value);
         }
 
-        public string SelectedCategory {
-            get => _selectedCategory;
-            set => SetProperty(ref _selectedCategory, value);
-        }
-
-        public string SelectedDifficulty {
-            get => _selectedDifficulty;
-            set => SetProperty(ref _selectedDifficulty, value);
-        }
-
         public ObservableCollection<string> GameCategories { get; }
         public ObservableCollection<string> DifficultyLevels { get; }
+        public ObservableCollection<string> AvailableUsers { get; }
 
         public ICommand NewGameCommand { get; }
         public ICommand SaveGameCommand { get; }
         public ICommand LoadGameCommand { get; }
         public ICommand ReturnToMenuCommand { get; }
         public ICommand FlipCardCommand { get; }
+        public ICommand SelectUserCommand { get; }
+        public ICommand CreateUserCommand { get; }
 
         public GameViewModel(NavigationService navigationService) {
-            _navigationService = navigationService;
+            _gameService = new GameService(navigationService);
+            _gameModel = new GameModel();
+            _userService = new UserManagementService();
 
-            // Initialize collections
             Cards = new ObservableCollection<CardViewModel>();
-            GameCategories = new ObservableCollection<string>
-            {
-                "Animals",
-                "Sports",
-                "Food",
-                "Countries",
-                "Technology"
-            };
-            DifficultyLevels = new ObservableCollection<string>
-            {
-                "Easy",
-                "Medium",
-                "Hard"
-            };
+            GameCategories = new ObservableCollection<string>(_gameModel.GameCategories);
+            AvailableUsers = _userService.GetAllUsernames();
 
-            // Set default values
-            SelectedCategory = GameCategories.First();
-            SelectedDifficulty = DifficultyLevels.First();
-            GameStatus = "Welcome to Memory Game";
-            GameTime = "00:00";
-            Score = 0;
-            Attempts = 0;
-            GridRows = 4;
-            GridColumns = 4;
+            // Initialize difficulty levels with any saved custom settings
+            DifficultyLevels = new ObservableCollection<string>();
 
-            // Initialize commands
+            // Add standard difficulties
+            DifficultyLevels.Add("Standard (4x4)");
+
+            // Load any saved custom settings
+            LoadCustomSettings();
+
+            // Add the "Custom" option at the end
+            DifficultyLevels.Add("Custom");
+
+            Score = _gameModel.Score;
+            Attempts = _gameModel.Attempts;
+            GameStatus = _gameModel.GameStatus;
+            GameTime = _gameModel.GameTime;
+            SelectedCategory = _gameModel.SelectedCategory;
+            SelectedDifficulty = _gameModel.SelectedDifficulty;
+            GridRows = _gameModel.GridRows;
+            GridColumns = _gameModel.GridColumns;
+
             NewGameCommand = new RelayCommand(p => StartNewGame());
-            SaveGameCommand = new RelayCommand(p => SaveGame());
-            LoadGameCommand = new RelayCommand(p => LoadGame());
-            ReturnToMenuCommand = new RelayCommand(p => _navigationService.NavigateTo(_navigationService.MainViewModel.HomeViewModel));
+            SaveGameCommand = new RelayCommand(p => SaveGame(), p => CurrentUser != null);
+            LoadGameCommand = new RelayCommand(p => LoadGame(), p => CurrentUser != null);
+            ReturnToMenuCommand = new RelayCommand(p => _gameService.NavigateToHome());
             FlipCardCommand = new RelayCommand(p => FlipCard(p as CardViewModel));
+            SelectUserCommand = new RelayCommand(p => SelectUser(p as string));
+            CreateUserCommand = new RelayCommand(p => CreateUser(p as string));
 
-            // Load test cards
-            LoadTestCards();
-        }
-
-        private void StartNewGame() {
-            // Reset game state
-            Score = 0;
-            Attempts = 0;
-            GameTime = "00:00";
-            GameStatus = $"New game started - {SelectedCategory} ({SelectedDifficulty})";
-
-            // Adjust grid size based on difficulty
-            switch (SelectedDifficulty) {
-                case "Easy":
-                    GridRows = 4;
-                    GridColumns = 4;
-                    break;
-                case "Medium":
-                    GridRows = 5;
-                    GridColumns = 4;
-                    break;
-                case "Hard":
-                    GridRows = 6;
-                    GridColumns = 5;
-                    break;
+            // Check if there's a last logged in user
+            if (AvailableUsers.Count > 0) {
+                SelectUser(AvailableUsers[0]);
             }
 
-            // Load appropriate cards for the selected category and difficulty
-            LoadCardsForCategory();
+            StartNewGame();
+        }
+
+        private void LoadCustomSettings() {
+            var customSettings = _gameService.LoadCustomSettings();
+
+            foreach (var setting in customSettings) {
+                if (setting.StartsWith("Custom (")) {
+                    DifficultyLevels.Add(setting);
+                }
+            }
+        }
+
+        private void ShowCustomSettingDialog() {
+            GameSizeView gameSizeView = new GameSizeView();
+            if (gameSizeView.ShowDialog() == true) {
+                _gameModel.GridRows = gameSizeView.Rows;
+                _gameModel.GridColumns = gameSizeView.Columns;
+
+                GridRows = _gameModel.GridRows;
+                GridColumns = _gameModel.GridColumns;
+
+                string customOption = $"Custom ({_gameModel.GridRows}x{_gameModel.GridColumns})";
+
+                bool customSizeExists = false;
+                foreach (var difficulty in DifficultyLevels) {
+                    if (difficulty == customOption) {
+                        customSizeExists = true;
+                        break;
+                    }
+                }
+
+                if (!customSizeExists) {
+                    int customIndex = DifficultyLevels.IndexOf("Custom");
+                    if (customIndex >= 0) {
+                        DifficultyLevels.Insert(customIndex, customOption);
+                    }
+                    else {
+                        DifficultyLevels.Add(customOption);
+                    }
+                }
+
+                _selectedDifficulty = null;
+                SelectedDifficulty = customOption;
+            }
+            else {
+                _selectedDifficulty = null;
+                SelectedDifficulty = "Standard (4x4)";
+            }
+        }
+
+        public void StartNewGame() {
+            // Use game service to handle game initialization logic
+            _gameService.StartNewGame(_gameModel);
+
+            // Update view properties from model
+            Score = _gameModel.Score;
+            Attempts = _gameModel.Attempts;
+            GameTime = _gameModel.GameTime;
+            GameStatus = _gameModel.GameStatus;
+            GridRows = _gameModel.GridRows;
+            GridColumns = _gameModel.GridColumns;
+
+            // Reset card selection
+            _firstCard = null;
+
+            // Update UI cards from model
+            UpdateCardsFromModel();
         }
 
         private void SaveGame() {
-            GameStatus = "Game saved successfully";
+            if (CurrentUser == null) {
+                MessageBox.Show("Please select a user before saving the game.", "User Required",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            // Save both the game state and custom settings
+            _gameService.SaveGame(_gameModel);
+            SaveCustomSettings();
+            GameStatus = $"Game saved successfully for {CurrentUser.Username}";
+        }
+
+        private void SaveCustomSettings() {
+            var customSettings = new List<string>();
+
+            foreach (var difficulty in DifficultyLevels) {
+                if (difficulty.StartsWith("Custom (") && difficulty != "Custom") {
+                    customSettings.Add(difficulty);
+                }
+            }
+
+            _gameService.SaveCustomSettings(customSettings);
         }
 
         private void LoadGame() {
-            GameStatus = "Game loaded successfully";
+            if (CurrentUser == null) {
+                MessageBox.Show("Please select a user before loading a game.", "User Required",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            if (_gameService.LoadGame(_gameModel)) {
+                // Update view properties from model
+                Score = _gameModel.Score;
+                Attempts = _gameModel.Attempts;
+                GameTime = _gameModel.GameTime;
+                GameStatus = $"Game loaded successfully for {CurrentUser.Username}";
+
+                GridRows = _gameModel.GridRows;
+                GridColumns = _gameModel.GridColumns;
+                SelectedCategory = _gameModel.SelectedCategory;
+                SelectedDifficulty = _gameModel.SelectedDifficulty;
+
+                UpdateCardsFromModel();
+                _firstCard = null;
+            }
+            else {
+                GameStatus = $"No saved game found for {CurrentUser.Username}";
+            }
         }
 
-        private void FlipCard(CardViewModel card) {
-            if (card == null || card.IsFlipped || card.IsMatched) return;
+        private async void FlipCard(CardViewModel cardViewModel) {
+            if (cardViewModel == null || cardViewModel.IsFlipped || cardViewModel.IsMatched) {
+                return;
+            }
 
-            // Flip the card
-            card.IsFlipped = true;
+            // Find the corresponding model card
+            Card modelCard = null;
 
-            // Check if we have two flipped cards
-            var flippedCards = Cards.Where(c => c.IsFlipped && !c.IsMatched).ToList();
-            if (flippedCards.Count == 2) {
-                Attempts++;
+            foreach (var card in _gameModel.Cards) {
+                if (card.CardId == cardViewModel.CardId &&
+                    card.ImagePath == cardViewModel.ImagePath &&
+                    !card.IsFlipped && !card.IsMatched) {
+                    modelCard = card;
+                    break;
+                }
+            }
 
-                // Check if they match
-                if (flippedCards[0].CardId == flippedCards[1].CardId) {
-                    // Cards match
-                    flippedCards[0].IsMatched = true;
-                    flippedCards[1].IsMatched = true;
-                    Score += 10;
-                    GameStatus = "Match found! +10 points";
+            if (modelCard == null) return;
 
-                    // Check if game is complete
-                    if (Cards.All(c => c.IsMatched)) {
-                        GameStatus = "Congratulations! Game complete!";
+            // Flip the card in the ViewModel to update UI
+            cardViewModel.IsFlipped = true;
+
+            if (_firstCard == null) {
+                // First card flipped - let service handle the logic
+                await _gameService.ProcessCardFlip(_gameModel, modelCard);
+                _firstCard = cardViewModel;
+            }
+            else {
+                // Find the model card for the first flipped card
+                Card firstModelCard = null;
+                foreach (var card in _gameModel.Cards) {
+                    if (card.CardId == _firstCard.CardId && card.IsFlipped && !card.IsMatched) {
+                        firstModelCard = card;
+                        break;
                     }
                 }
-                else {
-                    // Cards don't match - flip them back after a delay
-                    GameStatus = "No match, try again";
 
-                    // Simulate delay using a timer (in a real app)
-                    // For now, just flip them back immediately
-                    foreach (var c in flippedCards) {
-                        c.IsFlipped = false;
+                if (firstModelCard != null) {
+                    // Process the second card flip with the service
+                    var result = await _gameService.ProcessCardFlip(_gameModel, modelCard, firstModelCard);
+
+                    // Update UI based on result
+                    if (result.IsMatch) {
+                        // Match found - update UI
+                        _firstCard.IsMatched = true;
+                        cardViewModel.IsMatched = true;
                     }
+                    else {
+                        // No match - update UI after delay (handled by service)
+                        _firstCard.IsFlipped = false;
+                        cardViewModel.IsFlipped = false;
+                    }
+
+                    // Update game state in UI
+                    Score = _gameModel.Score;
+                    Attempts = _gameModel.Attempts;
+                    GameStatus = _gameModel.GameStatus;
+
+                    // Reset first card
+                    _firstCard = null;
                 }
             }
         }
 
-        private void LoadTestCards() {
+        private void UpdateCardsFromModel() {
             Cards.Clear();
-            int pairs = (GridRows * GridColumns) / 2;
+            var viewModels = _gameService.CreateCardViewModelsFromModel(_gameModel.Cards);
+            foreach (var card in viewModels) {
+                Cards.Add(card);
+            }
+        }
 
-            for (int i = 0; i < pairs; i++) {
-                var cardId = i + 1;
-
-                // Add two cards with the same ID (a pair)
-                Cards.Add(new CardViewModel {
-                    CardId = cardId,
-                    ImagePath = $"/Assets/Cards/{SelectedCategory.ToLower()}/{cardId}.png"
-                });
-
-                Cards.Add(new CardViewModel {
-                    CardId = cardId,
-                    ImagePath = $"/Assets/Cards/{SelectedCategory.ToLower()}/{cardId}.png"
-                });
+        private void SelectUser(string username) {
+            if (string.IsNullOrEmpty(username)) {
+                return;
             }
 
-            // Shuffle the cards
-            ShuffleCards();
+            // Set current user
+            UserProfile userProfile = _userService.SelectUser(username);
+            if (userProfile != null) {
+                CurrentUser = userProfile;
+                GameStatus = $"User {username} selected. Welcome back!";
+            }
         }
 
-        private void LoadCardsForCategory() {
-            // This would load cards for the selected category and difficulty
-            // For now, just use the test cards
-            LoadTestCards();
-        }
+        private void CreateUser(string username) {
+            if (string.IsNullOrEmpty(username)) {
+                MessageBox.Show("Please enter a username", "Username Required",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
-        private void ShuffleCards() {
-            // Fisher-Yates shuffle algorithm
-            Random rng = new Random();
-            int n = Cards.Count;
+            // Create new user
+            UserProfile newUser = _userService.CreateUser(username);
+            if (newUser != null) {
+                CurrentUser = newUser;
 
-            while (n > 1) {
-                n--;
-                int k = rng.Next(n + 1);
-                CardViewModel value = Cards[k];
-                Cards[k] = Cards[n];
-                Cards[n] = value;
+                // Add to the list if not already there
+                if (!AvailableUsers.Contains(username)) {
+                    AvailableUsers.Add(username);
+                }
+
+                GameStatus = $"New user {username} created successfully!";
             }
         }
     }
 
-    // Card view model
     public class CardViewModel : ViewModelBase {
         private int _cardId;
         private string _imagePath;

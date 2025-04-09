@@ -58,7 +58,7 @@
                     </ComboBox>
 
                     <!-- Difficulty Selection -->
-                    <TextBlock Text="Difficulty:" Margin="0,0,0,5" 
+                    <TextBlock Text="Board size:" Margin="0,0,0,5" 
                                Foreground="{StaticResource TextSecondary}"/>
                     <ComboBox Style="{StaticResource CustomComboBoxStyle}" 
                               ItemsSource="{Binding DifficultyLevels}" 

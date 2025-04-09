@@ -9,6 +9,25 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121325.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121331.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121335.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121342.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121347.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121352.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121357.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121401.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121406.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 121410.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124612.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124618.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124624.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124631.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124638.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124643.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124647.png" />
+    <None Remove="Resources\cards\math\Screenshot 2025-04-09 124651.png" />
+    <None Remove="Resources\users\0.png" />
     <None Remove="Resources\users\1.png" />
     <None Remove="Resources\users\2.png" />
     <None Remove="Resources\users\3.png" />
@@ -19,6 +38,63 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121325.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121331.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121335.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121342.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121347.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121352.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121357.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121401.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121406.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 121410.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124612.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124618.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124624.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124631.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124638.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124643.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124647.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\cards\math\Screenshot 2025-04-09 124651.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\users\0.png">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\users\1.png">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

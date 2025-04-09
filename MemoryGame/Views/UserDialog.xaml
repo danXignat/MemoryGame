@@ -6,29 +6,35 @@
         ResizeMode="NoResize"
         Background="{StaticResource PrimaryBackground}"
         ShowInTaskbar="False">
-	<Grid Margin="15">
-		<Grid.RowDefinitions>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
-			<RowDefinition Height="Auto"/>
-		</Grid.RowDefinitions>
+    <Grid Margin="15">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto" MinHeight="42.96"/>
+            <RowDefinition Height="Auto" MinHeight="17.96"/>
+        </Grid.RowDefinitions>
 
-		<TextBlock Grid.Row="0" Text="Enter username:" Margin="0,0,0,5"
+        <TextBlock Grid.Row="0" Text="Enter username:" Margin="0,0,0,5"
                    Foreground="{StaticResource TextPrimary}"/>
 
-		<TextBox Grid.Row="1" x:Name="txtUsername" Margin="0,0,0,15" Padding="8,5"
+        <TextBox Grid.Row="1" x:Name="txtUsername" Margin="0,0,0,15" Padding="8,5"
                  Background="{StaticResource SecondaryBackground}"
                  Foreground="{StaticResource TextPrimary}"
                  BorderBrush="{StaticResource AccentColor}"
                  CaretBrush="{StaticResource AccentColor}"/>
 
-		<StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
-			<Button x:Name="btnOK" Content="OK" Width="80" Margin="0,0,10,0"
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Left" Margin="100,0,0,0" Width="170">
+            <Button x:Name="btnOK" Content="OK" Width="80" Margin="0,0,10,0"
                     Click="btnOK_Click" IsDefault="True"
                     Style="{StaticResource PrimaryButtonStyle}"/>
-			<Button x:Name="btnCancel" Content="Cancel" Width="80"
+            <Button x:Name="btnCancel" Content="Cancel" Width="80"
                     Click="btnCancel_Click" IsCancel="True"
                     Style="{StaticResource SecondaryButtonStyle}"/>
-		</StackPanel>
-	</Grid>
+            <Button x:Name="btnCancel_Copy" Content="Cancel" Width="80"
+                Click="btnCancel_Click" IsCancel="True"
+                Style="{StaticResource SecondaryButtonStyle}"/>
+            <Button x:Name="btnCancel_Copy1" Content="Cancel" Width="80"
+                Click="btnCancel_Click" IsCancel="True"
+                Style="{StaticResource SecondaryButtonStyle}"/>
+        </StackPanel>
+    </Grid>
 </Window>

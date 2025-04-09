@@ -21,7 +21,6 @@ namespace MemoryGame.ViewModels {
             get => _currentUser;
             set {
                 if (SetProperty(ref _currentUser, value)) {
-                    // Update the user in all ViewModels that need it
                     if (GameViewModel != null) {
                         GameViewModel.CurrentUser = value;
                     }
