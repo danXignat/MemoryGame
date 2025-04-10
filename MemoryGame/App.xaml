@@ -249,6 +249,30 @@
             </Setter>
         </Style>
 
+        <Style x:Key="CustomTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="#2d2d2d"/>
+            <Setter Property="Foreground" Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentColor}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="5"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border Background="{TemplateBinding Background}"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        CornerRadius="3">
+                            <ScrollViewer x:Name="PART_ContentHost" 
+                                  Focusable="False" 
+                                  HorizontalScrollBarVisibility="Hidden" 
+                                  VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <!-- Switch Style Template -->
         <ControlTemplate x:Key="ToggleSwitchTemplate" TargetType="CheckBox">
             <Border x:Name="checkBoxBorder" BorderBrush="{StaticResource AccentColor}" BorderThickness="2" 

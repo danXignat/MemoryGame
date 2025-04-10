@@ -11,5 +11,9 @@ namespace MemoryGame.Views
         public ScoresView() {
             InitializeComponent();
         }
+
+        private void ListView_SelectionChanged(object sender, SelectionChangedEventArgs e) {
+
+        }
     }
 }

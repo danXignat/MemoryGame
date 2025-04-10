@@ -44,7 +44,9 @@ namespace MemoryGame.Services {
                     SelectedDifficulty = gameModel.SelectedDifficulty,
                     GridRows = gameModel.GridRows,
                     GridColumns = gameModel.GridColumns,
-                    Cards = gameModel.Cards
+                    Cards = gameModel.Cards,
+                    MaxGameTime = gameModel.MaxGameTime,
+                    RemainingGameTime = gameModel.RemainingGameTime
                 };
 
                 string username = SanitizeUsername(gameModel.CurrentUser.Username);
@@ -123,6 +125,8 @@ namespace MemoryGame.Services {
                     gameModel.SelectedDifficulty = gameState.SelectedDifficulty;
                     gameModel.GridRows = gameState.GridRows;
                     gameModel.GridColumns = gameState.GridColumns;
+                    gameModel.MaxGameTime = gameState.MaxGameTime;
+                    gameModel.RemainingGameTime = gameState.RemainingGameTime;
 
                     gameModel.Cards.Clear();
                     if (gameState.Cards != null) {
@@ -262,6 +266,8 @@ namespace MemoryGame.Services {
         public int GridRows { get; set; }
         public int GridColumns { get; set; }
         public List<Card> Cards { get; set; }
+        public int MaxGameTime { get; set; }
+        public int RemainingGameTime { get; set; }
     }
 
     public class CustomSettings {

@@ -12,6 +12,8 @@ namespace MemoryGame.ViewModels {
         private readonly GameService _gameService;
         private readonly GameModel _gameModel;
         private readonly UserManagementService _userService;
+        private readonly TimerService _timerService;
+        private readonly ScoreService _scoreService;
 
         private UserProfile _currentUser;
         private int _score;
@@ -23,6 +25,7 @@ namespace MemoryGame.ViewModels {
         private string _selectedDifficulty;
         private int _gridRows;
         private int _gridColumns;
+        private int _maxGameTime;
 
         private CardViewModel _firstCard = null;
 
@@ -94,6 +97,16 @@ namespace MemoryGame.ViewModels {
             set => SetProperty(ref _gridColumns, value);
         }
 
+        public int MaxGameTime {
+            get => _maxGameTime;
+            set {
+                if (SetProperty(ref _maxGameTime, value)) {
+                    _gameModel.MaxGameTime = value;
+                    _timerService.MaxTimeSeconds = value;
+                }
+            }
+        }
+
         public ObservableCollection<string> GameCategories { get; }
         public ObservableCollection<string> DifficultyLevels { get; }
         public ObservableCollection<string> AvailableUsers { get; }
@@ -110,6 +123,12 @@ namespace MemoryGame.ViewModels {
             _gameService = new GameService(navigationService);
             _gameModel = new GameModel();
             _userService = new UserManagementService();
+            _timerService = new TimerService();
+            _scoreService = new ScoreService();
+
+            // Set up timer
+            _timerService.TimerTick += TimerService_TimerTick;
+            _timerService.TimerExpired += TimerService_TimerExpired;
 
             Cards = new ObservableCollection<CardViewModel>();
             GameCategories = new ObservableCollection<string>(_gameModel.GameCategories);
@@ -135,6 +154,7 @@ namespace MemoryGame.ViewModels {
             SelectedDifficulty = _gameModel.SelectedDifficulty;
             GridRows = _gameModel.GridRows;
             GridColumns = _gameModel.GridColumns;
+            MaxGameTime = _gameModel.MaxGameTime;
 
             NewGameCommand = new RelayCommand(p => StartNewGame());
             SaveGameCommand = new RelayCommand(p => SaveGame(), p => CurrentUser != null);
@@ -149,6 +169,16 @@ namespace MemoryGame.ViewModels {
                 SelectUser(AvailableUsers[0]);
             }
 
+            StartNewGame();
+        }
+
+        private void TimerService_TimerTick(object sender, TimerEventArgs e) {
+            GameTime = e.FormattedTime;
+            _gameModel.RemainingGameTime = e.RemainingSeconds;
+        }
+
+        private void TimerService_TimerExpired(object sender, System.EventArgs e) {
+            GameStatus = "Time's up! Game over.";
             StartNewGame();
         }
 
@@ -215,8 +245,18 @@ namespace MemoryGame.ViewModels {
             // Reset card selection
             _firstCard = null;
 
+            // Reset and start timer
+            _timerService.Stop();
+            _timerService.Reset();
+            _timerService.Start();
+
             // Update UI cards from model
             UpdateCardsFromModel();
+
+            // Record that a game has been started for the current user
+            if (CurrentUser != null) {
+                _scoreService.RecordGameStarted(CurrentUser.Username, _selectedDifficulty);
+            }
         }
 
         private void SaveGame() {
@@ -225,6 +265,9 @@ namespace MemoryGame.ViewModels {
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
+
+            // Save current timer state
+            _gameModel.RemainingGameTime = _timerService.RemainingSeconds;
 
             // Save both the game state and custom settings
             _gameService.SaveGame(_gameModel);
@@ -262,6 +305,13 @@ namespace MemoryGame.ViewModels {
                 GridColumns = _gameModel.GridColumns;
                 SelectedCategory = _gameModel.SelectedCategory;
                 SelectedDifficulty = _gameModel.SelectedDifficulty;
+                MaxGameTime = _gameModel.MaxGameTime;
+
+                // Restore timer state
+                _timerService.Stop();
+                _timerService.MaxTimeSeconds = _gameModel.MaxGameTime;
+                _timerService.SetRemainingTime(_gameModel.RemainingGameTime);
+                _timerService.Start();
 
                 UpdateCardsFromModel();
                 _firstCard = null;
@@ -328,6 +378,17 @@ namespace MemoryGame.ViewModels {
                     Score = _gameModel.Score;
                     Attempts = _gameModel.Attempts;
                     GameStatus = _gameModel.GameStatus;
+
+                    // Check if game is complete
+                    if (_gameService.IsGameComplete(_gameModel.Cards)) {
+                        _timerService.Stop();
+                        GameStatus = "Congratulations! Game complete!";
+
+                        // Record game completion for the current user
+                        if (CurrentUser != null) {
+                            _scoreService.RecordGameCompleted(CurrentUser.Username, Score);
+                        }
+                    }
 
                     // Reset first card
                     _firstCard = null;

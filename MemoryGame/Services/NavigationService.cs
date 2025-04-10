@@ -12,7 +12,6 @@ namespace MemoryGame.Services {
         }
 
         public void NavigateTo(ViewModelBase viewModel) {
-            // Update current user in view models that need it
             if (viewModel is HomeViewModel homeViewModel) {
                 homeViewModel.CurrentUser = _mainViewModel.CurrentUser;
                 homeViewModel.Initialize();
@@ -25,7 +24,6 @@ namespace MemoryGame.Services {
             _mainViewModel.CurrentViewModel = viewModel;
         }
 
-        // Register actions for showing/hiding windows
         public void RegisterWindowActions(Action<bool> showMainWindowAction, Action showLoginWindowAction) {
             _showMainWindowAction = showMainWindowAction;
             _showLoginWindowAction = showLoginWindowAction;

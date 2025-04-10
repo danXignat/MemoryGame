@@ -8,7 +8,6 @@ using System.Text.Json;
 using System.Windows;
 
 namespace MemoryGame.Services {
-    // Move the ScoreRecord to a separate file or another namespace to avoid conflicts
     public class UserManagementService {
         private readonly DataService _dataService;
         private UserProfile _currentUser;
@@ -296,12 +295,5 @@ namespace MemoryGame.Services {
             }
             return username;
         }
-    }
-    public class ScoreRecord {
-        public string Username { get; set; }
-        public DateTime Date { get; set; }
-        public string Difficulty { get; set; }
-        public int Score { get; set; }
-        public TimeSpan Time { get; set; }
     }
 }

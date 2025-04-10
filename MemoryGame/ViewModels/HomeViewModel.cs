@@ -71,7 +71,7 @@ namespace MemoryGame.ViewModels {
 
             // Load the user's scores from the score service
             UserScores = new ObservableCollection<ScoreRecord>(
-                ScoreService.GetScoresForUser(CurrentUser.Username)
+                //ScoreService.GetScoresForUser(CurrentUser.Username)
             );
 
             HasNoScores = !UserScores.Any() && IsUserLoggedIn;

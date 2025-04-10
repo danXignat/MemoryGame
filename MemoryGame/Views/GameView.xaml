@@ -71,6 +71,13 @@
                         </ComboBox.ItemTemplate>
                     </ComboBox>
 
+                    <!-- Time Limit Setting -->
+                    <TextBlock Text="Time Limit:" Margin="0,0,0,5" 
+                               Foreground="{StaticResource TextSecondary}"/>
+                    <TextBox Text="{Binding MaxGameTime, UpdateSourceTrigger=PropertyChanged}"
+                             Style="{StaticResource CustomTextBoxStyle}"
+                             Margin="0,0,0,20"/>
+
                     <!-- Game Control Buttons -->
                     <Button Content="New Game" 
                             Command="{Binding NewGameCommand}"

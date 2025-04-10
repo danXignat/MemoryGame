@@ -7,12 +7,12 @@
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
     <Grid Background="{StaticResource PrimaryBackground}">
-        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="550">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="650">
             <TextBlock Text="HIGH SCORES" Style="{StaticResource TitleTextStyle}"/>
 
             <Border BorderBrush="{StaticResource AccentColor}" BorderThickness="2" CornerRadius="10">
                 <ListView Background="Transparent" BorderThickness="0" 
-                          ItemsSource="{Binding HighScores}" Height="300">
+                          ItemsSource="{Binding HighScores}" Height="300" SelectionChanged="ListView_SelectionChanged">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
                             <Setter Property="Background" Value="Transparent"/>
@@ -31,7 +31,19 @@
 
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="RANK" Width="80">
+                            <!-- Style for the column headers -->
+                            <GridView.ColumnHeaderContainerStyle>
+                                <Style TargetType="GridViewColumnHeader">
+                                    <Setter Property="Background" Value="#1e1e1e"/>
+                                    <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Padding" Value="10,5"/>
+                                    <Setter Property="BorderBrush" Value="#333333"/>
+                                    <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                                </Style>
+                            </GridView.ColumnHeaderContainerStyle>
+
+                            <GridViewColumn Header="RANK" Width="60">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Rank}" Foreground="{StaticResource TextPrimary}" 
@@ -40,7 +52,7 @@
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
 
-                            <GridViewColumn Header="PLAYER" Width="220">
+                            <GridViewColumn Header="PLAYER" Width="150">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding PlayerName}" Foreground="{StaticResource TextPrimary}"/>
@@ -48,7 +60,7 @@
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
 
-                            <GridViewColumn Header="SCORE" Width="100">
+                            <GridViewColumn Header="SCORE" Width="150">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
                                         <TextBlock Text="{Binding Score}" Foreground="{StaticResource AccentColor}" 
@@ -57,10 +69,19 @@
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
 
-                            <GridViewColumn Header="DATE" Width="120">
+                            <GridViewColumn Header="PLAYED" Width="150">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate>
-                                        <TextBlock Text="{Binding Date}" Foreground="{StaticResource TextSecondary}" 
+                                        <TextBlock Text="{Binding GamesPlayed}" Foreground="{StaticResource TextPrimary}" 
+                                                   HorizontalAlignment="Center"/>
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+
+                            <GridViewColumn Header="COMPLETED" Width="150">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding GamesCompleted}" Foreground="{StaticResource TextPrimary}" 
                                                    HorizontalAlignment="Center"/>
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
@@ -70,8 +91,15 @@
                 </ListView>
             </Border>
 
-            <Button Content="Reset Scores" Width="150" Height="35" Margin="0,20,0,0"
-                    Style="{StaticResource SecondaryButtonStyle}" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,20,0,0">
+                <Button Content="Reset Scores" Width="150" Height="35" Margin="0,0,10,0"
+                        Command="{Binding ResetScoresCommand}"
+                        Style="{StaticResource SecondaryButtonStyle}"/>
+
+                <Button Content="Back to Menu" Width="150" Height="35" Margin="10,0,0,0"
+                        Command="{Binding BackToMenuCommand}"
+                        Style="{StaticResource PrimaryButtonStyle}"/>
+            </StackPanel>
         </StackPanel>
     </Grid>
 </UserControl>

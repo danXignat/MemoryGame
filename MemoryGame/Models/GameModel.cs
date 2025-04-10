@@ -16,6 +16,8 @@ namespace MemoryGame.Models {
         private int _gridColumns;
         private string _selectedCategory;
         private string _selectedDifficulty;
+        private int _maxGameTime;
+        private int _remainingGameTime;
 
         public event PropertyChangedEventHandler PropertyChanged;
 
@@ -69,6 +71,16 @@ namespace MemoryGame.Models {
             set => SetProperty(ref _selectedDifficulty, value);
         }
 
+        public int MaxGameTime {
+            get => _maxGameTime;
+            set => SetProperty(ref _maxGameTime, value);
+        }
+
+        public int RemainingGameTime {
+            get => _remainingGameTime;
+            set => SetProperty(ref _remainingGameTime, value);
+        }
+
         public ObservableCollection<string> GameCategories { get; set; }
         public ObservableCollection<string> DifficultyLevels { get; set; }
 
@@ -77,7 +89,8 @@ namespace MemoryGame.Models {
             _cards = new List<Card>();
             GameCategories = new ObservableCollection<string> {
                 "Math",
-                "Bible"
+                "Bible",
+                "Calisthenics"
             };
             DifficultyLevels = new ObservableCollection<string> {
                 "Standard (4x4)",
@@ -92,6 +105,8 @@ namespace MemoryGame.Models {
             _attempts = 0;
             _gridRows = 4;
             _gridColumns = 4;
+            _maxGameTime = 30; // Default: 30 seconds
+            _remainingGameTime = _maxGameTime;
         }
 
         // Helper method for property change notification

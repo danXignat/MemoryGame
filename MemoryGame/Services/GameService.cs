@@ -72,7 +72,7 @@ namespace MemoryGame.Services {
                         AppDomain.CurrentDomain.BaseDirectory,
                         "Resources",
                         "cards",
-                        "math");
+                        gameModel.SelectedCategory);
                 }
 
                 if (!Directory.Exists(folderPath)) {
