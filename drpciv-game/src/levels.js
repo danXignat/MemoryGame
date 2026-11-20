@@ -28,14 +28,17 @@ function track(start, headingDeg, steps) {
   const stations = [];
   const geo = {};
   let n = 0;
-  const arm = (dir, len) => {
+  let lastSeg = null;
+  // leg: { seg, turn, K } tells the traffic code where this street meets the route
+  const arm = (dir, len, leg = null) => {
     const ang = dir === 'ahead' ? h : dir === 'back' ? h + Math.PI : dir === 'right' ? h + Math.PI / 2 : h - Math.PI / 2;
-    extraRoads.push({ id: `arm${n++}`, points: [[x, y], [x + Math.cos(ang) * len, y + Math.sin(ang) * len]], lane: true });
+    extraRoads.push({ id: `arm${n++}`, points: [[x, y], [x + Math.cos(ang) * len, y + Math.sin(ang) * len]], lane: true, leg });
   };
   const line = (id, len) => {
     const x1 = x + Math.cos(h) * len;
     const y1 = y + Math.sin(h) * len;
     segments.push({ id, type: 'line', to: [x1, y1] });
+    lastSeg = id;
     geo[id] = { x0: x, y0: y, h0: h, x1, y1, h1: h };
     x = x1;
     y = y1;
@@ -49,6 +52,7 @@ function track(start, headingDeg, steps) {
     const ex = cx + r * Math.cos(a1);
     const ey = cy + r * Math.sin(a1);
     segments.push({ id, type: 'arc', center: [cx, cy], radius: r, from: a0 / RAD, to: a1 / RAD });
+    lastSeg = id;
     geo[id] = { x0: x, y0: y, h0: h, x1: ex, y1: ey, h1: h + sgn * deg * RAD };
     x = ex;
     y = ey;
@@ -59,10 +63,11 @@ function track(start, headingDeg, steps) {
     else if (st[0] === 'turn') turn(st[1], st[2], st[3], st[4]);
     else if (st[0] === 'junction') {
       const [, id, dir, r, a] = st;
-      arm('ahead', r + a);
+      const K = [x + Math.cos(h) * r, y + Math.sin(h) * r];
+      arm('ahead', r + a, { seg: id, turn: true, K });
       turn(id, dir, 90, r);
-      arm('back', r + a);
-    } else if (st[0] === 'arm') arm(st[1], st[2]);
+      arm('back', r + a, { seg: id, turn: true, K });
+    } else if (st[0] === 'arm') arm(st[1], st[2], lastSeg ? { seg: lastSeg, turn: false, K: [x, y] } : null);
     else if (st[0] === 'roundabout') {
       // drive into a roundabout ahead and leave it after `exitDeg` degrees, counter-clockwise
       const [, id, exitDeg, R, armLen = 40] = st;

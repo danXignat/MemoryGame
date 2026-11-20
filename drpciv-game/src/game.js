@@ -99,6 +99,7 @@ export function createGame(world, opts = {}) {
     car: null,
     traffic: [],
     npcs: [],
+    walkers: [],
     peds: [],
     prog: null,
     activeSign: null,
@@ -316,6 +317,191 @@ export function createGame(world, opts = {}) {
   // ==========================================================================
   const spawned = new Set();
 
+  // ---- traffic helpers: cars in your lane, cars from side streets
+  const net = world.trafficNet;
+  let flowTimer = 2;
+  const NPC_CAP = 26;
+
+  /** Speed the car can have so it does not run into what is in front of it. */
+  /** Follow the car's own road ahead: is the player standing on it? (works in curves) */
+  const ptmp = {};
+  function playerOnPath(n, reach) {
+    const d = n.def;
+    const car = state.car;
+    const len = d.path.length;
+    for (let k = 2; k <= reach; k += 1.5) {
+      let sv = n.s + k;
+      if (d.loop) sv %= len;
+      else if (sv > len) break;
+      const q = d.path.at(sv, ptmp);
+      const x = q.x - q.dy * d.lane;
+      const y = q.y + q.dx * d.lane;
+      if (Math.hypot(car.x - x, car.y - y) < 2.3) {
+        const along = car.v * (Math.cos(car.heading) * q.dx + Math.sin(car.heading) * q.dy) * (car.v >= 0 ? 1 : 1);
+        return Math.max(0, (k - 6.5) * 0.7 + Math.max(0, along) * 0.6);
+      }
+    }
+    return Infinity;
+  }
+
+  let uidCounter = 0;
+  const uidOf = (n) => n.uid || (n.uid = ++uidCounter);
+  function gapAhead(n) {
+    const fx = Math.cos(n.heading);
+    const fy = Math.sin(n.heading);
+    const reach = 16 + n.v * 1.8;
+    let want = Infinity;
+    const test = (o, ov, isPlayer) => {
+      const rx = o.x - n.x;
+      const ry = o.y - n.y;
+      const ahead = rx * fx + ry * fy;
+      if (ahead <= 0 || ahead > reach) return;
+      const side = Math.abs(-rx * fy + ry * fx);
+      const across = Math.abs(Math.sin(o.heading - n.heading)) * 2.2; // a car crossing in front is long sideways
+      if (side > (isPlayer ? 2.2 : 2.0) + across) return;
+      if (!isPlayer && Math.cos(o.heading - n.heading) < -0.2) return; // coming the other way
+      if (!isPlayer && -rx * Math.cos(o.heading) - ry * Math.sin(o.heading) > 0) {
+        // we are each "in front" of the other (merging side by side): the older car goes first
+        if (uidOf(n) < uidOf(o)) return;
+      }
+      // stay well back from you when you cross in front or come head-on (turning, overtaking)
+      const keep = isPlayer ? 7 + 6 * Math.min(1, Math.abs(Math.sin(o.heading - n.heading)) + Math.max(0, -Math.cos(o.heading - n.heading))) : 7;
+      want = Math.min(want, Math.max(0, (ahead - keep) * 0.7 + Math.max(0, isPlayer ? ov * Math.cos(o.heading - n.heading) : ov) * 0.6));
+    };
+    // waiting for you while you also wait (a stand-off in a corner): after a while go if you are not right in the way
+    const rxp = state.car.x - n.x;
+    const ryp = state.car.y - n.y;
+    const sideP = Math.abs(-rxp * fy + ryp * fx);
+    if (n.passT > 0 && sideP > 1.4) n.passT -= C.fixedStep; // you are not right in the way: carry on
+    else {
+      n.passT = 0;
+      const before = want;
+      want = Math.min(want, playerOnPath(n, reach));
+      if (want < before && n.v < 0.2 && Math.abs(state.car.v) < 0.3) {
+        n.standoff = (n.standoff || 0) + C.fixedStep;
+        if (n.standoff > 3 && sideP > 1.4) {
+          n.passT = 4;
+          n.standoff = 0;
+          want = before;
+        }
+      } else n.standoff = 0;
+    }
+    for (const o of state.npcs) if (o !== n && o.init) test(o, o.v, false);
+    for (const o of state.traffic) test(o, o.v, false);
+    for (const o of state.obstacles) test(o, 0, false);
+    return want;
+  }
+
+  /** A car in your lane obeys STOP, give way, roundabouts, curves and pedestrians. */
+  function flowRules(n, dt) {
+    let want = Infinity;
+    for (const [a, b, k] of net.flowSlow) if (n.s > a - 14 && n.s < b) want = Math.min(want, k / 3.6);
+    for (const line of net.flowStops) {
+      const dist = line - n.s;
+      if (dist < -0.5 || dist > 32 || n.done.has(line)) continue;
+      want = Math.min(want, Math.sqrt(2 * 2.5 * Math.max(0, dist - 0.3)));
+      if (dist < 1.5 && n.v < 0.3) {
+        n.hold = (n.hold || 0) + dt;
+        if (n.hold > 1.5) {
+          n.done.add(line);
+          n.hold = 0;
+        }
+      }
+    }
+    for (const p of state.peds) {
+      const dist = p.s - n.s;
+      if ((p.phase === 'wait' || p.phase === 'cross') && dist > 0 && dist < 18) want = Math.min(want, Math.sqrt(2 * 3 * Math.max(0, dist - 5)));
+    }
+    return want;
+  }
+
+  /** Why a car from a side street may not go yet: 'you', 'traffic' or null (free). */
+  function legBlocked(leg, n) {
+    const car = state.car;
+    const pr = state.prog;
+    const dK = Math.hypot(car.x - leg.K[0], car.y - leg.K[1]);
+    if (dK < world.half + 6 && (!leg.minor || Math.abs(car.v) > 0.5)) return 'you';
+    if (!leg.minor && pr.onRoute && pr.s > leg.sE - 45 && pr.s < leg.sX + 4 && Math.abs(car.v) > 0.8) return 'you';
+    for (const o of [...state.npcs, ...state.traffic]) {
+      if (o === n || !o.init) continue;
+      if (o.def && o.def.feeder && !o.cleared) continue; // also waiting at a side street
+      const rx = leg.K[0] - o.x;
+      const ry = leg.K[1] - o.y;
+      const d = Math.hypot(rx, ry);
+      const towards = rx * Math.cos(o.heading) + ry * Math.sin(o.heading) > 0;
+      if (d < world.half + 7 || (towards && d < 26 && o.v > 0.5)) return 'traffic';
+    }
+    return null;
+  }
+
+  /** Cars that count for "give way" checks: not the ones in your own lane, not ones still waiting in a side street. */
+  function mustYieldTo(n) {
+    const d = n.def;
+    if (d.flow || d.exit) return false;
+    if (d.feeder && !n.cleared) return false;
+    return true;
+  }
+
+  /** The junction just after a STOP / give-way line: where crossing cars would meet you. */
+  function autoConflict(lineS) {
+    const q = world.route.at(Math.min(world.route.length, lineS + 9), {});
+    const turn = world.maneuvers.find((m) => m.s > lineS - 12 && m.s < lineS + 20);
+    return { x: q.x, y: q.y, r: 10, left: !!turn && turn.type === 'left' };
+  }
+  /** Is a car (that you must give way to) moving through that junction? */
+  function conflictBusy(cf, extra = 0, horizon = 0) {
+    if (!cf) return false;
+    return state.npcs.some((n) => {
+      if (!mustYieldTo(n) || n.def.mapNpc) return false;
+      if (n.def.oncoming && !cf.left) return false; // going straight or right: the other lane is not in your way
+      const d = Math.hypot(n.x - cf.x, n.y - cf.y);
+      if (n.v >= 1 && d < cf.r + extra) return true;
+      // (for planning) a car heading this way that will be there within `horizon` seconds
+      if (horizon > 0 && n.v > 1 && (cf.x - n.x) * Math.cos(n.heading) + (cf.y - n.y) * Math.sin(n.heading) > 0 && d - n.v * horizon < cf.r) return true;
+      if (horizon > 0 && n.def.feeder && n.cleared && d < cf.r + extra) return true;
+      return false;
+    });
+  }
+
+  function newNpc(def, s0, extra = {}) {
+    return { def, s: s0, v: 0, x: 0, y: 0, heading: 0, color: pickColor(), police: false, width: 1.8, length: 4.3, age: 0, alpha: 0, done: new Set(), ...extra };
+  }
+
+  function spawnNetTraffic(dt) {
+    if (!net || state.npcs.length >= NPC_CAP) return;
+    const pr = state.prog;
+    if (!pr.onRoute) return;
+    // a slower car appears ahead of you, out of sight
+    flowTimer -= dt;
+    if (flowTimer <= 0) {
+      flowTimer = 6 + Math.random() * 7;
+      const s0 = pr.s + 60 + Math.random() * 25;
+      const ahead = state.npcs.filter((o) => o.def.flow && o.s > pr.s && o.s < pr.s + 170).length;
+      const pt = world.route.at(Math.min(world.route.length, s0), {});
+      const clear = s0 < world.route.length - 60 && !net.isBlocked(s0) && !net.ringS.some(([a, b]) => s0 > a - 20 && s0 < b + 20) && !state.npcs.some((o) => Math.hypot(o.x - pt.x, o.y - pt.y) < 20);
+      const exit = clear && ahead < 2 ? net.planExit(s0) : null;
+      if (exit) {
+        const f = 0.5 + Math.random() * 0.2;
+        state.npcs.push(newNpc(net.flowDef, s0, { f, v: (net.limitAt(s0) * f) / 3.6, exit }));
+      }
+    }
+    // cars come out of side streets near you
+    for (const leg of net.legs) {
+      if (!(pr.s > leg.sE - 160 && pr.s < leg.sX + 25)) continue;
+      leg.timer -= dt;
+      if (leg.timer > 0) continue;
+      leg.timer = leg.minor ? 12 + Math.random() * 10 : 7 + Math.random() * 9;
+      const mine = state.npcs.filter((o) => o.def.leg === leg && !o.cleared);
+      if (mine.length >= 2 || mine.some((o) => o.s < 10)) continue;
+      const opts = [];
+      if (leg.inFlow && net.planExit(leg.inFlow.joinS)) opts.push(leg.inFlow);
+      if (leg.inOnc) opts.push(leg.inOnc);
+      if (!opts.length) continue;
+      const def = opts[Math.floor(Math.random() * opts.length)];
+      state.npcs.push(newNpc(def, 0, { v: 6, f: 0.65 + Math.random() * 0.2 }));
+    }
+  }
+
   function stepTraffic(dt) {
     // the slow car on the route (used by the No-overtaking check)
     if (state.mode === 'test' && state.test && !state.test.finished) {
@@ -358,37 +544,73 @@ export function createGame(world, opts = {}) {
         state.npcs.push({ def, s: 0, v: def.kmh / 3.6, x: 0, y: 0, heading: 0, color: police ? '#f4f6f8' : pickColor(), police, width: 1.8, length: police ? 4.6 : 4.3 });
       }
     }
+    spawnNetTraffic(dt);
     for (let i = state.npcs.length - 1; i >= 0; i--) {
       const n = state.npcs[i];
-      // drive sensibly: stop for the player in their lane, keep a gap to the car ahead
-      let want = n.def.kmh / 3.6;
-      if (n.init) {
-        const fx = Math.cos(n.heading);
-        const fy = Math.sin(n.heading);
-        const rx = state.car.x - n.x;
-        const ry = state.car.y - n.y;
-        const ahead = rx * fx + ry * fy;
-        const side = Math.abs(-rx * fy + ry * fx);
-        if (ahead > 0 && ahead < 24 && side < 2.8) want = 0;
-        for (const o of state.npcs) {
-          if (o === n || o.def !== n.def) continue;
-          const gap = o.s - n.s;
-          if (gap > 0 && gap < 11) want = Math.min(want, o.v * 0.8);
+      const d = n.def;
+      n.age = (n.age || 0) + dt;
+      let want = d.flow ? (net.limitAt(n.s) * n.f) / 3.6 : d.feeder ? 28 / 3.6 : d.exit ? 24 / 3.6 : d.kmh / 3.6;
+      if (d.flow) want = Math.min(want, flowRules(n, dt));
+      if (d.feeder && !n.cleared) {
+        const dist = d.leg.stopAt - n.s;
+        want = Math.min(want, Math.sqrt(2 * 3 * Math.max(0, dist)));
+        if (dist < 1 && n.v < 0.5) {
+          const why = legBlocked(d.leg, n);
+          if (!why) n.cleared = true;
+          else if (why === 'you' && !n.yielded) {
+            n.yielded = true;
+            if (!state.yieldNotes) state.yieldNotes = 0;
+            if (state.yieldNotes++ < 2) emit('gaveWay', { minor: true });
+          }
         }
       }
-      n.v = approach(n.v, want, (want < n.v ? 6 : 2) * dt);
+      if (n.init) want = Math.min(want, gapAhead(n));
+      n.v = approach(n.v, want, (want < n.v ? 6 : 2.2) * dt);
       n.s += n.v * dt;
-      if (n.def.loop) n.s %= n.def.path.length;
-      else if (n.s >= n.def.path.length) {
-        state.npcs.splice(i, 1);
-        continue;
+      if (d.loop) n.s %= d.path.length;
+      else if (n.s >= d.path.length) {
+        if (d.feeder && d.join === 'flow') {
+          n.def = net.flowDef;
+          n.s = d.joinS;
+          n.f = n.f || 0.65 + Math.random() * 0.2;
+          n.exit = net.planExit(n.s);
+          n.done = new Set();
+          if (!n.exit) {
+            state.npcs.splice(i, 1);
+            continue;
+          }
+        } else if (d.feeder && d.join === 'onc') {
+          n.def = net.oncDef;
+          n.s = d.joinS;
+        } else {
+          state.npcs.splice(i, 1);
+          continue;
+        }
+      }
+      if (n.def.flow && n.exit && n.s >= n.exit.exitS) {
+        n.def = n.exit.out;
+        n.s = 0;
       }
       const pt = n.def.path.at(n.s, tmp);
       n.x = pt.x - pt.dy * n.def.lane;
       n.y = pt.y + pt.dx * n.def.lane;
       n.heading = Math.atan2(pt.dy, pt.dx);
       n.init = true;
+      // fade in when they appear, fade out at the end of their road
+      const left = n.def.loop ? 99 : n.def.path.length - n.s;
+      n.alpha = Math.max(0, Math.min(1, n.age / 0.8, left / 10));
       if (pushOutOfTraffic(state.car, n) > 3) issue('pedHit', C.exam.penalty.pedHit, { ro: 'Ai lovit un alt vehicul.', en: 'You hit another vehicle.' }, { title: { ro: 'Accident', en: 'Crash' } });
+    }
+
+    // people on the pavements
+    for (const w of state.walkers) {
+      if (Math.abs(w.cur - state.prog.s) > 140) continue;
+      w.cur += w.dir * w.speed * dt;
+      if (w.cur > w.s1 || w.cur < w.s0) w.dir = -w.dir;
+      const q = world.route.at(Math.max(0, Math.min(world.route.length, w.cur)), tmp);
+      w.x = q.x - q.dy * w.off;
+      w.y = q.y + q.dx * w.off;
+      w.heading = Math.atan2(q.dy * w.dir, q.dx * w.dir);
     }
 
     // stopped cars (they do not move; you drive round them)
@@ -527,6 +749,7 @@ export function createGame(world, opts = {}) {
       init(t) {
         t.line = t.s + (t.p.lineOffset ?? 4);
         t.minV = Infinity;
+        t.cf = autoConflict(t.line);
       },
       update(t, c) {
         const win = t.p.lookback ?? 30;
@@ -534,7 +757,8 @@ export function createGame(world, opts = {}) {
         if (c.crossed(t.line)) {
           const low = t.minV === Infinity ? c.kmh : t.minV;
           const cf = t.p.conflict;
-          if (low <= T.stopMaxKmh && cf && state.npcs.some((n) => Math.hypot(n.x - cf.x, n.y - cf.y) < cf.r)) finish(t, false, 'yield');
+          const hit = (cf && state.npcs.some((n) => n.def.mapNpc && Math.hypot(n.x - cf.x, n.y - cf.y) < cf.r)) || conflictBusy(t.cf, 0);
+          if (low <= T.stopMaxKmh && hit) finish(t, false, 'yield');
           else finish(t, low <= T.stopMaxKmh, 'stop', { kmh: low.toFixed(1) });
         }
       },
@@ -546,6 +770,7 @@ export function createGame(world, opts = {}) {
         t.line = t.s + (t.p.lineOffset ?? 8);
         t.max = t.p.maxKmh;
         t.conflict = t.p.conflict || null;
+        t.cf = t.sign.key === 'giveWay' ? autoConflict(t.line) : null;
         t.ped = world.peds.length ? state.peds.find((pd) => Math.abs(pd.s - t.line) < 3) || null : null;
       },
       update(t, c) {
@@ -554,7 +779,7 @@ export function createGame(world, opts = {}) {
           finish(t, c.kmh <= 3.5, 'crosswalk', { kmh: Math.round(c.kmh) });
           return;
         }
-        if (t.conflict && state.npcs.some((n) => Math.hypot(n.x - t.conflict.x, n.y - t.conflict.y) < t.conflict.r)) {
+        if ((t.conflict && state.npcs.some((n) => n.def.mapNpc && Math.hypot(n.x - t.conflict.x, n.y - t.conflict.y) < t.conflict.r)) || conflictBusy(t.cf, 0)) {
           finish(t, false, 'yield');
           return;
         }
@@ -1167,6 +1392,9 @@ export function createGame(world, opts = {}) {
     state.prog = freshProgress();
     state.traffic = [];
     state.npcs = [];
+    state.walkers = (world.walkers || []).map((w) => ({ ...w, cur: w.s, x: 0, y: 0, heading: 0 }));
+    flowTimer = 1;
+    if (net) for (const leg of net.legs) leg.timer = 2 + Math.random() * 6;
     state.peds = world.peds.map((p) => ({ ...p, side: p.startSide, phase: 'idle', timer: 0, t: 0, used: false, hit: false, px: p.x, py: p.y }));
     for (const def of world.npcDefs) {
       if (def.loop) {
@@ -1287,5 +1515,5 @@ export function createGame(world, opts = {}) {
 
   setMode('learn');
 
-  return { indication, state, world, level, on, update, setMode, restart: () => setMode(state.mode), resetCar, endTest, answerQuiz, closeQuiz, toggleSignal, toggleHazard, cycleLights, toggleEngine, startRefuel, stopRefuel, setCar, setWeather };
+  return { indication, state, world, level, on, update, conflictBusy, setMode, restart: () => setMode(state.mode), resetCar, endTest, answerQuiz, closeQuiz, toggleSignal, toggleHazard, cycleLights, toggleEngine, startRefuel, stopRefuel, setCar, setWeather };
 }

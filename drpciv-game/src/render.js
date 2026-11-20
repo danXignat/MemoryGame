@@ -163,9 +163,10 @@ export function createRenderer(canvas, initialWorld) {
     drawBushes(R);
     for (const ai of state.traffic) drawCar(ai, null, ai.color, {});
     const flash = Math.floor(time * 4) % 2;
-    for (const n of state.npcs) drawCar(n, null, n.color, { police: n.police, flash });
+    for (const n of state.npcs) if (n.init && n.alpha !== 0) drawCar(n, null, n.color, { police: n.police, flash });
     for (const o of state.obstacles || []) drawCar(o, null, o.color, { hazard: true, blinkOn: Math.floor(time / 0.33) % 2 === 0 });
     drawPeds(state, time);
+    drawWalkers(state, time);
     drawMission(state, settings, time);
     drawBeams(state.car, state.spec);
     drawCar(state.car, state.spec, state.spec.color, { braking: state.car.braking, reversing: state.car.reversing, signal: state.car.signal, hazard: state.car.hazard, blinkOn, lights: state.car.lights, player: true, passenger: state.passenger, mood: state.mood, engineOn: state.car.engineOn });
@@ -422,6 +423,36 @@ export function createRenderer(canvas, initialWorld) {
   }
 
   // ---------------------------------------------------------- pedestrians
+  function drawWalkers(state, time) {
+    for (const w of state.walkers || []) {
+      if (w.x == null || Math.hypot(w.x - cam.x, w.y - cam.y) > 80) continue;
+      const swing = Math.sin(time * 8 + w.s) * 0.22;
+      ctx.save();
+      ctx.translate(w.x, w.y);
+      ctx.rotate(w.heading + Math.PI / 2);
+      ctx.fillStyle = COL.shadow;
+      ctx.beginPath();
+      ctx.ellipse(0.2, 0.2, 0.55, 0.8, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#2a2d33';
+      ctx.fillRect(-0.28, -0.1 + swing, 0.2, 0.55);
+      ctx.fillRect(0.08, -0.1 - swing, 0.2, 0.55);
+      ctx.fillStyle = w.shirt;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 0.62, 0.32, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#e8b89a';
+      ctx.beginPath();
+      ctx.arc(0, 0, 0.27, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = w.hair;
+      ctx.beginPath();
+      ctx.arc(0, 0.05, 0.24, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   function drawPeds(state, time) {
     for (const p of state.peds) {
       if (Math.hypot(p.px - cam.x, p.py - cam.y) > 90) continue;
@@ -609,6 +640,7 @@ export function createRenderer(canvas, initialWorld) {
     const L = spec ? spec.length : car.length || 4.3;
     const Wd = spec ? spec.width : car.width || 1.8;
     ctx.save();
+    if (car.alpha != null && car.alpha < 1) ctx.globalAlpha = Math.max(0, car.alpha);
     ctx.translate(car.x, car.y);
     ctx.rotate(car.heading);
 

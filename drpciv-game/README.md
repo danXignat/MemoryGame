@@ -19,6 +19,8 @@ Other commands: `npm test` (simulated drivers play every level and compare the f
 | Build or change a level (roads, signs, pedestrians, traffic, weather) | `src/levels.js` |
 | Change the free-roam training town | `src/map.js` |
 | Add or edit theory exam questions (Chestionare) | `src/questions.js` |
+| Edit the theory book chapters (Cartea șoferului) | `src/book.js` |
+| Traffic: side streets, cars in your lane, give way | `src/mapbuild.js` (traffic network), `src/game.js` (driving rules) |
 | Tune game feel, fuel, exam penalty points | `src/config.js` |
 | Driving physics, fuel, gearbox, exam rules | `src/game.js` |
 | How the world, cars, night/rain/fog and minimap are drawn | `src/render.js` |

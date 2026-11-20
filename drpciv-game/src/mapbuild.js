@@ -128,9 +128,62 @@ export function buildWorld(MAP) {
     return r[0] + d;
   };
 
+  // ------------------------------------------------- extra side streets for traffic
+  //  Long straight stretches get a few side streets so cars can come out of them
+  //  (and turn into them). They are only added where nothing else is in the way.
+  const allExtra = [...(MAP.extraRoads || [])];
+  if (MAP.sideStreets !== false && MAP.route.segments.length > 1) {
+    const avoidS = [];
+    for (const sg of MAP.signs || []) avoidS.push([resolveAt(sg.at, 'sign'), 16]);
+    for (const pd of MAP.peds || []) avoidS.push([resolveAt(pd.at, 'pedestrian'), 22]);
+    for (const o of MAP.obstacles || []) avoidS.push([resolveAt(o.at, 'obstacle'), 40]);
+    for (const o of MAP.hazardStops || []) avoidS.push([resolveAt(o.at, 'breakdown'), 40]);
+    if (MAP.refuel) avoidS.push([resolveAt(MAP.refuel.at, 'refuel'), 60]);
+    if (MAP.mission && MAP.mission.pickup) avoidS.push([resolveAt(MAP.mission.pickup.at, 'pickup'), 30]);
+    for (const l of MAP.lanes || []) avoidS.push([resolveAt(l.at, 'lane'), (l.window ?? 80) + 30]);
+    const otherLines = allExtra.map((r) => r.points);
+    const segDist = (x, y, a, b) => {
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(x - a[0] - dx * t, y - a[1] - dy * t);
+    };
+    const clearAt = (x, y, sv) => {
+      for (let k = 0; k <= N; k += 2) if (Math.abs(k * ds - sv) > 12 && Math.hypot(X[k] - x, Y[k] - y) < half * 2 + 6) return false;
+      for (const pts of otherLines) for (let i = 1; i < pts.length; i++) if (segDist(x, y, pts[i - 1], pts[i]) < half * 2 + 6) return false;
+      for (const rg of MAP.rings || []) if (Math.hypot(x - rg.cx, y - rg.cy) < rg.r + half * 2 + 10) return false;
+      for (const stn of MAP.stations || []) if (Math.hypot(x - stn.x, y - stn.y) < 45) return false;
+      return true;
+    };
+    let side = 1;
+    let made = 0;
+    for (const sg of MAP.route.segments) {
+      if (sg.type !== 'line') continue;
+      const [a, b] = segRanges[sg.id];
+      for (let sv = a + 45; sv < b - 40; sv += 95 + ((made * 37) % 40)) {
+        if (avoidS.some(([q, r]) => Math.abs(q - sv) < r)) continue;
+        if (otherLines.some((pts) => Math.hypot(pts[0][0] - routeAt(sv).x, pts[0][1] - routeAt(sv).y) < 45)) continue;
+        const q = routeAt(sv, {});
+        side = -side;
+        for (const sd of [side, -side]) {
+          const ux = -q.dy * sd;
+          const uy = q.dx * sd;
+          const len = 58;
+          let ok = true;
+          for (let d = half + 6; d <= len; d += 4) if (!clearAt(q.x + ux * d, q.y + uy * d, sv)) ok = false;
+          if (!ok) continue;
+          const pts = [[q.x, q.y], [q.x + ux * len, q.y + uy * len]];
+          allExtra.push({ id: `side${made++}`, points: pts, lane: true, side: true, leg: { seg: sg.id, turn: false, K: [q.x, q.y], s: sv } });
+          otherLines.push(pts);
+          break;
+        }
+      }
+    }
+  }
+
   // ---------------------------------------------------------- road shapes
   const roads = [{ id: 'route', segs: routeSegs, lane: true }];
-  for (const road of MAP.extraRoads || []) {
+  for (const road of allExtra) {
     const segs = [];
     for (let i = 1; i < road.points.length; i++) {
       segs.push({
@@ -341,6 +394,7 @@ export function buildWorld(MAP) {
     count: n.count ?? 1,
     color: n.color || '#8c6bd6',
     lane: n.lane ?? C.traffic.laneOffset,
+    mapNpc: true, // counts for the "give way" checks in levels
   }));
   // also let other cars' roads be drivable & drawn
   for (const n of MAP.npcs || []) {
@@ -444,6 +498,131 @@ export function buildWorld(MAP) {
     const pts = [];
     for (let k = N; k >= 0 && k * ds >= sFrom; k -= 3) pts.push([X[k], Y[k]]);
     if (pts.length > 10) npcDefs.push({ id: 'oncoming', path: makePath(pts), kmh: MAP.oncoming.kmh ?? 36, every: MAP.oncoming.every ?? 13, color: '#5f7fbf', lane: C.traffic.laneOffset, oncoming: true, policeEvery: MAP.oncoming.policeEvery ?? 4 });
+  }
+
+  // ------------------------------------------- side streets, cars in your lane, walkers
+  //  legs:   side streets that meet the route; cars come out of them, wait for you when
+  //          you have priority, then join your lane (in front of you) or the other lane.
+  //  flow:   cars driving the route in your direction, slower than the limit, so you can
+  //          queue behind them or overtake. They turn off into a side street before any
+  //          spot where the exam needs the lane (stopped car, refuel, pickup, finish...).
+  const lane = C.traffic.laneOffset;
+  const fwdPts = [];
+  for (let k = 0; k <= N; k += 3) fwdPts.push([X[k], Y[k]]);
+  if (fwdPts[fwdPts.length - 1][0] !== X[N]) fwdPts.push([X[N], Y[N]]);
+  const flowDef = { id: 'flow', path: makePath(fwdPts), lane, flow: true, kmh: 35 };
+  const oncDef = npcDefs.find((d) => d.oncoming) || null;
+  const oncFrom = oncDef ? length - oncDef.path.length : Infinity;
+  // stretches the flow cars must leave free
+  const blockedS = [[length - 40, length + 1]];
+  for (const o of obstacles) blockedS.push([o.s - 45, o.s + 25]);
+  for (const hz of hazardStops) blockedS.push([hz.s - 45, hz.s + 25]);
+  for (const l of laneTasks) blockedS.push([l.s - l.window - 30, l.s + l.window + 20]);
+  if (refuel) blockedS.push([refuel.s - 60, refuel.s + 30]);
+  if (mission && mission.pickup) blockedS.push([mission.pickup.s - 50, mission.pickup.s + 20]);
+  if (mission && mission.destSpot) blockedS.push([mission.destSpot.s - 60, length + 1]);
+  for (const stn of stations) {
+    let a = Infinity;
+    let b = -Infinity;
+    for (let k = 0; k <= N; k += 2) if (Math.hypot(X[k] - stn.x, Y[k] - stn.y) < 40) (a = Math.min(a, k * ds)), (b = Math.max(b, k * ds));
+    if (a < b) blockedS.push([a - 25, b + 15]);
+  }
+  for (const t of MAP.traffic || []) blockedS.push([resolveAt(t.at, 'slow car') - 30, resolveAt(t.at, 'slow car') + 260]);
+  const ringS = MAP.route.segments.filter((sg) => sg.roundabout).map((sg) => segRanges[sg.id]);
+  const isBlocked = (sv) => blockedS.some(([a, b]) => sv >= a && sv <= b);
+  const nextBlocked = (sv) => Math.min(...blockedS.filter(([a, b]) => b >= sv).map(([a]) => Math.max(a, sv)));
+
+  const bez = (P0, d0, P3, d3, out) => {
+    const k = Math.hypot(P3[0] - P0[0], P3[1] - P0[1]) * 0.42;
+    const P1 = [P0[0] + d0[0] * k, P0[1] + d0[1] * k];
+    const P2 = [P3[0] - d3[0] * k, P3[1] - d3[1] * k];
+    for (let i = 1; i <= 10; i++) {
+      const t = i / 10;
+      const u = 1 - t;
+      out.push([u * u * u * P0[0] + 3 * u * u * t * P1[0] + 3 * u * t * t * P2[0] + t * t * t * P3[0], u * u * u * P0[1] + 3 * u * u * t * P1[1] + 3 * u * t * t * P2[1] + t * t * t * P3[1]]);
+    }
+    return out;
+  };
+  const laneAt = (sv, dir) => {
+    const q = routeAt(Math.max(0, Math.min(length, sv)), {});
+    const o = dir > 0 ? lane : -lane;
+    return { p: [q.x - q.dy * o, q.y + q.dx * o], d: [q.dx * dir, q.dy * dir] };
+  };
+  const segPt = (x, y, a, b) => {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const t = Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / (dx * dx + dy * dy || 1)));
+    return Math.hypot(x - a[0] - dx * t, y - a[1] - dy * t);
+  };
+  const minorAt = (sE) => signs.some((sg) => (sg.key === 'stop' || sg.key === 'giveWay') && sg.s > sE - 45 && sg.s < sE + 3);
+  const legs = [];
+  for (const r of allExtra) {
+    if (!r.leg || !segRanges[r.leg.seg]) continue;
+    const [K0, K1] = [r.leg.K[0], r.leg.K[1]];
+    const Q = r.points[r.points.length - 1];
+    const len = Math.hypot(Q[0] - K0, Q[1] - K1);
+    if (len < half + 14) continue;
+    const u = [(Q[0] - K0) / len, (Q[1] - K1) / len];
+    const range = segRanges[r.leg.seg];
+    const sE = r.leg.s ?? (r.leg.turn ? range[0] : range[1]);
+    const sX = r.leg.s ?? range[1];
+    if (ringS.some(([a, b]) => sE > a - 25 && sE < b + 25)) continue;
+    // streets the level already uses for its own cross traffic stay theirs
+    const nearNpcRoad = (MAP.npcs || []).some((nd) => !nd.loop && nd.points.some((pt, i) => i > 0 && segPt(K0 + u[0] * 15, K1 + u[1] * 15, nd.points[i - 1], pt) < 8));
+    if (nearNpcRoad) continue;
+    const inR = [u[1] * lane, -u[0] * lane]; // right-hand lane when driving towards the route
+    const outR = [-u[1] * lane, u[0] * lane]; // right-hand lane when driving away from it
+    const stopD = half + 3;
+    const S = [K0 + u[0] * stopD + inR[0], K1 + u[1] * stopD + inR[1]];
+    const leg = { id: r.id, K: [K0, K1], Q, u, sE, sX, minor: minorAt(sE), stopAt: Math.hypot(Q[0] + inR[0] - S[0], Q[1] + inR[1] - S[1]), timer: 3 + (legs.length % 5) * 2 };
+    // into your lane (ahead of the junction) or into the other lane (behind it)
+    const din = [-u[0], -u[1]];
+    const toFlow = laneAt(sX + 9, 1);
+    const toOnc = laneAt(sE - 9, -1);
+    if (!isBlocked(sX + 9)) leg.inFlow = { id: `in-${r.id}-f`, path: makePath(bez(S, din, toFlow.p, toFlow.d, [[Q[0] + inR[0], Q[1] + inR[1]], S])), lane: 0, feeder: true, leg, join: 'flow', joinS: sX + 9 };
+    if (oncDef && sE - 9 > oncFrom + 8) leg.inOnc = { id: `in-${r.id}-o`, path: makePath(bez(S, din, toOnc.p, toOnc.d, [[Q[0] + inR[0], Q[1] + inR[1]], S])), lane: 0, feeder: true, leg, join: 'onc', joinS: length - (sE - 9) };
+    // a car in your lane turning off into this street
+    const from = laneAt(sE - 9, 1);
+    const B = [K0 + u[0] * stopD + outR[0], K1 + u[1] * stopD + outR[1]];
+    leg.exitS = sE - 9;
+    if (!isBlocked(leg.exitS)) leg.out = { id: `out-${r.id}`, path: makePath([...bez(from.p, from.d, B, u, [from.p]), [Q[0] + outR[0], Q[1] + outR[1]]]), lane: 0, exit: true, leg };
+    if (leg.inFlow || leg.inOnc || leg.out) legs.push(leg);
+  }
+  legs.sort((a, b) => a.exitS - b.exitS);
+  /** pick where a car in your lane at s will turn off (or null if it cannot) */
+  const planExit = (sv, rand = Math.random) => {
+    const stop = nextBlocked(sv);
+    const options = legs.filter((l) => l.out && l.exitS > sv + 12 && l.exitS < stop - 4);
+    if (!options.length) return null;
+    for (const l of options) if (rand() < 0.25) return l;
+    return options[options.length - 1];
+  };
+  // posted speed limit along the route
+  const speedMarks = signs.filter((sg) => sg.test.type === 'speed').map((sg) => [sg.s, sg.test.kmh]).sort((a, b) => a[0] - b[0]);
+  const limitAt = (sv) => {
+    let lim = 50;
+    for (const [a, k] of speedMarks) if (a <= sv) lim = k;
+    return lim;
+  };
+  const flowStops = signs.filter((sg) => sg.key === 'stop').map((sg) => sg.s + (sg.test.lineOffset ?? 4) - 2);
+  const flowSlow = [
+    ...signs.filter((sg) => sg.key === 'giveWay').map((sg) => [sg.s, sg.s + 14, 16]),
+    ...ringS.map(([a, b]) => [a - 12, b + 6, 20]),
+    ...MAP.route.segments.filter((sg) => sg.type === 'arc' && !sg.roundabout).map((sg) => [segRanges[sg.id][0] - 6, segRanges[sg.id][1], Math.min(45, Math.sqrt(3.2 * sg.radius) * 3.6)]),
+  ];
+  const trafficNet = { flowDef, oncDef, legs, planExit, isBlocked, limitAt, flowStops, flowSlow, ringS };
+
+  // people walking on the pavements (decoration, they never step onto the road)
+  const walkers = [];
+  {
+    const wr = mulberry32((MAP.seed ?? 7) + 99);
+    const busy = MAP.decor && MAP.decor.style === 'city' ? 1 : 0.6;
+    for (let sv = 20; sv < length - 20; sv += 14 + wr() * 22) {
+      if (wr() > busy) continue;
+      if (ringS.some(([a, b]) => sv > a - 20 && sv < b + 20)) continue;
+      const side = wr() < 0.5 ? 1 : -1;
+      walkers.push({ s: sv, s0: sv - 12 - wr() * 18, s1: sv + 12 + wr() * 18, dir: wr() < 0.5 ? 1 : -1, off: side * (half + 1.7 + wr() * 0.8), speed: 0.9 + wr() * 0.6, shirt: ['#2b4c8c', '#c0392b', '#2e8b57', '#8e44ad', '#e67e22', '#34495e', '#d35400', '#16a085'][Math.floor(wr() * 8)], hair: ['#4a2f23', '#1d1d1d', '#c9a227', '#7b3f00'][Math.floor(wr() * 4)] });
+    }
   }
 
   // ------------------------------------------------------ scenery (decoration)
@@ -598,6 +777,8 @@ export function buildWorld(MAP) {
     paint,
     traffic,
     npcDefs,
+    trafficNet,
+    walkers,
     peds,
     stations,
     pins,

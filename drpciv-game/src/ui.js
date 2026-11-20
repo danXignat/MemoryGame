@@ -30,6 +30,7 @@ const ICON = {
   flag: svg('M6 21V4M6 5h12l-2.5 4L18 13H6'),
   book: svg('M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4zM9 9h5M9 13h5'),
   restart: svg('M4 12a8 8 0 1 0 2.6-5.9M3.5 3.5v5h5'),
+  bookOpen: svg('M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5M12 6.5C14 5 17 4.5 21 5v13c-4-.5-7 0-9 1.5M12 6.5v13'),
   quiz: svg('M9 4h6M8 4H6a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2M8.5 11l1.5 1.5 3-3M8.5 17h7'),
 };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -925,6 +926,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
             <button type="button" class="mtile" id="mLevel">${ICON.flag}<span>Nivel</span></button>
             <button type="button" class="mtile" id="mSigns">${ICON.book}<span>Semne</span></button>
             <button type="button" class="mtile" id="mTheory">${ICON.quiz}<span>Chestionare</span></button>
+            <button type="button" class="mtile" id="mBook">${ICON.bookOpen}<span>Carte</span></button>
             <button type="button" class="mtile" id="mRestart">${ICON.restart}<span>Restart</span></button>
           </div>
           <div class="row"><span>Mod<small>Learn: explică semnele · Test: examen cu puncte de penalizare</small></span><div class="seg2" data-set="mode"><button type="button" data-v="learn">Learn</button><button type="button" data-v="test">Test</button></div></div>
@@ -979,6 +981,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     go('#mLevel', openLevels);
     go('#mSigns', () => openLibrary());
     go('#mTheory', theory.open);
+    go('#mBook', () => theory.openBook());
     go('#mDrill', openDrill);
     go('#mHelp', openHelp);
     go('#mRestart', () => restartLevel());
@@ -1126,6 +1129,11 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       const en = lang() === 'en';
       if (c.ok) showInfo(en ? 'Speed camera: OK' : 'Radar: OK', en ? `You passed at ${c.kmh} km/h (limit ${c.lim}).` : `Ai trecut cu ${c.kmh} km/h (limita ${c.lim}).`);
       else showInfo(en ? 'Speed camera: too fast!' : 'Radar: prea repede!', en ? `${c.kmh} km/h in a ${c.lim} km/h zone. In Test mode this costs penalty points.` : `${c.kmh} km/h unde limita e ${c.lim}. În modul Test primești puncte de penalizare.`);
+    });
+    game.on('gaveWay', () => {
+      if (st().mode !== 'learn') return;
+      const en = lang() === 'en';
+      showInfo(en ? 'You have priority' : 'Ai prioritate', en ? 'The car in the side street waits for you: you are on the main road.' : 'Mașina de pe strada laterală te așteaptă: tu ești pe drumul principal.');
     });
     game.on('lowfuel', () => {
       sfx.lowfuel();

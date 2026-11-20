@@ -13,6 +13,9 @@ export function makeBot(game, world, map, kind = 'careful') {
   let refuelStage = 0;
   let hold = 0;
 
+  const yieldTo = (n) => !(n.def.flow || n.def.exit || (n.def.feeder && !n.cleared));
+  // a car waiting in a side street of this junction will pull out any moment: let it go first
+  const feederReady = (cf) => !!cf && st.npcs.some((n) => n.def.feeder && n.def.leg.minor && !n.cleared && n.s > n.def.leg.stopAt - 3 && Math.hypot(n.def.leg.K[0] - cf.x, n.def.leg.K[1] - cf.y) < 22);
   function stopAt(dist) {
     return dist <= 0.2 ? 0 : Math.sqrt(4.5 * dist);
   }
@@ -56,7 +59,8 @@ export function makeBot(game, world, map, kind = 'careful') {
                 target = Math.min(target, Math.sqrt((task.max - 5) ** 2 / 12.96 + 6 * Math.max(0, dist - 1)));
                 let wait = false;
                 if (task.ped && ['wait', 'cross'].includes(task.ped.phase)) wait = true;
-                if (task.conflict && st.npcs.some((n) => Math.hypot(n.x - task.conflict.x, n.y - task.conflict.y) < task.conflict.r + Math.max(12, task.conflict.r))) wait = true;
+                if (task.conflict && st.npcs.some((n) => n.def.mapNpc && Math.hypot(n.x - task.conflict.x, n.y - task.conflict.y) < task.conflict.r + Math.max(12, task.conflict.r))) wait = true;
+                if (game.conflictBusy && game.conflictBusy(task.cf, 10, 4.5)) wait = true;
                 if (wait && dist > -1) target = Math.min(target, stopAt(dist - 1.5));
               }
             }
@@ -64,7 +68,7 @@ export function makeBot(game, world, map, kind = 'careful') {
               const dist = task.line - s - 2.0;
               if (dist > -3 && dist < 60 && !(task.minV <= C.test.stopMaxKmh)) target = Math.min(target, stopAt(dist));
               const cf = task.p.conflict;
-              if (cf && dist > -1 && dist < 6 && st.npcs.some((n) => Math.hypot(n.x - cf.x, n.y - cf.y) < cf.r + Math.max(12, cf.r))) target = 0;
+              if (dist > -1 && dist < 6 && ((cf && st.npcs.some((n) => n.def.mapNpc && Math.hypot(n.x - cf.x, n.y - cf.y) < cf.r + Math.max(12, cf.r))) || (game.conflictBusy && game.conflictBusy(task.cf, 10, 4.5)))) target = 0;
             }
             if (task.type === 'pickup' && task.s - s < 30) target = Math.min(target, stopAt(task.s - s - 1));
           }
@@ -102,8 +106,26 @@ export function makeBot(game, world, map, kind = 'careful') {
       }
       if (kind === 'overtaker') for (const ai of st.traffic) if (ai.s > s - 10 && ai.s - s < 22) lane = -2.2;
 
+      // keep a safe gap to any car in front (queues, side-street cars joining your lane)
+      if (kind !== 'reckless') {
+        const fx = Math.cos(car.heading);
+        const fy = Math.sin(car.heading);
+        for (const n of st.npcs) {
+          if (!n.init) continue;
+          const rx = n.x - car.x;
+          const ry = n.y - car.y;
+          const ahead = rx * fx + ry * fy;
+          const side = Math.abs(-rx * fy + ry * fx);
+          if (ahead <= 0 || ahead > 30 || side > 2.3 - (lane < 0 ? 0 : 0)) continue;
+          if (Math.cos(n.heading - car.heading) < -0.2) continue;
+          target = Math.min(target, Math.max(0, (ahead - 7.5) * 0.6 + Math.max(0, n.v) * 0.7));
+        }
+      }
+
       // steering: pure pursuit to a point ahead on the route, in the chosen lane
-      const look = 7 + Math.abs(v) * 0.5;
+      // look closer in tight corners so the car stays in its lane instead of cutting across
+      const tight = arcs.some((a) => s > a.range[0] - 4 && s < a.range[1] + 2 && a.v < 8);
+      const look = tight ? 3.5 + Math.abs(v) * 0.35 : 7 + Math.abs(v) * 0.5;
       const p = world.route.at(Math.min(world.route.length, s + look), tmp);
       const tx = p.x - p.dy * lane;
       const ty = p.y + p.dx * lane;
