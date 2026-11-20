@@ -1,0 +1,88 @@
+# Builds the Car.dat game for phones on every push that touches the game:
+#   - web:     the installable web app (Safari "Add to Home Screen") -> gh-pages branch
+#   - ios:     an unsigned iPhone app (.ipa) to sign and install with Sideloadly / AltStore
+#   - android: the Android app (.apk)
+# The .ipa and .apk are under "Artifacts" on the run's page (Actions tab).
+name: Car.dat apps
+
+on:
+  push:
+    paths: ['drpciv-game/**', '.github/workflows/car-dat-apps.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: drpciv-game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drpciv-game/package-lock.json
+      - run: npm ci
+      - run: node scripts/build-app.mjs
+      - name: Publish to the gh-pages branch (turn on Pages once: Settings > Pages > Deploy from branch > gh-pages)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: drpciv-game/app-www
+          publish_branch: gh-pages
+          force_orphan: true
+
+  ios:
+    runs-on: macos-15
+    defaults:
+      run:
+        working-directory: drpciv-game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drpciv-game/package-lock.json
+      - run: npm ci
+      - run: node scripts/build-app.mjs && npx cap sync ios
+      - name: Build the iPhone app (unsigned)
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/App.app Payload/
+          zip -qry Car.dat-iOS-unsigned.ipa Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Car.dat-iOS
+          path: drpciv-game/Car.dat-iOS-unsigned.ipa
+
+  android:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: drpciv-game
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: drpciv-game/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: node scripts/build-app.mjs && npx cap sync android
+      - run: cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Car.dat-Android
+          path: drpciv-game/android/app/build/outputs/apk/debug/app-debug.apk
