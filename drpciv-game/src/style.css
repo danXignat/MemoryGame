@@ -2989,3 +2989,53 @@ p {
   text-align: center;
   font-size: 14px;
 }
+
+/* exam: resume card and the "leave?" bar */
+.thresume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  background: #e8f1ff;
+  border: 1px solid #b7d0ff;
+  color: #10305f;
+}
+.thresume > div {
+  flex: 1 1 180px;
+  display: grid;
+}
+.thresume small {
+  opacity: 0.8;
+}
+.thresume .btn {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 16px;
+}
+.thask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #fff4d6;
+  border: 1px solid #f0d08a;
+  color: #4a3500;
+  font-size: 13.5px;
+}
+.thask span {
+  flex: 1 1 200px;
+}
+.thask .btn {
+  height: 38px;
+  padding: 0 14px;
+}
+.bk-cont {
+  width: 100%;
+  margin: 0 0 10px;
+  font-family: Inter, system-ui, sans-serif;
+}

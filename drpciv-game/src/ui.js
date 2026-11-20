@@ -54,7 +54,20 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   let G = { game: null, world: null, level: null };
   const overlays = $('#overlays');
   const modals = [];
-  let rotateSkipped = false;
+  const reorient = () => {
+    try {
+      checkOrientation();
+    } catch {
+      /* not set up yet */
+    }
+  };
+  let rotateSkipped = (() => {
+    try {
+      return localStorage.getItem('drpciv.rotateSkip') === '1';
+    } catch {
+      return false;
+    }
+  })();
   const lang = () => settings.lang;
   const img = (key, px = 192) => getSignDataURL(key, SIGNS[key].art, px);
   const name = (o) => tr(o, lang());
@@ -78,6 +91,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         const i = modals.indexOf(api);
         if (i >= 0) modals.splice(i, 1);
         el.remove();
+        reorient();
         if (onClose) onClose();
       },
     };
@@ -89,6 +103,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     });
     overlays.appendChild(el);
     modals.push(api);
+    reorient();
     return api;
   }
   const closeAll = () => [...modals].forEach((m) => m.close());
@@ -526,12 +541,18 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
 
   function checkOrientation() {
     const portrait = window.innerHeight > window.innerWidth * 1.02;
-    E.rotate.hidden = !(portrait && !rotateSkipped);
+    // never cover a menu, the book or an exam: only the bare game asks to turn the phone
+    E.rotate.hidden = !(portrait && !rotateSkipped && !modals.length);
   }
   window.addEventListener('resize', checkOrientation);
   window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 150));
   $('#rotateSkip').addEventListener('click', () => {
     rotateSkipped = true;
+    try {
+      localStorage.setItem('drpciv.rotateSkip', '1');
+    } catch {
+      /* ignore */
+    }
     checkOrientation();
   });
 

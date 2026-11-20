@@ -10,6 +10,22 @@ import { EXAM, QUESTIONS } from './questions.js';
 import { CHAPTERS, questionsFor, blockHTML } from './book.js';
 
 const KEY = 'drpciv.theory.v1';
+const RUNKEY = 'drpciv.theory.run.v1'; // an exam in progress, so it survives a reload or a phone call
+const loadRun = () => {
+  try {
+    return JSON.parse(localStorage.getItem(RUNKEY)) || null;
+  } catch {
+    return null;
+  }
+};
+const saveRun = (r) => {
+  try {
+    if (r) localStorage.setItem(RUNKEY, JSON.stringify(r));
+    else localStorage.removeItem(RUNKEY);
+  } catch {
+    /* private mode */
+  }
+};
 const LETTERS = ['A', 'B', 'C'];
 
 function loadStats() {
@@ -48,6 +64,12 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
         ${head('Chestionare auto · categoria B')}
         <div class="sheet-body">
           <p class="thintro">Ca la examenul teoretic DRPCIV: <b>${EXAM.count} de întrebări</b>, <b>${EXAM.minutes} de minute</b>. Fiecare întrebare are 3 variante și <b>unul sau mai multe</b> răspunsuri corecte. Ești admis cu <b>${EXAM.passAt}</b> răspunsuri corecte; la al ${EXAM.maxWrong + 1}-lea răspuns greșit ești respins.</p>
+          ${(() => {
+            const r = loadRun();
+            if (!r) return '';
+            const what = r.chapter ? `Testul capitolului „${(CHAPTERS.find((c) => c.id === r.chapter) || {}).title || ''}”` : r.practice ? 'Antrenamentul' : 'Examenul';
+            return `<div class="thresume"><div><b>${what} început</b><small>${r.answered.length} din ${r.total} răspunse · ${Math.ceil(r.left / 60000)} min rămase</small></div><button type="button" class="btn" data-th="resume">Continuă</button><button type="button" class="btn ghost" data-th="drop">Renunță</button></div>`;
+          })()}
           ${stats.runs ? `<p class="thstats">Cel mai bun rezultat: <b>${stats.best}/${EXAM.count}</b> · admis de ${stats.passed} ${stats.passed === 1 ? 'dată' : 'ori'} din ${stats.runs}</p>` : ''}
           <div class="stack three">
             <button type="button" class="btn big ghost bk-open" data-th="book">📖 Cartea<small>Citește teoria pe capitole</small></button>
@@ -61,8 +83,14 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       const b = e.target.closest('[data-th]');
       if (!b) return;
       sfx.tap();
+      if (b.dataset.th === 'drop') {
+        saveRun(null);
+        b.closest('.thresume').remove();
+        return;
+      }
       m.close();
       if (b.dataset.th === 'book') openBook();
+      else if (b.dataset.th === 'resume') run(false, { resume: loadRun() });
       else run(b.dataset.th === 'practice');
     });
   }
@@ -80,7 +108,7 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
   }
 
   function openBook(startChapter = null) {
-    const m = openModal(`<div class="book" role="dialog" aria-label="Cartea șoferului"><div class="bk-page" id="bkPage"></div></div>`, { dismiss: true });
+    const m = openModal(`<div class="book" role="dialog" aria-label="Cartea șoferului"><div class="bk-page" id="bkPage"></div></div>`, { dismiss: false });
     const page = m.el.querySelector('#bkPage');
     let chI = -1; // -1 = cover / contents
     let pI = 0;
@@ -89,6 +117,11 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       const rs = readState();
       return `<div class="bk-cover">
           <div class="bk-title"><small>Car.dat</small><h2>Cartea șoferului</h2><p>Teoria pentru sala de examen, categoria B, explicată pe înțeles</p></div>
+          ${(() => {
+            const pos = loadStats().pos;
+            if (!pos || !CHAPTERS[pos.ch]) return '';
+            return `<button type="button" class="btn bk-cont" data-cont>Continuă cu „${esc(CHAPTERS[pos.ch].title)}”, pagina ${pos.p + 1}</button>`;
+          })()}
           <ol class="bk-toc">${CHAPTERS.map(
             (c, i) => `<li><button type="button" data-ch="${i}"><img src="${signImg(c.sign, 64)}" alt="" /><span><b>${i + 1}. ${esc(c.title)}</b><small>${c.pages.length} pagini · ${questionsFor(c.id).length} întrebări${rs.ch[c.id] != null ? ` · test ${rs.ch[c.id]}%` : ''}</small></span>${rs.ch[c.id] >= 80 ? '<i class="bk-done" title="Lecție rezolvată">✓</i>' : rs.read[c.id] ? '<i class="bk-read" title="Citit">📖</i>' : ''}</button></li>`
           ).join('')}</ol>
@@ -117,6 +150,11 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       const body = page.querySelector('.bk-body');
       if (body) body.scrollTop = 0;
       if (chI >= 0 && pI === CHAPTERS[chI].pages.length - 1) markRead(CHAPTERS[chI].id);
+      if (chI >= 0) {
+        const st = loadStats();
+        st.pos = { ch: chI, p: pI };
+        saveStats(st);
+      }
     }
 
     function go(step) {
@@ -134,6 +172,13 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
     }
 
     page.addEventListener('click', (e) => {
+      if (e.target.closest('[data-cont]')) {
+        const pos = loadStats().pos;
+        chI = pos.ch;
+        pI = Math.min(pos.p, CHAPTERS[chI].pages.length - 1);
+        sfx.tap();
+        return render(1);
+      }
       const ch = e.target.closest('[data-ch]');
       if (ch) {
         chI = +ch.dataset.ch;
@@ -169,32 +214,63 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
     render();
   }
 
+  // one question with its answers in a shuffled order (qi = index in QUESTIONS)
+  const makeItem = (qi, order) => {
+    const q = QUESTIONS[qi];
+    return { ...q, qi, order, a: order.map((i) => q.a[i]), ok: order.map((i, k) => (q.ok.includes(i) ? k : -1)).filter((k) => k >= 0) };
+  };
+
   function run(practice, opts = {}) {
+    const R = opts.resume || null;
+    if (R) {
+      practice = R.practice;
+      if (R.chapter) opts = { list: questionsFor(R.chapter), chapter: R.chapter, resume: R };
+    }
     const pool = opts.list || QUESTIONS;
-    const total = opts.list ? pool.length : EXAM.count;
+    const total = R ? R.total : opts.list ? pool.length : EXAM.count;
     const maxWrong = opts.list ? Infinity : EXAM.maxWrong;
     const passAt = opts.list ? Math.ceil(total * 0.8) : EXAM.passAt;
-    const queue = shuffle(pool).slice(0, total).map((q) => {
-      // shuffle the answers too, keeping track of which are correct
-      const order = shuffle([0, 1, 2]);
-      return { ...q, a: order.map((i) => q.a[i]), ok: order.map((i, k) => (q.ok.includes(i) ? k : -1)).filter((k) => k >= 0) };
-    });
-    const answered = [];
-    let right = 0;
-    let wrong = 0;
+    const queue = R
+      ? R.queue.map((x) => makeItem(x.qi, x.order))
+      : shuffle(pool)
+          .slice(0, total)
+          .map((q) => makeItem(QUESTIONS.indexOf(q), shuffle([0, 1, 2])));
+    const answered = R ? R.answered.map((x) => ({ q: makeItem(x.qi, x.order), pick: x.pick, ok: x.ok })) : [];
+    let right = R ? R.right : 0;
+    let wrong = R ? R.wrong : 0;
     let pick = [];
     let reviewing = false;
-    const deadline = Date.now() + (opts.list ? Math.max(5, Math.ceil(total * 1.2)) : EXAM.minutes) * 60 * 1000;
+    // the clock only runs while the game is on screen: a call or another app does not eat your time
+    let left = R ? R.left : (opts.list ? Math.max(5, Math.ceil(total * 1.2)) : EXAM.minutes) * 60 * 1000;
+    let lastTick = Date.now();
     let timer = 0;
+    let over = false;
+    const persist = () => {
+      if (over) return;
+      saveRun({ practice, chapter: opts.chapter || null, total, left, right, wrong, queue: queue.map((x) => ({ qi: x.qi, order: x.order })), answered: answered.map((x) => ({ qi: x.q.qi, order: x.q.order, pick: x.pick, ok: x.ok })) });
+    };
+    const onVis = () => {
+      lastTick = Date.now();
+      persist();
+    };
+    document.addEventListener('visibilitychange', onVis);
 
     const m = openModal(`<div class="sheet theory exam" role="dialog" aria-label="Chestionar"><div id="thBody" class="thbody"></div></div>`, {
       dismiss: false,
-      onClose: () => clearInterval(timer),
+      onClose: () => {
+        clearInterval(timer);
+        document.removeEventListener('visibilitychange', onVis);
+      },
     });
     const body = m.el.querySelector('#thBody');
 
+    let ticks = 0;
     function clock() {
-      const left = Math.max(0, deadline - Date.now());
+      if (over) return;
+      const now = Date.now();
+      if (!document.hidden) left = Math.max(0, left - (now - lastTick));
+      lastTick = now;
+      if (++ticks % 5 === 0) persist();
       const el = body.querySelector('#thClock');
       if (el) el.textContent = `${Math.floor(left / 60000)}:${String(Math.floor(left / 1000) % 60).padStart(2, '0')}`;
       if (left <= 0) finish('time');
@@ -234,14 +310,14 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
     }
 
     function submit() {
-      const q = queue[0];
+      const q = queue.shift();
       const ok = sameSet(pick, q.ok);
       if (ok) right++;
       else wrong++;
       answered.push({ q, pick: [...pick], ok });
       ok ? sfx.ok() : sfx.bad();
+      persist();
       if (!practice) {
-        queue.shift();
         if (wrong > maxWrong) return finish('wrong');
         return show();
       }
@@ -260,12 +336,15 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       body.querySelector('#thLater').hidden = true;
       body.querySelector('#thClear').hidden = true;
       const send = body.querySelector('#thSend');
-      send.textContent = queue.length > 1 && wrong <= maxWrong ? 'Următoarea' : 'Vezi rezultatul';
+      send.textContent = queue.length > 0 && wrong <= maxWrong ? 'Următoarea' : 'Vezi rezultatul';
       send.disabled = false;
     }
 
     function finish(reason) {
+      if (over) return;
+      over = true;
       clearInterval(timer);
+      saveRun(null);
       const passed = reason !== 'wrong' && reason !== 'time' && right >= passAt;
       const stats = loadStats();
       if (opts.chapter) {
@@ -302,7 +381,7 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       }
       body.querySelector('#thAgain').onclick = () => {
         m.close();
-        run(practice, opts);
+        run(practice, { list: opts.list, chapter: opts.chapter });
       };
     }
 
@@ -318,10 +397,18 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       }
       const id = e.target.closest('button')?.id;
       if (id === 'thQuit') {
-        if (answered.length && !body.querySelector('.thres') && !confirm('Ieși din chestionar? Progresul se pierde.')) return;
-        m.close();
-      } else if (id === 'thLater' && queue.length > 1) {
+        if (over || !answered.length) {
+          if (!over) saveRun(null);
+          return m.close();
+        }
+        persist();
+        if (body.querySelector('.thask')) return;
+        body.insertAdjacentHTML('afterbegin', `<div class="thask"><span>Ieși acum? Răspunsurile rămân salvate și continui de unde ai rămas, din „Chestionare”.</span><button type="button" class="btn ghost" id="thStay">Rămân</button><button type="button" class="btn" id="thLeave">Ies</button></div>`);
+      } else if (id === 'thStay') body.querySelector('.thask').remove();
+      else if (id === 'thLeave') m.close();
+      else if (id === 'thLater' && queue.length > 1) {
         queue.push(queue.shift());
+        persist();
         show();
       } else if (id === 'thClear') {
         pick = [];
@@ -329,7 +416,6 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
         body.querySelector('#thSend').disabled = true;
       } else if (id === 'thSend') {
         if (reviewing) {
-          queue.shift();
           if (wrong > maxWrong) return finish('wrong');
           return show();
         }
@@ -337,6 +423,7 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       }
     });
 
+    persist();
     show();
     timer = setInterval(clock, 1000);
   }
