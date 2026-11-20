@@ -1,17 +1,18 @@
 // ============================================================================
 //  game.js  —  THE HEART OF THE GAME
 //
-//   1. CAR PHYSICS       steering, gas, progressive brake, reverse, curb bumps
-//   2. TRAFFIC           the slow car you must not overtake (Test mode)
-//   3. TEST-MODE RULES   what is checked at every sign + the score
-//   4. THE GAME OBJECT   update() called by the main loop, mode switching, reset
+//   1. CAR PHYSICS      engine + gearbox + fuel, steering, brakes, curb bumps
+//   2. OTHER ROAD USERS slow car, NPC traffic, walking pedestrians
+//   3. EXAM RULES       what is checked at signs, turns, crossings + penalty points
+//   4. THE GAME OBJECT  update(), mode switching, lights, blinkers, refuelling
 //
 //  No drawing and no buttons here (see render.js / ui.js), so it can be tested
-//  automatically. Tune numbers in config.js; add/modify rules in section 3.
+//  automatically. Car numbers live in cars.js, tuning in config.js.
 // ============================================================================
 
 import { CONFIG as C } from './config.js';
-import { SIGNS, CATEGORIES } from './signs.js';
+import { SIGNS, CATEGORIES, visibleSignKeys } from './signs.js';
+import { CARS, powerCurve, gearTopKmh } from './cars.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -21,14 +22,6 @@ const wrap = (a) => {
   while (a < -Math.PI) a += TAU;
   return a;
 };
-
-const HL = C.car.length / 2;
-const HW = C.car.width / 2;
-// points of the car body that must stay on the asphalt
-const BODY_POINTS = [
-  [HL, HW], [HL, -HW], [-HL, HW], [-HL, -HW],
-  [HL, 0], [-HL, 0], [0, HW], [0, -HW],
-];
 
 // ------------------------------------------------------------------ messages
 // Short bilingual explanations shown after each check in Test mode.
@@ -61,23 +54,29 @@ const MSG = {
     ok
       ? { ro: 'Corect!', en: 'Correct!' }
       : { ro: `Greșit. Răspunsul corect: „${i.right.ro}”.`, en: `Wrong. The correct answer: “${i.right.en}”.` },
-  missed: () => ({ ro: 'Nu ai ajuns la acest indicator.', en: 'You did not reach this sign.' }),
 };
-// special wording for particular signs that use the generic "zones" rule
+const MSG_REASON = {
+  crosswalk: (ok, i) =>
+    ok
+      ? { ro: 'Corect! Ai oprit pentru pieton.', en: 'Correct! You stopped for the pedestrian.' }
+      : { ro: `Nu ai acordat prioritate pietonului (${i.kmh} km/h).`, en: `You did not give way to the pedestrian (${i.kmh} km/h).` },
+  yield: () => ({ ro: 'Nu ai cedat trecerea: veneau vehicule pe drumul cu prioritate.', en: 'You did not give way: vehicles were coming on the priority road.' }),
+  signal: () => ({ ro: 'Corect! Ai semnalizat înainte de viraj.', en: 'Correct! You signalled before turning.' }),
+  signalOff: () => ({ ro: 'Nu ai semnalizat înainte de viraj.', en: 'You did not signal before the turn.' }),
+  signalWrong: () => ({ ro: 'Ai semnalizat în partea greșită.', en: 'You signalled the wrong side.' }),
+  pickup: (ok) => (ok ? { ro: 'Pasagerul a urcat. Drum bun!', en: 'Your passenger is in. Have a good trip!' } : { ro: 'Ai trecut de locul de întâlnire fără să oprești.', en: 'You drove past the meeting point without stopping.' }),
+};
 const MSG_BY_KEY = {
-  turnRight: (ok) =>
-    ok
-      ? { ro: 'Corect! Ai virat la dreapta.', en: 'Correct! You turned right.' }
-      : { ro: 'Direcție greșită: trebuia să virezi la dreapta.', en: 'Wrong direction: you had to turn right.' },
-  noEntry: (ok) =>
-    ok
-      ? { ro: 'Corect! Nu ai intrat pe drumul cu acces interzis.', en: 'Correct! You did not enter the no-entry road.' }
-      : { ro: 'Ai intrat pe un drum cu acces interzit.', en: 'You entered a no-entry road.' },
+  turnRight: (ok) => (ok ? { ro: 'Corect! Ai virat la dreapta.', en: 'Correct! You turned right.' } : { ro: 'Direcție greșită: trebuia să virezi la dreapta.', en: 'Wrong direction: you had to turn right.' }),
+  turnLeft: (ok) => (ok ? { ro: 'Corect! Ai virat la stânga.', en: 'Correct! You turned left.' } : { ro: 'Direcție greșită: trebuia să virezi la stânga.', en: 'Wrong direction: you had to turn left.' }),
+  noEntry: (ok) => (ok ? { ro: 'Corect! Nu ai intrat pe drumul cu acces interzis.', en: 'Correct! You did not enter the no-entry road.' } : { ro: 'Ai intrat pe un drum cu acces interzis.', en: 'You entered a no-entry road.' }),
 };
 
+const SIGNAL_SIGN = (id, s) => ({ id, key: 'signalling', def: SIGNS.signalling, s, test: {}, zones: null });
+
 // ============================================================================
-export function createGame(world) {
-  const P = C.car;
+export function createGame(world, opts = {}) {
+  const level = opts.level || null;
   const listeners = {};
   const on = (name, fn) => {
     (listeners[name] ||= []).push(fn);
@@ -87,77 +86,145 @@ export function createGame(world) {
   const state = {
     mode: 'learn', // 'learn' | 'test'
     time: 0,
+    spec: CARS[opts.carId] || CARS.golf5,
+    weather: opts.weather || world.weather || 'day',
     car: null,
     traffic: [],
+    npcs: [],
+    peds: [],
     prog: null,
     activeSign: null,
-    speedLimit: null, // current speed limit in Test mode (km/h) or null
+    speedLimit: null,
     shake: 0,
     wrongWay: false,
     quiz: null,
     test: null,
+    station: null,
+    refueling: null,
+    fuelSpent: 0,
+    passenger: false,
+    mood: 'happy', // passenger mood: happy | wince
+    moodT: 0,
+    blink: 0,
   };
+
+  let HL = 2.3;
+  let HW = 0.9;
+  let BODY_POINTS = [];
+  let gearTop = [];
+  function applySpec(spec) {
+    state.spec = spec;
+    HL = spec.length / 2;
+    HW = spec.width / 2;
+    BODY_POINTS = [[HL, HW], [HL, -HW], [-HL, HW], [-HL, -HW], [HL, 0], [-HL, 0], [0, HW], [0, -HW]];
+    gearTop = gearTopKmh(spec).map((k) => k / 3.6);
+  }
+  applySpec(state.spec);
+
+  const envGrip = () => (state.weather === 'rain' ? 0.85 : 1);
 
   // ==========================================================================
   //  1. CAR PHYSICS
   // ==========================================================================
   function makeCar(at) {
+    const spec = state.spec;
     return {
       x: at.x, y: at.y, heading: at.heading,
-      v: 0, // speed in m/s (negative = reversing)
-      steer: 0, // current front-wheel angle (radians, + = right)
-      gas: 0, brakeP: 0, // pedal "pressure" 0..1
-      standTimer: 0,
-      contact: false,
-      braking: false, reversing: false,
+      v: 0, // m/s, negative = reversing
+      steer: 0, // front wheel angle (rad, + = right)
+      gas: 0, brakeP: 0, standTimer: 0,
+      contact: false, braking: false, reversing: false,
+      engineOn: true, starting: 0, rpm: spec.idle, boost: 0, gear: 0, shiftT: 0,
+      fuel: spec.tankL * (opts.fuel ?? level?.fuel ?? C.fuel.startFraction),
+      fuelRate: 0, lowWarned: false,
+      signal: null, signalT: 0, sigH: 0, hazard: false, lights: 0,
     };
   }
 
   function stepCar(car, input, dt) {
-    const vmax = P.maxSpeedKmh / 3.6;
-    const vrev = P.maxReverseKmh / 3.6;
+    const spec = state.spec;
+    const grip = envGrip();
+    const vmax = Math.min(spec.topKmh, C.car2.capKmh) / 3.6;
+    const vrev = C.car.maxReverseKmh / 3.6;
     const av = Math.abs(car.v);
 
-    // --- steering: the wheel angle is limited by tyre grip, and it takes time to turn
-    const lock = Math.min(P.maxSteer, Math.atan((P.wheelbase * P.gripLat) / Math.max(av * av, 1)));
+    // --- steering: limited by tyre grip, and heavier cars turn in more slowly
+    const lock = Math.min(spec.maxSteer, Math.atan((spec.wheelbase * spec.gripLat * grip) / Math.max(av * av, 1)));
     const target = clamp(input.steer, -1, 1) * lock;
-    const rate = lock / (input.steer !== 0 ? P.steerTime : P.steerReturnTime);
+    const rate = lock / (Math.abs(target) > 1e-3 ? spec.steerTime : spec.steerReturn);
     car.steer = clamp(approach(car.steer, target, rate * dt), -lock, lock);
+
+    // --- engine on/off + fuel
+    if (car.starting > 0) {
+      car.starting -= dt;
+      if (car.starting <= 0) car.engineOn = car.fuel > 0;
+    }
+    if (car.engineOn && car.fuel <= 0) {
+      car.engineOn = false;
+      emit('stall');
+      issue('fuel', C.exam.penalty.fuel, { ro: 'Ai rămas fără combustibil.', en: 'You ran out of fuel.' }, { title: { ro: 'Fără combustibil', en: 'Out of fuel' } });
+    }
+    const engineOn = car.engineOn;
 
     // --- pedals build up gradually
     const brakeOn = input.brake > 0.5;
-    car.gas = approach(car.gas, input.gas > 0.5 && !brakeOn ? 1 : 0, (input.gas > 0.5 ? P.throttleRise : P.throttleFall) * dt);
-    if (brakeOn) car.brakeP = Math.max(car.brakeP, P.brakeStart);
-    car.brakeP = approach(car.brakeP, brakeOn ? 1 : 0, (brakeOn ? (1 - P.brakeStart) / P.brakeBuildTime : 6) * dt);
+    const gasWanted = input.gas > 0.5 && !brakeOn && engineOn;
+    car.gas = approach(car.gas, gasWanted ? 1 : 0, (gasWanted ? C.car.throttleRise : C.car.throttleFall) * dt);
+    if (brakeOn) car.brakeP = Math.max(car.brakeP, C.car.brakeStart);
+    car.brakeP = approach(car.brakeP, brakeOn ? 1 : 0, (brakeOn ? (1 - C.car.brakeStart) / C.car.brakeBuildTime : 6) * dt);
 
-    // --- forces
+    // --- automatic gearbox + revs
+    const vf = Math.max(car.v, 0);
+    car.shiftT = Math.max(0, car.shiftT - dt);
+    if (car.v < -0.3) car.gear = -1;
+    else if (vf < 0.3 && car.gas < 0.05) car.gear = 0;
+    else {
+      if (car.gear <= 0) car.gear = 1;
+      if (car.gear < 6 && vf > gearTop[car.gear - 1] * 0.94) {
+        car.gear++;
+        car.shiftT = 0.2;
+      } else if (car.gear > 1 && vf < gearTop[car.gear - 2] * 0.6) car.gear--;
+    }
+    const gtop = gearTop[Math.max(1, car.gear) - 1];
+    let rpmF = engineOn ? clamp(vf / gtop, 0, 1) : 0;
+    if (engineOn) rpmF = Math.max(rpmF, car.gas > 0.1 ? 0.28 : 0.05);
+    const wantRpm = engineOn ? spec.idle + (spec.redline - spec.idle) * rpmF : 0;
+    car.rpm += (wantRpm - car.rpm) * Math.min(1, 12 * dt);
+    car.boost = approach(car.boost, car.gas > 0.6 && rpmF > 0.3 ? 1 : 0, dt / (car.gas > 0.6 ? 0.9 : 0.4));
+
+    // --- engine power: each car delivers it differently
+    const pm = powerCurve(spec.engineType, rpmF, car.boost);
+    const powerW = spec.powerKw * 1000 * C.car2.driveEff * pm;
+    const aPow = powerW / (spec.massKg * Math.max(vf, 2.5));
+    const lowEnd = clamp(pm / 0.85, 0.7, 1.15); // torque at these revs: diesel/V8 strong, VTEC and turbo (before boost) weaker
+    const aDrive = Math.min(aPow, spec.traction * grip * lowEnd) * car.gas * (car.shiftT > 0 ? 0.2 : 1) * (1 - Math.pow(clamp(vf / vmax, 0, 1), 4));
+
     const v0 = car.v;
     let a = 0;
     if (car.v > 0.15) {
       car.standTimer = 0;
-      if (brakeOn) a -= P.brake * car.brakeP;
-      else a += P.accel * car.gas * (1 - car.v / vmax);
+      if (brakeOn) a -= spec.brake * grip * car.brakeP;
+      else a += aDrive;
     } else if (car.v < -0.15) {
       car.standTimer = 0;
-      if (brakeOn) a -= P.reverseAccel * clamp(1 - -car.v / vrev, 0, 1);
-      else if (input.gas > 0.5) a += P.brake * 0.7; // gas while rolling backwards = brake first
+      if (brakeOn) a -= engineOn ? C.car.reverseAccel * clamp(1 - -car.v / vrev, 0, 1) : 0;
+      else if (input.gas > 0.5) a += spec.brake * 0.7;
     } else if (brakeOn) {
-      car.standTimer += dt; // standing still, brake held: after a short pause go into reverse
-      if (car.standTimer > P.reverseDelay) a -= P.reverseAccel;
+      car.standTimer += dt;
+      if (car.standTimer > C.car.reverseDelay && engineOn) a -= C.car.reverseAccel;
     } else {
       car.standTimer = 0;
-      a += P.accel * car.gas;
+      a += aDrive;
     }
     car.v += a * dt;
 
-    // resistances always push towards standstill
-    let res = P.rolling + P.drag * car.v * car.v;
-    if (!brakeOn && car.gas < 0.05) res += P.engineBrake * Math.min(1, Math.abs(car.v) / 3);
+    // resistances always push towards standstill (a heavy car keeps rolling longer)
+    const dragK = C.car.drag * (1450 / spec.massKg) * (spec.width / 1.74);
+    let res = C.car.rolling + dragK * car.v * car.v;
+    if (!brakeOn && car.gas < 0.05 && engineOn) res += C.car.engineBrake * Math.min(1, av / 3);
     const dv = res * dt;
     if (Math.abs(car.v) <= dv) car.v = 0;
     else car.v -= Math.sign(car.v) * dv;
-
-    // don't flip direction by accident while braking / gas-braking
     if (v0 > 0 && car.v < 0 && brakeOn && car.standTimer === 0) car.v = 0;
     if (v0 < 0 && car.v > 0) car.v = 0;
     car.v = clamp(car.v, -vrev, vmax);
@@ -165,9 +232,20 @@ export function createGame(world) {
     car.braking = brakeOn && car.v > 0.15;
     car.reversing = car.v < -0.15;
 
+    // --- fuel: depends on the car, throttle and speed
+    if (engineOn) {
+      const idleLs = 0.00022 + spec.massKg * 5e-8;
+      const cruise = (spec.l100 / 100000) * Math.max(car.v, 0) * (0.6 + 0.9 * car.gas * (spec.powerKw / 100));
+      car.fuelRate = (idleLs + cruise) * C.fuel.scale;
+      car.fuel = Math.max(0, car.fuel - car.fuelRate * dt);
+      if (!car.lowWarned && car.fuel / spec.tankL < C.fuel.lowFraction) {
+        car.lowWarned = true;
+        emit('lowfuel');
+      }
+    } else car.fuelRate = 0;
+
     // --- movement (bicycle model)
-    car.heading += ((car.v * Math.tan(car.steer)) / P.wheelbase) * dt;
-    car.heading = wrap(car.heading);
+    car.heading = wrap(car.heading + ((car.v * Math.tan(car.steer)) / spec.wheelbase) * dt);
     car.x += Math.cos(car.heading) * car.v * dt;
     car.y += Math.sin(car.heading) * car.v * dt;
   }
@@ -196,16 +274,15 @@ export function createGame(world) {
       car.x -= wnx * (worst + 0.003);
       car.y -= wny * (worst + 0.003);
 
-      const vn = car.v * (c * wnx + s * wny); // speed towards the wall
+      const vn = car.v * (c * wnx + s * wny);
       if (vn > 0) {
         if (!car.contact && vn > 1.2) {
-          // first touch: a gentle bump
           const frac = clamp(vn / Math.max(Math.abs(car.v), 0.1), 0, 1);
           car.v *= 1 - C.collision.speedLoss * frac;
           state.shake = Math.max(state.shake, clamp(vn / 9, 0.2, 1));
           emit('bump', vn);
+          if (vn > 2.2) curbHit();
         }
-        // slowly turn the car so that it slides along the wall
         let tx = -wny;
         let ty = wnx;
         const dirx = car.v >= 0 ? c : -c;
@@ -214,9 +291,9 @@ export function createGame(world) {
           tx = -tx;
           ty = -ty;
         }
-        let target = Math.atan2(ty, tx);
-        if (car.v < 0) target += Math.PI;
-        car.heading = wrap(car.heading + wrap(target - car.heading) * Math.min(1, C.collision.align * dt));
+        let tgt = Math.atan2(ty, tx);
+        if (car.v < 0) tgt += Math.PI;
+        car.heading = wrap(car.heading + wrap(tgt - car.heading) * Math.min(1, C.collision.align * dt));
       }
     }
     if (touched) car.v *= Math.max(0, 1 - C.collision.scrape * dt);
@@ -224,22 +301,20 @@ export function createGame(world) {
   }
 
   // ==========================================================================
-  //  2. TRAFFIC  (one slow car to practise "No overtaking")
+  //  2. OTHER ROAD USERS
   // ==========================================================================
   const spawned = new Set();
 
   function stepTraffic(dt) {
-    if (state.mode !== 'test' || !state.test || state.test.finished) return;
-    const pr = state.prog;
-    for (const def of world.traffic) {
-      if (!spawned.has(def.id) && pr.onRoute && pr.s >= def.s - def.spawnBefore && pr.s < def.s - 15) {
-        spawned.add(def.id);
-        const end = world.signs.filter((sg) => sg.test.type === 'endOvertake' && sg.s > def.s).sort((a, b) => a.s - b.s)[0];
-        state.traffic.push({
-          id: def.id, def, s: def.s, v: def.kmh / 3.6, color: def.color,
-          releaseS: end ? end.s : def.s + 120,
-          x: 0, y: 0, heading: 0, init: false,
-        });
+    // the slow car on the route (used by the No-overtaking check)
+    if (state.mode === 'test' && state.test && !state.test.finished) {
+      const pr = state.prog;
+      for (const def of world.traffic) {
+        if (!spawned.has(def.id) && pr.onRoute && pr.s >= def.s - def.spawnBefore && pr.s < def.s - 15) {
+          spawned.add(def.id);
+          const end = world.signs.filter((sg) => sg.test.type === 'endOvertake' && sg.s > def.s).sort((a, b) => a.s - b.s)[0];
+          state.traffic.push({ id: def.id, def, s: def.s, v: def.kmh / 3.6, color: def.color, releaseS: end ? end.s : def.s + 120, x: 0, y: 0, heading: 0, init: false, width: 1.8, length: 4.2 });
+        }
       }
     }
     const tmp = {};
@@ -253,23 +328,84 @@ export function createGame(world) {
       const want = Math.atan2(pt.dy, pt.dx);
       ai.heading = ai.init ? wrap(ai.heading + clamp(wrap(want - ai.heading), -3.5 * dt, 3.5 * dt)) : want;
       ai.init = true;
-      ai.ghost = false;
-      // bump into the player's car (the traffic car is heavy, the player gives way)
       pushOutOfTraffic(state.car, ai);
     }
-    // remove cars that are far behind / ahead and out of sight
     for (let i = state.traffic.length - 1; i >= 0; i--) {
       const ai = state.traffic[i];
       const far = Math.hypot(ai.x - state.car.x, ai.y - state.car.y) > 95;
       if ((ai.s > ai.releaseS + 20 && far) || ai.s >= world.route.length - 1) state.traffic.splice(i, 1);
     }
+
+    // NPC cars with their own road (cross traffic)
+    for (const def of world.npcDefs) {
+      def.timer = (def.timer ?? 0) - dt;
+      if (def.timer <= 0 && state.npcs.filter((n) => n.def === def).every((n) => n.s > 18)) {
+        def.timer = def.every;
+        state.npcs.push({ def, s: 0, v: def.kmh / 3.6, x: 0, y: 0, heading: 0, color: def.color, width: 1.8, length: 4.3 });
+      }
+    }
+    for (let i = state.npcs.length - 1; i >= 0; i--) {
+      const n = state.npcs[i];
+      n.s += n.v * dt;
+      if (n.s >= n.def.path.length) {
+        state.npcs.splice(i, 1);
+        continue;
+      }
+      const pt = n.def.path.at(n.s, tmp);
+      n.x = pt.x - pt.dy * n.def.lane;
+      n.y = pt.y + pt.dx * n.def.lane;
+      n.heading = Math.atan2(pt.dy, pt.dx);
+      if (pushOutOfTraffic(state.car, n) > 3) issue('pedHit', C.exam.penalty.pedHit, { ro: 'Ai lovit un alt vehicul.', en: 'You hit another vehicle.' }, { title: { ro: 'Accident', en: 'Crash' } });
+    }
+
+    // pedestrians
+    const pr = state.prog;
+    for (const p of state.peds) {
+      if (p.phase === 'idle' && !p.used && pr.onRoute && pr.s >= p.s - 48 && pr.s < p.s) {
+        p.phase = 'wait';
+        p.timer = 2.2;
+      } else if (p.phase === 'wait') {
+        p.timer -= dt;
+        if (p.timer <= 0) {
+          p.phase = 'cross';
+          p.t = 0;
+        }
+      } else if (p.phase === 'cross') {
+        p.t += (p.speed * dt) / (2 * p.reach);
+        if (p.t >= 1) {
+          p.t = 1;
+          p.phase = 'rest';
+          p.timer = 3;
+          p.used = true;
+        }
+      } else if (p.phase === 'rest') {
+        p.timer -= dt;
+        if (p.timer <= 0) {
+          p.phase = 'idle';
+          p.side = -p.side;
+          p.t = 0;
+        }
+      }
+      if (p.used && (pr.s > p.s + 30 || pr.s < p.s - 70)) p.used = false;
+      const lat = p.side * p.reach * (1 - 2 * p.t);
+      p.px = p.x + p.nx * lat;
+      p.py = p.y + p.ny * lat;
+      if (!p.hit && (p.phase === 'cross' || p.phase === 'wait') && Math.hypot(state.car.x - p.px, state.car.y - p.py) < HW + 0.8 && Math.abs(state.car.v) > 1) {
+        p.hit = true;
+        issue('pedHit', C.exam.penalty.pedHit, { ro: 'Ai lovit un pieton!', en: 'You hit a pedestrian!' }, { title: { ro: 'Accident', en: 'Crash' } });
+      }
+    }
   }
 
+  /** Push the player out of another car. Returns how hard they closed in (m/s). */
   function pushOutOfTraffic(car, ai) {
-    const offs = [-HL * 0.55, HL * 0.55];
-    const R = 1.05;
+    const spec = state.spec;
+    const offs = [-spec.length * 0.28, spec.length * 0.28];
+    const aoffs = [-(ai.length || 4.2) * 0.28, (ai.length || 4.2) * 0.28];
+    const R = Math.max(spec.width, ai.width || 1.8) * 0.55 + 0.15;
+    let closeSpeed = 0;
     for (const a of offs) {
-      for (const b of offs) {
+      for (const b of aoffs) {
         const ax = car.x + Math.cos(car.heading) * a;
         const ay = car.y + Math.sin(car.heading) * a;
         const bx = ai.x + Math.cos(ai.heading) * b;
@@ -284,36 +420,67 @@ export function createGame(world) {
             car.v = ai.v + closing * 0.35;
             state.shake = Math.max(state.shake, 0.4);
             emit('bump', closing);
+            closeSpeed = Math.max(closeSpeed, closing);
           }
         }
       }
     }
+    return closeSpeed;
   }
 
   // ==========================================================================
-  //  3. TEST-MODE RULES
-  //     Every sign with a `test:` in signs.js becomes a "task". Each task has
-  //     a small handler below that watches the car and calls finish(ok, ...).
+  //  3. EXAM RULES
+  //     Every sign with a `test:` in signs.js becomes a "task", and so does
+  //     every turn that needs a signal. Each task has a small handler below
+  //     that watches the car and calls finish(ok, ...).
   // ==========================================================================
   const T = C.test;
+
+  function checkEliminated() {
+    const t = state.test;
+    if (t && !t.finished && t.penalty >= C.exam.failAt) {
+      t.failedExam = true;
+      setTimeout(() => endTest(), 0);
+    }
+  }
+
+  /** A mistake that is not tied to one sign (lights, curb, fuel ...). */
+  function issue(key, pts, message, extra = {}) {
+    const t = state.test;
+    if (!t || t.finished || state.mode !== 'test') return;
+    t.penalty += pts;
+    t.log.push({ key, pts, message, title: extra.title || null, signKey: extra.signKey || null });
+    state.mood = 'wince';
+    state.moodT = 2;
+    emit('feedback', { taskId: null, issue: true, issueKey: key, signKey: extra.signKey || null, def: extra.def || null, title: extra.title || null, ok: false, points: 0, penalty: pts, totalPenalty: t.penalty, score: t.score, message, quiz: false });
+    checkEliminated();
+  }
+
+  let curbCount = 0;
+  function curbHit() {
+    curbCount++;
+    if (curbCount <= 5) issue('curb', C.exam.penalty.curb, { ro: 'Ai atins bordura.', en: 'You touched the curb.' }, { title: { ro: 'Bordură', en: 'Curb' } });
+  }
 
   function finish(t, ok, reason, info = {}) {
     if (t.status === 'done') return;
     t.status = 'done';
     t.ok = ok;
     t.reason = reason;
-    state.test.score += ok ? T.pointsPerSign : 0;
-    const mk = MSG_BY_KEY[t.sign.key] || MSG[t.type] || MSG[reason];
-    emit('feedback', {
-      taskId: t.id,
-      signKey: t.sign.key,
-      def: t.sign.def,
-      ok,
-      points: ok ? T.pointsPerSign : 0,
-      score: state.test.score,
-      message: mk ? mk(ok, info) : { ro: ok ? 'Corect!' : 'Greșit.', en: ok ? 'Correct!' : 'Wrong.' },
-      quiz: t.type === 'quiz',
-    });
+    const test = state.test;
+    const pen = ok ? 0 : t.p.penalty ?? C.exam.penalty[reason] ?? C.exam.penalty[t.type] ?? 5;
+    test.score += ok ? T.pointsPerSign : 0;
+    test.penalty += pen;
+    t.penalty = pen;
+    const mk = MSG_REASON[reason] || MSG_BY_KEY[t.sign.key] || MSG[t.type];
+    const message = mk ? mk(ok, info) : { ro: ok ? 'Corect!' : 'Greșit.', en: ok ? 'Correct!' : 'Wrong.' };
+    t.message = message;
+    if (!ok) {
+      state.mood = 'wince';
+      state.moodT = 2;
+    }
+    emit('feedback', { taskId: t.id, signKey: t.sign.key, def: t.sign.def, ok, points: ok ? T.pointsPerSign : 0, penalty: pen, totalPenalty: test.penalty, score: test.score, message, quiz: t.type === 'quiz' });
+    if (pen) checkEliminated();
   }
 
   const HANDLERS = {
@@ -333,14 +500,25 @@ export function createGame(world) {
       },
     },
 
-    // Speed at a line must be at most maxKmh (give way, crossing, curve, children)
+    // Speed at a line must be at most maxKmh. Also: give way to cars / pedestrians.
     slow: {
       init(t) {
         t.line = t.s + (t.p.lineOffset ?? 8);
         t.max = t.p.maxKmh;
+        t.conflict = t.p.conflict || null;
+        t.ped = world.peds.length ? state.peds.find((pd) => Math.abs(pd.s - t.line) < 3) || null : null;
       },
       update(t, c) {
-        if (c.crossed(t.line)) finish(t, c.kmh <= t.max + 0.5, 'slow', { kmh: Math.round(c.kmh), max: t.max });
+        if (!c.crossed(t.line)) return;
+        if (t.ped && (t.ped.phase === 'wait' || t.ped.phase === 'cross')) {
+          finish(t, c.kmh <= 3.5, 'crosswalk', { kmh: Math.round(c.kmh) });
+          return;
+        }
+        if (t.conflict && state.npcs.some((n) => Math.hypot(n.x - t.conflict.x, n.y - t.conflict.y) < t.conflict.r)) {
+          finish(t, false, 'yield');
+          return;
+        }
+        finish(t, c.kmh <= t.max + 0.5, 'slow', { kmh: Math.round(c.kmh), max: t.max });
       },
     },
 
@@ -419,7 +597,7 @@ export function createGame(world) {
       },
     },
 
-    // Must drive into the "pass" spot / must not drive into the "fail" spot (set in map.js)
+    // Must drive into the "pass" spot / must not drive into the "fail" spot (set in the map)
     zones: {
       init(t) {
         t.zones = t.sign.zones || {};
@@ -455,7 +633,7 @@ export function createGame(world) {
         if (r && Math.abs(Math.hypot(dx, dy) - r.r) < 6 && Math.abs(c.car.v) > 2) {
           const a = Math.atan2(dy, dx);
           if (t.prevA != null) {
-            const da = wrap(a - t.prevA) * Math.sign(c.car.v); // + = clockwise on screen
+            const da = wrap(a - t.prevA) * Math.sign(c.car.v);
             if (da > 0) t.wrong += c.dt;
             else t.wrong = Math.max(0, t.wrong - c.dt);
           }
@@ -478,20 +656,54 @@ export function createGame(world) {
         if (t.status === 'pending' && c.crossed(t.at)) startQuiz(t);
       },
     },
+
+    // The right blinker must be on (for a moment) before a turn
+    signal: {
+      init(t) {
+        t.side = t.p.side;
+        t.line = t.s - (t.p.lead ?? 8);
+      },
+      update(t, c) {
+        if (!c.crossed(t.line)) return;
+        const car = c.car;
+        if (car.signal === t.side && car.signalT >= 0.8) finish(t, true, 'signal');
+        else finish(t, false, car.signal ? 'signalWrong' : 'signalOff');
+      },
+    },
+
+    // Stop at the meeting point and let the passenger in
+    pickup: {
+      init(t) {
+        t.hold = 0;
+        t.spot = world.mission.pickup;
+      },
+      update(t, c) {
+        const d = Math.hypot(c.car.x - t.spot.x, c.car.y - t.spot.y);
+        if (d < 10 && c.kmh < 3) t.hold += c.dt;
+        else t.hold = Math.max(0, t.hold - c.dt);
+        if (t.hold > 1.2) {
+          state.passenger = true;
+          finish(t, true, 'pickup');
+        } else if (c.s > t.s + 16) {
+          state.passenger = true;
+          finish(t, false, 'pickup');
+        }
+      },
+    },
   };
 
   function startQuiz(t) {
     t.status = 'quiz';
-    const keys = Object.keys(SIGNS).filter((k) => k !== t.sign.key);
-    const sameCat = keys.filter((k) => SIGNS[k].category === t.sign.def.category);
+    const all = visibleSignKeys().filter((k) => k !== t.sign.key);
+    const same = all.filter((k) => SIGNS[k].category === t.sign.def.category);
     const pick = (arr) => arr.splice(Math.floor(Math.random() * arr.length), 1)[0];
     const options = [t.sign.key];
-    if (sameCat.length) {
-      const k = pick(sameCat);
+    if (same.length) {
+      const k = pick(same);
       options.push(k);
-      keys.splice(keys.indexOf(k), 1);
+      all.splice(all.indexOf(k), 1);
     }
-    while (options.length < 3 && keys.length) options.push(pick(keys));
+    while (options.length < 3 && all.length) options.push(pick(all));
     for (let i = options.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [options[i], options[j]] = [options[j], options[i]];
@@ -509,54 +721,67 @@ export function createGame(world) {
     finish(t, ok, 'quiz', { right: SIGNS[q.signKey].name });
     return { ok, right: q.signKey };
   }
-
-  function closeQuiz() {
+  const closeQuiz = () => {
     state.quiz = null;
-  }
+  };
 
   function startTest() {
     const tasks = [];
+    const add = (sign, type, p, s) => {
+      if (!HANDLERS[type]) {
+        console.warn(`unknown test type "${type}"`);
+        return;
+      }
+      const t = { id: sign.id, sign, type, p, s, status: 'pending', ok: null, reason: null };
+      HANDLERS[type].init(t);
+      tasks.push(t);
+    };
     for (const sg of world.signs) {
       const type = sg.test && sg.test.type;
       if (!type || type === 'endOvertake') continue;
-      if (!HANDLERS[type]) {
-        console.warn(`signs.js: unknown test type "${type}" for sign ${sg.key}`);
-        continue;
-      }
-      const t = { id: sg.id, sign: sg, type, p: sg.test, s: sg.s, status: 'pending', ok: null, reason: null };
-      HANDLERS[type].init(t);
-      tasks.push(t);
+      add(sg, type, sg.test, sg.s);
     }
-    state.test = { tasks, score: 0, max: tasks.length * T.pointsPerSign, finished: false, summary: null, speedTask: null, startTime: state.time };
+    for (const st of world.signalTasks) add(SIGNAL_SIGN(st.id, st.s), 'signal', { side: st.side, lead: st.lead }, st.s);
+    if (world.mission && world.mission.pickup) add(SIGNAL_PICKUP(), 'pickup', {}, world.mission.pickup.s);
+    tasks.sort((a, b) => a.s - b.s);
+    state.test = { tasks, score: 0, penalty: 0, log: [], max: tasks.length * T.pointsPerSign, finished: false, failedExam: false, summary: null, speedTask: null, startTime: state.time, lightsT: 0, lightsCool: 0, hazardT: 0, hazardCool: 0, stationFlag: false };
+    curbCount = 0;
   }
+  const SIGNAL_PICKUP = () => ({ id: 'pickup', key: 'pickup', def: SIGNS.pickup, s: world.mission.pickup.s, test: {}, zones: null });
 
   function summarize() {
+    const test = state.test;
     const cats = {};
     for (const k of Object.keys(CATEGORIES)) cats[k] = { total: 0, correct: 0 };
-    for (const t of state.test.tasks) {
+    for (const t of test.tasks) {
       const cat = t.sign.def.category;
       cats[cat].total += 1;
       if (t.ok) cats[cat].correct += 1;
     }
-    const tasks = state.test.tasks.map((t) => ({
-      id: t.id,
-      key: t.sign.key,
-      def: t.sign.def,
-      ok: !!t.ok,
-      missed: t.reason === 'missed',
-    }));
+    const tasks = test.tasks.map((t) => ({ id: t.id, key: t.sign.key, def: t.sign.def, ok: !!t.ok, missed: t.reason === 'missed', penalty: t.penalty || 0, message: t.message || null }));
     return {
-      score: state.test.score,
-      max: state.test.max,
+      score: test.score,
+      max: test.max,
+      penalty: test.penalty,
+      failAt: C.exam.failAt,
+      passed: !test.failedExam && test.penalty < C.exam.failAt,
+      eliminated: test.failedExam,
+      reachedFinish: !!test.reachedFinish,
       correct: tasks.filter((x) => x.ok).length,
       total: tasks.length,
       cats,
       tasks,
-      seconds: state.time - state.test.startTime,
+      issues: test.log,
+      seconds: state.time - test.startTime,
+      levelId: level ? level.id : null,
+      boss: !!(level && level.boss),
+      passenger: state.passenger,
+      carId: state.spec.id,
+      fuelSpent: state.fuelSpent,
     };
   }
 
-  /** End the test: running checks that had no problem count as passed; unreached signs count as missed. */
+  /** End the test: running checks without a problem count as passed; unreached signs count as missed. */
   function endTest() {
     const test = state.test;
     if (!test || test.finished) return test && test.summary;
@@ -588,14 +813,43 @@ export function createGame(world) {
     ctx.onRoute = pr.onRoute;
     ctx.jumped = pr.jumped;
     ctx.car = car;
+    const test = state.test;
+
+    // lights at night / in fog
+    if ((state.weather === 'night' || state.weather === 'fog') && ctx.kmh > 5 && car.lights < 2) test.lightsT += dt;
+    else test.lightsT = Math.max(0, test.lightsT - dt);
+    test.lightsCool -= dt;
+    if (test.lightsT > 5 && test.lightsCool <= 0) {
+      test.lightsCool = 25;
+      issue('lights', C.exam.penalty.lights, { ro: 'Pe întuneric sau ceață trebuie să folosești faza scurtă.', en: 'In the dark or in fog you must use low beams.' }, { title: { ro: 'Faruri', en: 'Headlights' } });
+    }
+    // hazard lights used while driving normally
+    if (car.hazard && ctx.kmh > 20) test.hazardT += dt;
+    else test.hazardT = 0;
+    test.hazardCool -= dt;
+    if (test.hazardT > 6 && test.hazardCool <= 0) {
+      test.hazardCool = 20;
+      issue('hazard', C.exam.penalty.hazard, { ro: 'Avariile se folosesc doar pentru pericol sau oprire forțată.', en: 'Hazard lights are for danger or a forced stop, not normal driving.' }, { title: { ro: 'Lumini de avarie', en: 'Hazard lights' } });
+    }
+    // speed inside a gas station
+    const st = state.station;
+    if (st && st.inZone) {
+      if (ctx.kmh > 25 && !test.stationFlag) {
+        test.stationFlag = true;
+        issue('stationSpeed', C.exam.penalty.stationSpeed, { ro: 'În benzinărie conduci încet.', en: 'Drive slowly inside a fuel station.' }, { title: { ro: 'Benzinărie', en: 'Fuel station' } });
+      }
+    } else test.stationFlag = false;
+
     if (state.wrongWay || state.quiz) return;
-    for (const t of state.test.tasks) {
+    for (const t of test.tasks) {
       if (t.status === 'done') continue;
       HANDLERS[t.type].update(t, ctx);
       if (state.quiz) break;
     }
-    // reached the finish line?
-    if (pr.onRoute && pr.s >= world.route.length - 0.8 && pr.vAlong > 0.5) endTest();
+    if (pr.onRoute && pr.s >= world.route.length - 0.8 && pr.vAlong > 0.5) {
+      test.reachedFinish = true;
+      endTest();
+    }
   }
 
   // ==========================================================================
@@ -648,9 +902,56 @@ export function createGame(world) {
     const prev = state.activeSign;
     if (prev && prev !== best) {
       const ps = score(prev);
-      if (ps !== Infinity && bs > ps - 6) best = prev; // stick with the current sign for a moment
+      if (ps !== Infinity && bs > ps - 6) best = prev;
     }
     state.activeSign = best;
+  }
+
+  function updateBlinkersAndStation(dt) {
+    const car = state.car;
+    if (car.signal && !car.hazard) {
+      car.signalT += dt;
+      const turned = wrap(car.heading - car.sigH);
+      if (((car.signal === 'right' && turned > 1.0) || (car.signal === 'left' && turned < -1.0)) && Math.abs(car.steer) < 0.06) car.signal = null;
+    }
+    if (car.signal || car.hazard) {
+      const ph = Math.floor(state.time / 0.33) % 2;
+      if (ph !== state.blink) {
+        state.blink = ph;
+        emit('blink', ph);
+      }
+    } else state.blink = 0;
+
+    // gas station
+    let info = null;
+    for (const st of world.stations) {
+      const dz = Math.hypot(car.x - st.zone.x, car.y - st.zone.y);
+      if (dz < st.zone.r) {
+        const db = Math.hypot(car.x - st.bay.x, car.y - st.bay.y);
+        const inBay = db < st.bay.r + 1.5 && Math.abs(car.v) < 0.8;
+        info = { name: st.name, inZone: true, inBay, canRefuel: inBay && !car.engineOn, needEngineOff: inBay && car.engineOn };
+      }
+    }
+    state.station = info;
+    const rf = state.refueling;
+    if (rf) {
+      if (!(info && info.canRefuel) || car.fuel >= state.spec.tankL - 0.01) state.refueling = null;
+      else {
+        const add = Math.min(1.6 * dt, state.spec.tankL - car.fuel, rf.left);
+        car.fuel += add;
+        rf.left -= add;
+        state.fuelSpent += add * C.fuel.pricePerLitre;
+        if (rf.left <= 0.001) state.refueling = null;
+        car.lowWarned = car.fuel / state.spec.tankL < C.fuel.lowFraction;
+      }
+    }
+    // passenger mood
+    state.moodT = Math.max(0, state.moodT - dt);
+    if (state.moodT <= 0) state.mood = 'happy';
+    if (state.passenger && car.brakeP > 0.85 && car.v > 6) {
+      state.mood = 'wince';
+      state.moodT = 1.2;
+    }
   }
 
   function update(dt, input) {
@@ -660,6 +961,7 @@ export function createGame(world) {
     stepTraffic(dt);
     updateProgress(dt);
     updateActiveSign();
+    updateBlinkersAndStation(dt);
     if (state.mode === 'test' && state.test && !state.test.finished) runRules(dt);
     state.shake = Math.max(0, state.shake - dt * 2.5);
   }
@@ -672,12 +974,23 @@ export function createGame(world) {
     state.car = makeCar(world.start);
     state.prog = freshProgress();
     state.traffic = [];
+    state.npcs = [];
+    state.peds = world.peds.map((p) => ({ ...p, side: p.startSide, phase: 'idle', timer: 0, t: 0, used: false, hit: false, px: p.x, py: p.y }));
+    for (const def of world.npcDefs) {
+      def.timer = def.every;
+      const gap = (def.kmh / 3.6) * def.every;
+      for (let s0 = gap * 0.4; s0 < def.path.length - 20; s0 += gap) state.npcs.push({ def, s: s0, v: def.kmh / 3.6, x: 0, y: 0, heading: 0, color: def.color, width: 1.8, length: 4.3 });
+    }
     spawned.clear();
     state.quiz = null;
     state.speedLimit = null;
     state.wrongWay = false;
     state.shake = 0;
     state.activeSign = null;
+    state.passenger = false;
+    state.refueling = null;
+    state.fuelSpent = 0;
+    curbCount = 0;
     updateProgress(0);
   }
 
@@ -691,14 +1004,13 @@ export function createGame(world) {
 
   /** Put the car back on the road, facing the right way (a little behind where it is now). */
   function resetCar() {
-    const loc = world.route.locate(state.car.x, state.car.y, null);
+    const old = state.car;
+    const loc = world.route.locate(old.x, old.y, null);
     const s = Math.max(0, loc.s - 4);
     const pt = world.route.at(s, {});
-    const car = makeCar({
-      x: pt.x - pt.dy * C.world.laneOffset,
-      y: pt.y + pt.dx * C.world.laneOffset,
-      heading: Math.atan2(pt.dy, pt.dx),
-    });
+    const car = makeCar({ x: pt.x - pt.dy * C.world.laneOffset, y: pt.y + pt.dx * C.world.laneOffset, heading: Math.atan2(pt.dy, pt.dx) });
+    for (const k of ['fuel', 'signal', 'hazard', 'lights', 'engineOn', 'lowWarned']) car[k] = old[k];
+    car.signalT = old.signalT;
     state.car = car;
     state.prog.ready = false;
     state.prog.wrongTime = 0;
@@ -707,18 +1019,51 @@ export function createGame(world) {
     state.prog.prevS = state.prog.s;
   }
 
+  // --- controls that are not steering / pedals ------------------------------------
+  function toggleSignal(side) {
+    const car = state.car;
+    car.signal = car.signal === side ? null : side;
+    car.signalT = 0;
+    car.sigH = car.heading;
+  }
+  const toggleHazard = () => {
+    state.car.hazard = !state.car.hazard;
+  };
+  const cycleLights = () => {
+    state.car.lights = (state.car.lights + 1) % 4;
+  };
+  function toggleEngine() {
+    const car = state.car;
+    if (car.engineOn) {
+      car.engineOn = false;
+      car.starting = 0;
+    } else if (car.fuel > 0 && car.starting <= 0) car.starting = 0.9;
+    else if (car.fuel <= 0) emit('stall');
+  }
+  function startRefuel(litres) {
+    const st = state.station;
+    if (!st || !st.canRefuel) return false;
+    state.refueling = { left: litres === 'full' ? state.spec.tankL : litres };
+    return true;
+  }
+  const stopRefuel = () => {
+    state.refueling = null;
+  };
+  function setCar(carId) {
+    const old = state.car;
+    const frac = old ? old.fuel / state.spec.tankL : C.fuel.startFraction;
+    applySpec(CARS[carId]);
+    if (old) {
+      old.fuel = frac * state.spec.tankL;
+      old.steer = 0;
+      old.rpm = state.spec.idle;
+    }
+  }
+  const setWeather = (w) => {
+    state.weather = w;
+  };
+
   setMode('learn');
 
-  return {
-    state,
-    world,
-    on,
-    update,
-    setMode,
-    restart: () => setMode(state.mode),
-    resetCar,
-    endTest,
-    answerQuiz,
-    closeQuiz,
-  };
+  return { state, world, level, on, update, setMode, restart: () => setMode(state.mode), resetCar, endTest, answerQuiz, closeQuiz, toggleSignal, toggleHazard, cycleLights, toggleEngine, startRefuel, stopRefuel, setCar, setWeather };
 }

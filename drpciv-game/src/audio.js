@@ -50,6 +50,19 @@ export const sfx = {
   bump(strength = 3) {
     tone(110, 0, 0.14, 'square', Math.min(0.2, 0.05 + strength * 0.015), 55);
   },
+  tick(phase) {
+    tone(phase ? 1900 : 1350, 0, 0.018, 'square', 0.035);
+  },
+  lowfuel() {
+    tone(880, 0, 0.12, 'sine', 0.12);
+    tone(660, 0.16, 0.18, 'sine', 0.12);
+  },
+  pump() {
+    tone(240, 0, 0.05, 'triangle', 0.05);
+  },
+  stall() {
+    tone(160, 0, 0.5, 'sawtooth', 0.1, 50);
+  },
   tap() {
     tone(520, 0, 0.05, 'triangle', 0.08);
   },

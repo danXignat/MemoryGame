@@ -1,11 +1,13 @@
-// Automatic test: drives a simulated car around the whole track (no screen needed).
+// Automatic test: drives simulated cars around every playable level (no screen needed).
 //   npm test
-// A careful "bot" must score 100%; a reckless bot must fail the speed/stop/overtake rules.
+// A careful "bot" must pass each level; a reckless bot must fail. Also checks the 5 cars differ.
 
-import { MAP } from '../src/map.js';
+import { LEVELS, getMap } from '../src/levels.js';
 import { buildWorld } from '../src/mapbuild.js';
 import { createGame } from '../src/game.js';
 import { CONFIG as C } from '../src/config.js';
+import { CARS, CAR_ORDER } from '../src/cars.js';
+import { makeBot } from './bot.mjs';
 
 let failures = 0;
 const check = (cond, msg) => {
@@ -13,151 +15,133 @@ const check = (cond, msg) => {
   if (!cond) failures++;
 };
 
-const world = buildWorld(MAP);
-console.log(`Route length: ${world.route.length.toFixed(1)} m, ${world.signs.length} signs, ${world.trees.length} trees, ${world.houses.length} houses`);
-check(world.warnings.length === 0, `map has no warnings ${world.warnings.join(' | ')}`);
+const worlds = {};
+for (const l of LEVELS.filter((x) => x.playable)) {
+  const w = buildWorld(getMap(l));
+  worlds[l.id] = w;
+  check(w.warnings.length === 0, `${l.id} map builds without warnings ${w.warnings.join(' | ')}`);
+}
 
 // ---------------------------------------------------------------- the bot
-function runBot(kind, { maxSeconds = 600 } = {}) {
-  const game = createGame(world);
+function runBot(levelId, kind, { carId = 'golf5', maxSeconds = 700, weather } = {}) {
+  const level = LEVELS.find((l) => l.id === levelId);
+  const world = worlds[levelId];
+  const map = getMap(level);
+  const game = createGame(world, { level, carId, weather });
   const st = game.state;
   game.setMode('test');
-  let bumps = 0;
-  const events = { feedback: [], quiz: 0 };
-  const bumpAt = [];
+  const log = { feedback: [], bumps: 0, quiz: 0, bumpAt: [] };
   game.on('bump', (vn) => {
-    bumps++;
-    bumpAt.push(`s=${st.prog.s.toFixed(0)} (${st.car.x.toFixed(0)},${st.car.y.toFixed(0)}) v=${(st.car.v * 3.6).toFixed(0)}km/h vn=${vn.toFixed(1)}`);
+    log.bumps++;
+    log.bumpAt.push(`s=${st.prog.s.toFixed(0)} vn=${vn.toFixed(1)}`);
   });
-  game.on('feedback', (f) => events.feedback.push(f));
+  game.on('feedback', (f) => log.feedback.push(f));
   game.on('quiz', () => {
-    events.quiz++;
+    log.quiz++;
     if (kind !== 'reckless') game.answerQuiz(st.quiz.signKey);
     else game.answerQuiz(st.quiz.options.find((o) => o !== st.quiz.signKey));
     game.closeQuiz();
   });
 
-  const input = { steer: 0, gas: 0, brake: 0 };
-  const dt = C.fixedStep;
-  const stopHold = {};
+  const bot = makeBot(game, world, map, kind);
   let t = 0;
-  const tmp = {};
   while (t < maxSeconds && !st.test.finished) {
-    const car = st.car;
-    const pr = st.prog;
-    const s = pr.s;
-    const v = car.v;
-
-    // steering: pure pursuit to a point ahead on the route (right lane)
-    const look = 7 + Math.abs(v) * 0.5;
-    const p = world.route.at(Math.min(world.route.length, s + look), tmp);
-    let lane = C.world.laneOffset;
-    if (kind === 'overtaker') {
-      for (const ai of st.traffic) if (ai.s > s - 10 && ai.s - s < 22) lane = -2.2; // pull out to the left lane
-    }
-    const tx = p.x - p.dy * lane;
-    const ty = p.y + p.dx * lane;
-    const desired = Math.atan2(ty - car.y, tx - car.x);
-    let err = desired - car.heading;
-    while (err > Math.PI) err -= 2 * Math.PI;
-    while (err < -Math.PI) err += 2 * Math.PI;
-    input.steer = Math.max(-1, Math.min(1, err * 2.2));
-
-    // speed target
-    let target = kind !== 'reckless' ? 40 / 3.6 : 75 / 3.6;
-    if (kind !== 'reckless') {
-      // slow down for tight turns (T1 junction, roundabout)
-      const ring = world.route.segRanges.ring;
-      if (s > ring[0] - 12 && s < ring[1] + 22) target = Math.min(target, 18 / 3.6);
-      const fil = world.route.segRanges.fillet;
-      if (s > fil[0] - 14 && s < fil[1] + 8) target = Math.min(target, 16 / 3.6);
-      if (st.speedLimit) target = Math.min(target, (st.speedLimit - 4) / 3.6);
-      for (const task of st.test.tasks) {
-        if (task.status === 'done') continue;
-        if (task.type === 'slow') {
-          const dist = task.line - s;
-          if (dist > -2 && dist < 45) target = Math.min(target, Math.sqrt((task.max - 5) ** 2 / 12.96 + 2 * 3 * Math.max(0, dist - 1)));
-        }
-        if (task.type === 'stop') {
-          const dist = task.line - s - 2.0;
-          if (dist > -3 && dist < 60) {
-            if (task.minV <= C.test.stopMaxKmh) continue; // already stopped: go
-            if (dist <= 0.2) {
-              target = 0;
-            } else target = Math.min(target, Math.sqrt(2 * 2.5 * dist));
-          }
-        }
-        if (task.type === 'noOvertake' && task.status !== 'pending') {
-          // stay behind the slow car
-          if (kind !== 'overtaker') for (const ai of st.traffic) if (ai.s > s && ai.s - s < 30) target = Math.min(target, Math.max(0, ai.v - (22 - (ai.s - s)) * 0.1));
-        }
-      }
-      // keep behind the slow car also before the zone starts
-      if (kind !== 'overtaker') for (const ai of st.traffic) if (ai.s > s && ai.s - s < 26 && s > world.route.length * 0.3) target = Math.min(target, Math.max(0, ai.v * 0.92 - (14 - (ai.s - s)) * 0.12));
-    } else {
-      // reckless: only slows for curves a little
-      target = 75 / 3.6;
-      if (pr.s > 0 && Math.abs(err) > 0.4) target = 25 / 3.6;
-    }
-    if (v < target - 0.1) {
-      input.gas = 1;
-      input.brake = 0;
-    } else if (v > target + 0.4) {
-      input.gas = 0;
-      input.brake = 1;
-    } else {
-      input.gas = Math.abs(v - target) < 0.2 && v > 4 ? (Math.random() < 0.5 ? 1 : 0) : 0;
-      input.brake = 0;
-    }
-    if (target === 0 && v < 0.3) {
-      input.gas = 0;
-      input.brake = 0;
-    }
-
-    game.update(dt, input);
-    t += dt;
+    bot.step();
+    t += C.fixedStep;
   }
-  return { game, st, t, bumps, events, bumpAt };
+  return { game, st, t, log, summary: st.test.summary };
 }
 
-// ---------------------------------------------------------------- careful run
+// -------------------------------------------------------- every level, careful
+for (const id of ['free', 'L1', 'L2', 'L3', 'L4', 'L5', 'boss']) {
+  const r = runBot(id, 'careful');
+  const sum = r.summary;
+  console.log(`\n${id}: finished=${r.st.test.finished} time=${r.t.toFixed(0)}s correct=${sum && sum.correct}/${sum && sum.total} penalty=${sum && sum.penalty} bumps=${r.log.bumps}`);
+  if (sum) for (const x of sum.tasks.filter((x) => !x.ok)) console.log(`     ✗ ${x.key}${x.missed ? ' (missed)' : ''}: ${x.message ? x.message.en : ''}`);
+  check(r.st.test.finished && sum && sum.reachedFinish, `${id}: careful driver reaches the finish`);
+  check(sum && sum.correct === sum.total, `${id}: careful driver gets every check right`);
+  check(sum && sum.passed, `${id}: careful driver passes (penalty ${sum && sum.penalty} < ${C.exam.failAt})`);
+  if (id === 'boss') check(sum && sum.passenger, 'boss: the passenger was picked up');
+}
+
+// ------------------------------------------------------------ reckless runs
+for (const id of ['free', 'L3', 'L4', 'L5']) {
+  const r = runBot(id, 'reckless');
+  const sum = r.summary;
+  console.log(`\n${id} reckless: penalty=${sum.penalty} eliminated=${sum.eliminated} correct=${sum.correct}/${sum.total}`);
+  check(!sum.passed, `${id}: reckless driver FAILS the exam`);
+}
+
+// ------------------------------------------------- pedestrians & give way
 {
-  const r = runBot('careful');
-  const sum = r.st.test.summary;
-  console.log(`\nCareful driver: finished=${r.st.test.finished} time=${r.t.toFixed(0)}s score=${sum && sum.score}/${sum && sum.max} bumps=${r.bumps}`);
-  if (sum) {
-    for (const t of sum.tasks) console.log(`     ${t.ok ? '✓' : '✗'} ${t.key}${t.missed ? ' (missed)' : ''}`);
-    for (const [k, v] of Object.entries(sum.cats)) console.log(`     ${k}: ${v.correct}/${v.total}`);
+  const r = runBot('L5', 'reckless');
+  check(r.summary.issues.some((i) => i.key === 'pedHit') || r.summary.tasks.some((t) => !t.ok && t.message && /pedestrian/i.test(t.message.en)), 'L5: not stopping for a pedestrian is caught');
+  const r4 = runBot('L4', 'reckless');
+  check(r4.summary.tasks.some((t) => t.key === 'giveWay' && !t.ok), 'L4: driving out in front of traffic fails Give Way');
+}
+
+// ------------------------------------------------------------ night lights
+{
+  const r = runBot('L1', 'reckless', { weather: 'night', maxSeconds: 200 });
+  check(r.summary.issues.some((i) => i.key === 'lights'), 'night: driving without low beams is penalised');
+}
+
+// ------------------------------------------------------------ the 5 cars
+console.log('\nCar comparison (0-50 km/h, 50-0 braking distance, fuel per 100 s of hard driving):');
+const stats = {};
+for (const id of CAR_ORDER) {
+  const world = worlds.free;
+  const game = createGame(world, { carId: id, level: LEVELS[0] });
+  const st = game.state;
+  const dt = C.fixedStep;
+  // straight flat test: put the car on the long top road
+  const c = st.car;
+  c.x = 60; c.y = 2; c.heading = 0; c.v = 0;
+  let t0 = 0;
+  let t50 = null;
+  const f0 = c.fuel;
+  for (let i = 0; i < 120 * 12 && t50 === null; i++) {
+    game.update(dt, { steer: 0, gas: 1, brake: 0 });
+    t0 += dt;
+    if (c.v * 3.6 >= 50) t50 = t0;
   }
-  r.bumpAt.forEach((b) => console.log('     bump at ' + b));
-  check(r.st.test.finished, 'careful bot reaches the finish line');
-  check(sum && sum.correct === sum.total, 'careful bot gets every sign right');
-  check(r.bumps <= 2, `careful bot barely touches the curb (bumps=${r.bumps})`);
-  check(r.events.quiz === 3, `3 quiz questions appeared (got ${r.events.quiz})`);
+  // brake from 50
+  c.v = 50 / 3.6;
+  c.gas = 0;
+  c.brakeP = 0;
+  const x0 = c.x;
+  for (let i = 0; i < 120 * 6 && c.v > 0.05; i++) game.update(dt, { steer: 0, gas: 0, brake: 1 });
+  const dist = c.x - x0;
+  // fuel: 20 s of full throttle from rest, on the long road
+  c.x = 40; c.v = 0; c.fuel = CARS[id].tankL * 0.6;
+  const fa = c.fuel;
+  for (let i = 0; i < 120 * 20; i++) {
+    game.update(dt, { steer: 0, gas: 1, brake: 0 });
+    if (c.x > 395) c.x = 40;
+  }
+  stats[id] = { t50, dist, fuel: fa - c.fuel };
+  console.log(`  ${CARS[id].name.padEnd(22)} 0-50: ${t50 ? t50.toFixed(1) : '>12'} s   50-0: ${dist.toFixed(1)} m   fuel (20 s flat out): ${(fa - c.fuel).toFixed(2)} L`);
+}
+check(stats.octavia.t50 < stats.golf5.t50 && stats.octavia.t50 < stats.x5.t50 + 0.01, 'Octavia vRS accelerates faster than the Golf');
+check(stats.x5.dist > stats.golf5.dist + 1.5 && stats.x5.dist > stats.civic.dist + 1.5, 'X5 needs a clearly longer braking distance');
+check(stats.x5.fuel > stats.passat.fuel * 1.3, 'X5 burns clearly more fuel than the Passat when pushed');
+check(stats.octavia.fuel > stats.golf5.fuel, 'Octavia vRS burns more fuel than the Golf when pushed');
+check(new Set(CAR_ORDER.map((id) => stats[id].t50.toFixed(1))).size >= 4, 'the cars have clearly different acceleration');
+
+// ------------------------------------------------------- level 1 with every car
+for (const id of CAR_ORDER) {
+  const r = runBot('L1', 'careful', { carId: id });
+  check(r.summary && r.summary.passed && r.summary.reachedFinish, `L1 can be driven with ${CARS[id].name} (penalty ${r.summary && r.summary.penalty}, bumps ${r.log.bumps})`);
 }
 
-// ---------------------------------------------------------------- reckless run
+// ------------------------------------------------------- fuel stops the car
 {
-  const r = runBot('reckless');
-  const sum = r.st.test.summary;
-  console.log(`\nReckless driver: finished=${r.st.test.finished} time=${r.t.toFixed(0)}s score=${sum && sum.score}/${sum && sum.max} bumps=${r.bumps}`);
-  if (sum) for (const t of sum.tasks) console.log(`     ${t.ok ? '✓' : '✗'} ${t.key}${t.missed ? ' (missed)' : ''}`);
-  const bad = (key) => sum && sum.tasks.filter((x) => x.key === key).every((x) => !x.ok);
-  check(!!sum, 'reckless bot also gets a result');
-  check(bad('stop'), 'reckless: STOP failed');
-  check(bad('giveWay'), 'reckless: Give Way failed');
-  check(bad('speed30'), 'reckless: speed 30 failed');
-  check(bad('children'), 'reckless: children slow-down failed');
-  check(sum && sum.score < sum.max * 0.5, 'reckless bot scores below 50%');
-}
-
-// ---------------------------------------------------------------- overtaker run
-{
-  const r = runBot('overtaker');
-  const sum = r.st.test.summary;
-  console.log(`\nOvertaking driver: finished=${r.st.test.finished} score=${sum && sum.score}/${sum && sum.max}`);
-  if (sum) for (const t of sum.tasks.filter((x) => !x.ok)) console.log(`     ✗ ${t.key}${t.missed ? ' (missed)' : ''}`);
-  check(sum && sum.tasks.find((x) => x.key === 'noOvertaking').ok === false, 'passing the slow car in the no-overtaking zone is detected');
+  const world = worlds.free;
+  const game = createGame(world, { carId: 'passat', level: LEVELS[0], fuel: 0.0005 });
+  let stalled = false;
+  game.on('stall', () => (stalled = true));
+  for (let i = 0; i < 120 * 20; i++) game.update(C.fixedStep, { steer: 0, gas: 1, brake: 0 });
+  check(stalled && !game.state.car.engineOn, 'running out of fuel stalls the engine');
 }
 
 console.log(failures ? `\n${failures} check(s) FAILED` : '\nAll checks passed');

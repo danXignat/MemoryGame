@@ -1,35 +1,53 @@
 // ============================================================================
-//  controls.js  —  touch buttons + keyboard  ->  { steer, gas, brake }
+//  controls.js  —  steering wheel (drag to turn), pedals, keyboard
+//                  ->  { steer, gas, brake }
 //
-//  Works with several fingers at once (steer + gas together) and lets a finger
-//  slide from one button to another. Keyboard: arrows / WASD, Space = brake, R = reset.
+//  The wheel follows your finger around its centre and springs back when you
+//  let go. Several fingers work at once (wheel + pedal). Keyboard:
+//    A/D or arrows  steer     W / Up  gas     S / Down / Space  brake
+//    Q / E  left / right blinker    H  hazard lights    L  lights    I  ignition    R  reset
 // ============================================================================
 
-export function createControls({ onReset }) {
-  const touching = new Map(); // pointerId -> name of the button under that finger
+const FULL_LOCK_DEG = 150; // wheel angle that means "full steering"
+const MAX_DEG = 200;
+
+export function createControls({ onReset, onAction }) {
+  const wheelEl = document.getElementById('wheel');
+  const wheelImg = document.getElementById('wheelImg');
+  const touching = new Map(); // pointerId -> pedal name under that finger
   const keys = new Set();
-  const buttons = [...document.querySelectorAll('[data-btn]')];
+  const pedals = [...document.querySelectorAll('[data-btn]')];
   let enabled = true;
+  let wheelDeg = 0;
+  let drag = null; // { id, last }
 
-  const KEYMAP = {
-    ArrowLeft: 'left', KeyA: 'left',
-    ArrowRight: 'right', KeyD: 'right',
-    ArrowUp: 'gas', KeyW: 'gas',
-    ArrowDown: 'brake', KeyS: 'brake', Space: 'brake',
-  };
+  const KEYMAP = { ArrowUp: 'gas', KeyW: 'gas', ArrowDown: 'brake', KeyS: 'brake', Space: 'brake', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right' };
+  const ACTIONS = { KeyQ: 'signalLeft', KeyE: 'signalRight', KeyH: 'hazard', KeyL: 'lights', KeyI: 'engine' };
 
-  const active = () => {
+  const pressed = () => {
     const set = new Set(keys);
-    if (enabled) for (const name of touching.values()) if (name) set.add(name);
+    if (enabled) for (const n of touching.values()) if (n) set.add(n);
     return set;
   };
-
   function paint() {
-    const a = active();
-    for (const b of buttons) b.classList.toggle('down', a.has(b.dataset.btn));
+    const a = pressed();
+    for (const b of pedals) b.classList.toggle('down', a.has(b.dataset.btn));
+    wheelEl.classList.toggle('grab', !!drag);
   }
+  const showWheel = () => {
+    wheelImg.style.transform = `rotate(${wheelDeg.toFixed(1)}deg)`;
+  };
 
-  const buttonAt = (x, y) => {
+  const angleOf = (e) => {
+    const r = wheelEl.getBoundingClientRect();
+    return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2));
+  };
+  const wrapPi = (a) => {
+    while (a > Math.PI) a -= 2 * Math.PI;
+    while (a < -Math.PI) a += 2 * Math.PI;
+    return a;
+  };
+  const pedalAt = (x, y) => {
     const el = document.elementFromPoint(x, y);
     return el && el.closest ? el.closest('[data-btn]') : null;
   };
@@ -37,16 +55,21 @@ export function createControls({ onReset }) {
   window.addEventListener(
     'pointerdown',
     (e) => {
-      if (!enabled) return;
-      const target = e.target && e.target.closest ? e.target : null;
-      const b = target && target.closest('[data-btn]');
+      if (!enabled || !e.target || !e.target.closest) return;
+      if (e.target.closest('#wheel') && !drag) {
+        drag = { id: e.pointerId, last: angleOf(e) };
+        e.preventDefault();
+        paint();
+        return;
+      }
+      const b = e.target.closest('[data-btn]');
       if (b) {
         touching.set(e.pointerId, b.dataset.btn);
         e.preventDefault();
         paint();
         return;
       }
-      const r = target && target.closest('[data-action="reset"]');
+      const r = e.target.closest('[data-action="reset"]');
       if (r) {
         e.preventDefault();
         r.classList.add('down');
@@ -56,29 +79,38 @@ export function createControls({ onReset }) {
     },
     { passive: false }
   );
-
   window.addEventListener(
     'pointermove',
     (e) => {
-      if (!touching.has(e.pointerId)) return;
-      const b = buttonAt(e.clientX, e.clientY);
-      touching.set(e.pointerId, b ? b.dataset.btn : null);
-      paint();
+      if (drag && e.pointerId === drag.id) {
+        const a = angleOf(e);
+        wheelDeg = Math.max(-MAX_DEG, Math.min(MAX_DEG, wheelDeg + (wrapPi(a - drag.last) * 180) / Math.PI));
+        drag.last = a;
+        showWheel();
+        return;
+      }
+      if (touching.has(e.pointerId)) {
+        const b = pedalAt(e.clientX, e.clientY);
+        touching.set(e.pointerId, b ? b.dataset.btn : null);
+        paint();
+      }
     },
     { passive: true }
   );
-
   const release = (e) => {
+    if (drag && e.pointerId === drag.id) {
+      drag = null;
+      paint();
+    }
     if (touching.delete(e.pointerId)) paint();
   };
   window.addEventListener('pointerup', release);
   window.addEventListener('pointercancel', release);
 
   window.addEventListener('keydown', (e) => {
-    if (e.code === 'KeyR' && !e.repeat) {
-      onReset();
-      return;
-    }
+    if (e.target && /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.code === 'KeyR' && !e.repeat) return void onReset();
+    if (ACTIONS[e.code] && !e.repeat) return void onAction(ACTIONS[e.code]);
     if (KEYMAP[e.code]) {
       keys.add(KEYMAP[e.code]);
       e.preventDefault();
@@ -95,6 +127,7 @@ export function createControls({ onReset }) {
   const clear = () => {
     touching.clear();
     keys.clear();
+    drag = null;
     paint();
   };
   window.addEventListener('blur', clear);
@@ -106,10 +139,22 @@ export function createControls({ onReset }) {
   document.addEventListener('dblclick', (e) => e.preventDefault());
 
   return {
+    /** call every frame: moves the wheel back to centre when nobody holds it */
+    tick(dt) {
+      if (!drag) {
+        const a = pressed();
+        const want = (a.has('right') ? 1 : 0) - (a.has('left') ? 1 : 0);
+        if (want) wheelDeg += Math.max(-1, Math.min(1, (want * 170 - wheelDeg) / 30)) * 480 * dt;
+        else wheelDeg *= Math.exp(-7 * dt);
+        if (Math.abs(wheelDeg) < 0.2) wheelDeg = 0;
+        showWheel();
+      }
+    },
     /** current input, read once per physics step */
     read() {
-      const a = active();
-      return { steer: (a.has('right') ? 1 : 0) - (a.has('left') ? 1 : 0), gas: a.has('gas') ? 1 : 0, brake: a.has('brake') ? 1 : 0 };
+      const a = pressed();
+      const dz = Math.abs(wheelDeg) < 2 ? 0 : wheelDeg;
+      return { steer: Math.max(-1, Math.min(1, dz / FULL_LOCK_DEG)), gas: a.has('gas') ? 1 : 0, brake: a.has('brake') ? 1 : 0 };
     },
     clear,
     setEnabled(v) {

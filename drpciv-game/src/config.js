@@ -81,5 +81,25 @@ export const CONFIG = {
     accel: 1.5,
   },
 
+  // ---- Fuel (the real consumption is multiplied so you notice it in a short game) ----
+  fuel: {
+    scale: 40,
+    startFraction: 0.6, // tank at the start of a level
+    lowFraction: 0.15, // low-fuel warning
+    pricePerLitre: 7.6, // RON
+  },
+
+  // ---- Exam penalty points (DRPCIV style: 21 or more = failed) -------------------------
+  //  Figures follow what driving-school guides describe; check the official scale.
+  exam: {
+    failAt: 21,
+    penalty: { stop: 21, slow: 5, speed: 5, noOvertake: 21, noStop: 5, zones: 8, roundabout: 8, quiz: 2, signal: 3, crosswalk: 21, yield: 21, lights: 3, hazard: 2, curb: 1, fuel: 5, pedHit: 21, pickup: 8, stationSpeed: 3 },
+  },
+
+  car2: { capKmh: 140, driveEff: 0.6 }, // game speed limit and how much engine power reaches the road
+
+  // ---- Final Boss story text (change the name here) ----------------------------------------
+  story: { passenger: 'Alisia' },
+
   fixedStep: 1 / 120, // physics step (seconds)
 };

@@ -1,26 +1,41 @@
 // ============================================================================
-//  ui.js  —  everything that is NOT the road: speed read-out, sign card,
-//  feedback messages, sign library, quiz pop-ups, results, menus.
-//  All the words you see on screen are in this file (and in signs.js).
+//  ui.js  —  everything that is NOT the road: HUD read-outs, speedometer,
+//  sign card, feedback toasts, pickers (car / level), sign library, quiz,
+//  results, "My Mistakes" drill, fuel station panel and the Final Boss ending.
+//  All the words you see on screen are in this file (and in signs.js / levels.js).
 // ============================================================================
 
 import { CONFIG as C } from './config.js';
-import { CATEGORIES, SIGNS, tr } from './signs.js';
+import { CATEGORIES, SIGNS, tr, visibleSignKeys } from './signs.js';
 import { getSignDataURL } from './signart.js';
+import { CARS, CAR_ORDER } from './cars.js';
+import { LEVELS } from './levels.js';
 import { sfx, vibrate, unlock, setEnabled as setSoundEnabled } from './audio.js';
+import { addMistake, forgiveMistake, topMistakes } from './storage.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CAT_ORDER = ['warning', 'priority', 'prohibition', 'mandatory', 'information'];
-const ICON_OK = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const ICON_BAD = '<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg>';
+const WEATHER = { day: 'Day', night: 'Night', rain: 'Rain', fog: 'Fog' };
+const ICON_OK = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const ICON_BAD = '<svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg>';
+const NAV_ICON = {
+  right: '<path d="M6 20V11a5 5 0 0 1 5-5h6M13 2l5 4-5 4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  left: '<path d="M18 20V11a5 5 0 0 0-5-5H7M11 2L6 6l5 4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
+  roundabout: '<circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 22v-4M20 6l-3 3M8 4l4 2" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
+  finish: '<path d="M6 21V4M6 5h12l-2.5 4 2.5 4H6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+};
 
-export function createUI({ game, world, settings, saveSettings, controls }) {
-  const state = game.state;
+export function createUI({ settings, saveSettings, controls, renderer, actions }) {
+  let G = { game: null, world: null, level: null };
   const overlays = $('#overlays');
   const modals = [];
+  let rotateSkipped = false;
   const lang = () => settings.lang;
   const img = (key, px = 192) => getSignDataURL(key, SIGNS[key].art, px);
+  const name = (o) => tr(o, lang());
+  const st = () => G.game.state;
 
   const catPill = (key) => {
     const c = CATEGORIES[key];
@@ -29,7 +44,7 @@ export function createUI({ game, world, settings, saveSettings, controls }) {
   };
 
   // ---------------------------------------------------------------- modals
-  function openModal(html, { center = false, dismiss = true, onClose } = {}) {
+  function openModal(html, { center = true, dismiss = true, onClose } = {}) {
     controls.clear();
     const el = document.createElement('div');
     el.className = 'overlay' + (center ? ' center' : '');
@@ -57,6 +72,7 @@ export function createUI({ game, world, settings, saveSettings, controls }) {
   window.addEventListener('keydown', (e) => {
     if (e.code === 'Escape' && modals.length) modals[modals.length - 1].close();
   });
+  const head = (title, extra = '') => `<div class="sheet-head"><h2>${title}</h2>${extra}<button type="button" class="x" data-close aria-label="Close">&times;</button></div>`;
 
   // ------------------------------------------------------------ sign card
   const card = $('#card');
@@ -89,11 +105,10 @@ export function createUI({ game, world, settings, saveSettings, controls }) {
     card.hidden = true;
     cardSign = null;
     pinned = false;
-    card.classList.remove('pinned');
   }
   card.addEventListener('click', () => {
     pinned = !pinned;
-    if (!pinned && state.activeSign !== cardSign) hideCard();
+    if (!pinned && st().activeSign !== cardSign) hideCard();
     else if (cardSign) renderCard(cardSign);
   });
 
@@ -113,131 +128,353 @@ export function createUI({ game, world, settings, saveSettings, controls }) {
     } else {
       sfx.bad();
       vibrate([40, 40, 60]);
+      if (!fb.issue && fb.signKey && !SIGNS[fb.signKey].hidden) addMistake(fb.signKey);
     }
-    if (fb.quiz) return; // the quiz window shows its own answer
+    if (fb.quiz) return;
     hideCard();
     toast.className = fb.ok ? 'ok' : 'bad';
+    const noImg = !fb.signKey;
+    const title = fb.def ? esc(fb.def.name.ro) : esc(fb.title ? tr(fb.title, lang()) : 'Penalty');
+    const right = fb.ok ? `+${fb.points}` : fb.penalty ? `Pen +${fb.penalty}` : '0';
     toast.innerHTML = `
-      <div class="toastrow">
-        <img src="${img(fb.signKey, 128)}" alt="" />
+      <div class="toastrow ${noImg ? 'noimg' : ''}">
+        ${noImg ? '' : `<img src="${img(fb.signKey, 128)}" alt="" />`}
         <div>
-          <div class="verdict ${fb.ok ? 'ok' : 'bad'}">${fb.ok ? ICON_OK : ICON_BAD}<span>${esc(fb.def.name.ro)}</span><span class="pts">${fb.ok ? '+' + fb.points : '0'}</span></div>
+          <div class="verdict ${fb.ok ? 'ok' : 'bad'}">${fb.ok ? ICON_OK : ICON_BAD}<span>${title}</span><span class="pts">${right}</span></div>
           <div class="msg">${esc(tr(fb.message, lang()))}</div>
-          ${fb.ok ? '' : `<p class="rule">${esc(tr(fb.def.rule, lang()))}</p>`}
+          ${fb.ok || !fb.def ? '' : `<p class="rule">${esc(tr(fb.def.rule, lang()))}</p>`}
         </div>
       </div>`;
     toast.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(hideToast, fb.ok ? 3400 : 7500);
+    toastTimer = setTimeout(hideToast, fb.ok ? 3200 : 7000);
   }
 
   function showInfo(title, text) {
     hideCard();
     toast.className = 'info';
-    toast.innerHTML = `<div class="toastrow" style="grid-template-columns:1fr"><div><div class="verdict" style="color:var(--accent)">${esc(title)}</div><div class="msg" style="font-weight:500">${esc(text)}</div></div></div>`;
+    toast.innerHTML = `<div class="toastrow noimg"><div><div class="verdict" style="color:var(--accent)">${esc(title)}</div><div class="msg" style="font-weight:500">${esc(text)}</div></div></div>`;
     toast.hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(hideToast, 6000);
+    toastTimer = setTimeout(hideToast, 5500);
   }
 
-  // -------------------------------------------------------------- read-outs
-  const spdNum = $('#spdNum');
-  const speedo = $('#speedo');
-  const limit = $('#limit');
-  const limNum = $('#limNum');
-  const scoreBox = $('#scoreBox');
-  const scoreNum = $('#scoreNum');
-  const scoreOf = $('#scoreOf');
-  const wrongWay = $('#wrongWay');
-  let lastKmh = -1;
-  let lastLimit = null;
+  // ---------------------------------------------------------------- HUD
+  const E = {
+    pts: $('#pts'), pen: $('#pen'), lvName: $('#lvName'), fuelPill: $('#pillFuel'), fuelFill: $('#fuelFill'), fuelTxt: $('#fuelTxt'),
+    progTxt: $('#progTxt'), progK: $('#progK'), alert: $('#alertPill'), alertImg: $('#alertImg'), alertTxt: $('#alertTxt'),
+    limit: $('#limit'), limNum: $('#limNum'), nav: $('#nav'), navIcon: $('#navIcon'), navTxt: $('#navTxt'), wrong: $('#wrongWay'),
+    sigL: $('#bSigL'), sigR: $('#bSigR'), haz: $('#bHaz'), lights: $('#bLights'), lightLv: $('#lightLv'), eng: $('#bEng'),
+    station: $('#station'), speedoCv: $('#speedoCv'), miniCv: $('#minimapCv'), rotate: $('#rotate'),
+  };
 
   function updateScore() {
-    const t = state.test;
-    scoreBox.hidden = state.mode !== 'test';
-    if (t) {
-      scoreNum.textContent = t.score;
-      scoreOf.textContent = `/ ${t.max}`;
+    const t = st().test;
+    const test = st().mode === 'test' && t;
+    E.pen.hidden = !test;
+    E.pts.textContent = test ? t.score : 0;
+    if (test) {
+      E.pen.textContent = `Pen ${t.penalty}/${C.exam.failAt}`;
+      E.pen.classList.toggle('bad', t.penalty >= 15);
     }
   }
 
+  // --- circular arc speedometer + gear indicator
+  const sc = E.speedoCv.getContext('2d');
+  let sSize = 0;
+  function drawSpeedo(s) {
+    const size = E.speedoCv.clientWidth || 120;
+    const d = Math.min(window.devicePixelRatio || 1, 2.5);
+    if (sSize !== size) {
+      sSize = size;
+      E.speedoCv.width = Math.round(size * d);
+      E.speedoCv.height = Math.round(size * d);
+    }
+    sc.setTransform(d, 0, 0, d, 0, 0);
+    sc.clearRect(0, 0, size, size);
+    const car = s.car;
+    const kmh = Math.abs(car.v) * 3.6;
+    const cx = size / 2;
+    const cy = size / 2;
+    const R = size * 0.45;
+    const a0 = Math.PI * 0.75;
+    const sweep = Math.PI * 1.5;
+    const MAXK = 160;
+    sc.fillStyle = 'rgba(11,19,23,0.78)';
+    sc.beginPath();
+    sc.arc(cx, cy, size * 0.5 - 1, 0, Math.PI * 2);
+    sc.fill();
+    sc.strokeStyle = 'rgba(255,255,255,0.18)';
+    sc.lineWidth = 1.5;
+    sc.stroke();
+    sc.lineCap = 'round';
+    sc.lineWidth = size * 0.065;
+    sc.strokeStyle = 'rgba(255,255,255,0.12)';
+    sc.beginPath();
+    sc.arc(cx, cy, R, a0, a0 + sweep);
+    sc.stroke();
+    const over = s.mode === 'test' && s.speedLimit && kmh > s.speedLimit + C.test.speedTolerance;
+    const frac = clamp(kmh / MAXK, 0, 1);
+    if (frac > 0.004) {
+      sc.strokeStyle = over ? '#ff5d52' : kmh > 100 ? '#ffb84d' : '#4cc9f0';
+      sc.shadowColor = sc.strokeStyle;
+      sc.shadowBlur = 8;
+      sc.beginPath();
+      sc.arc(cx, cy, R, a0, a0 + sweep * frac);
+      sc.stroke();
+      sc.shadowBlur = 0;
+    }
+    // rev arc (thin, inside)
+    const spec = s.spec;
+    const rf = clamp((car.rpm - spec.idle) / (spec.redline - spec.idle), 0, 1);
+    sc.lineWidth = size * 0.022;
+    sc.strokeStyle = 'rgba(255,255,255,0.1)';
+    sc.beginPath();
+    sc.arc(cx, cy, R * 0.8, a0, a0 + sweep);
+    sc.stroke();
+    if (car.engineOn && rf > 0.01) {
+      sc.strokeStyle = rf > 0.88 ? '#ff5d52' : '#ffd166';
+      sc.beginPath();
+      sc.arc(cx, cy, R * 0.8, a0, a0 + sweep * rf);
+      sc.stroke();
+    }
+    // ticks
+    sc.lineCap = 'butt';
+    sc.fillStyle = 'rgba(255,255,255,0.75)';
+    sc.font = `600 ${Math.round(size * 0.075)}px "Barlow Condensed", Arial Narrow, sans-serif`;
+    sc.textAlign = 'center';
+    sc.textBaseline = 'middle';
+    for (let k = 0; k <= MAXK; k += 20) {
+      const a = a0 + sweep * (k / MAXK);
+      const long = k % 40 === 0;
+      sc.strokeStyle = 'rgba(255,255,255,0.5)';
+      sc.lineWidth = long ? 1.6 : 1;
+      sc.beginPath();
+      sc.moveTo(cx + Math.cos(a) * (R + size * 0.055), cy + Math.sin(a) * (R + size * 0.055));
+      sc.lineTo(cx + Math.cos(a) * (R + size * (long ? 0.095 : 0.075)), cy + Math.sin(a) * (R + size * (long ? 0.095 : 0.075)));
+      sc.stroke();
+    }
+    if (s.mode === 'test' && s.speedLimit) {
+      const a = a0 + sweep * clamp(s.speedLimit / MAXK, 0, 1);
+      sc.strokeStyle = '#ff5d52';
+      sc.lineWidth = 2.6;
+      sc.beginPath();
+      sc.moveTo(cx + Math.cos(a) * (R - size * 0.05), cy + Math.sin(a) * (R - size * 0.05));
+      sc.lineTo(cx + Math.cos(a) * (R + size * 0.1), cy + Math.sin(a) * (R + size * 0.1));
+      sc.stroke();
+    }
+    // numbers
+    sc.fillStyle = over ? '#ff8a80' : '#ffffff';
+    sc.font = `700 ${Math.round(size * 0.3)}px "Barlow Condensed", Arial Narrow, sans-serif`;
+    sc.fillText(String(Math.round(kmh)), cx, cy - size * 0.03);
+    sc.fillStyle = 'rgba(255,255,255,0.65)';
+    sc.font = `600 ${Math.round(size * 0.085)}px Inter, Arial, sans-serif`;
+    sc.fillText('km/h', cx, cy + size * 0.17);
+    // gear
+    const g = car.gear < 0 ? 'R' : car.gear === 0 ? 'N' : String(car.gear);
+    const bw = size * 0.2;
+    const bh = size * 0.15;
+    sc.fillStyle = car.gear < 0 ? '#ff8a65' : car.gear === 0 ? 'rgba(255,255,255,0.18)' : '#4cc9f0';
+    sc.beginPath();
+    sc.roundRect ? sc.roundRect(cx - bw / 2, cy + size * 0.26, bw, bh, 6) : sc.rect(cx - bw / 2, cy + size * 0.26, bw, bh);
+    sc.fill();
+    sc.fillStyle = car.gear === 0 ? '#fff' : '#04141c';
+    sc.font = `800 ${Math.round(size * 0.12)}px Inter, Arial, sans-serif`;
+    sc.fillText(g, cx, cy + size * 0.26 + bh / 2 + 1);
+  }
+
+  // --- next-manoeuvre banner (Waze style)
+  let lastNav = '';
+  function updateNav(s) {
+    const { world } = G;
+    const pr = s.prog;
+    const total = world.route.length;
+    let kind = 'finish';
+    let text = '';
+    const m = world.maneuvers.find((x) => x.s > pr.s - 4);
+    const remain = total - pr.s;
+    const rounded = (v) => Math.max(10, Math.round(v / 10) * 10);
+    if (!pr.onRoute && s.mode === 'test') {
+      kind = null;
+    } else if (m && m.s - pr.s < 220) {
+      const dist = m.s - pr.s;
+      kind = m.type;
+      const en = { right: 'turn right', left: 'turn left', roundabout: 'enter the roundabout' };
+      const ro = { right: 'virează la dreapta', left: 'virează la stânga', roundabout: 'intră în sensul giratoriu' };
+      const hint = m.type !== 'roundabout' && dist > 25 ? (lang() === 'en' ? ' — signal first' : ' — semnalizează') : '';
+      text = dist < 22 ? (lang() === 'en' ? `${en[m.type]} now` : `${ro[m.type]} acum`) : lang() === 'en' ? `In ${rounded(dist)} m ${en[m.type]}${hint}` : `Peste ${rounded(dist)} m ${ro[m.type]}${hint}`;
+    } else if (remain < 300) {
+      text = lang() === 'en' ? `Finish in ${rounded(remain)} m` : `Sosire în ${rounded(remain)} m`;
+      const mission = world.mission;
+      if (mission && mission.dest) text = lang() === 'en' ? `${mission.dest.name.split(',')[0]} in ${rounded(remain)} m` : `${mission.dest.name.split(',')[0]} peste ${rounded(remain)} m`;
+    } else kind = null;
+    const key = kind + '|' + text;
+    if (key === lastNav) return;
+    lastNav = key;
+    E.nav.hidden = !kind;
+    if (kind) {
+      E.navIcon.innerHTML = NAV_ICON[kind];
+      E.navTxt.textContent = text;
+    }
+  }
+
+  // --- gas-station panel
+  let lastStationKey = '';
+  function updateStation(s) {
+    const info = s.station;
+    const car = s.car;
+    const spec = s.spec;
+    const show = info && info.inBay;
+    E.station.hidden = !show;
+    if (!show) {
+      lastStationKey = '';
+      return;
+    }
+    const rf = s.refueling;
+    const key = `${info.canRefuel}|${!!rf}|${car.fuel >= spec.tankL - 0.05}`;
+    if (key !== lastStationKey) {
+      lastStationKey = key;
+      if (rf) E.station.innerHTML = `<div><b>Filling up…</b> <span id="stL"></span></div><div class="row2"><button class="ghost" data-st="stop">Stop</button></div>`;
+      else if (info.canRefuel) {
+        E.station.innerHTML = car.fuel >= spec.tankL - 0.05 ? '<div><b>Tank is full.</b> Start the engine to leave.</div>' : `<div><b>${esc(info.name)}</b> · ${C.fuel.pricePerLitre} RON / L</div><div class="row2"><button data-st="10">+10 L</button><button data-st="full">Full tank</button></div>`;
+      } else E.station.innerHTML = '<div><b>Fuel bay.</b> Switch the engine off with the power button to refuel.</div>';
+    }
+    if (rf) {
+      const el = $('#stL');
+      if (el) el.textContent = `${car.fuel.toFixed(1)} / ${spec.tankL} L · ${s.fuelSpent.toFixed(0)} RON`;
+      if (Math.random() < 0.1) sfx.pump();
+    }
+  }
+  E.station.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-st]');
+    if (!b) return;
+    unlock();
+    if (b.dataset.st === 'stop') G.game.stopRefuel();
+    else G.game.startRefuel(b.dataset.st === 'full' ? 'full' : 10);
+  });
+
+  let frame = 0;
   function update() {
-    const kmh = Math.round(Math.abs(state.car.v) * 3.6);
-    if (kmh !== lastKmh) {
-      spdNum.textContent = kmh;
-      lastKmh = kmh;
+    if (!G.game) return;
+    const s = st();
+    const car = s.car;
+    frame++;
+    drawSpeedo(s);
+    if (frame % 3 === 0) renderer.drawMinimap(E.miniCv, E.miniCv.clientWidth || 100, s);
+
+    // fuel
+    const frac = car.fuel / s.spec.tankL;
+    E.fuelFill.style.width = `${Math.round(frac * 100)}%`;
+    E.fuelTxt.textContent = `${Math.round(frac * 100)}%`;
+    E.fuelPill.classList.toggle('low', frac < C.fuel.lowFraction);
+
+    // lights, signals, engine
+    const blink = s.blink === 1;
+    E.sigL.classList.toggle('on', car.signal === 'left' && !car.hazard);
+    E.sigR.classList.toggle('on', car.signal === 'right' && !car.hazard);
+    E.haz.classList.toggle('on', car.hazard);
+    E.sigL.classList.toggle('blink', blink && (car.signal === 'left' || car.hazard));
+    E.sigR.classList.toggle('blink', blink && (car.signal === 'right' || car.hazard));
+    E.haz.classList.toggle('blink', blink && car.hazard);
+    E.lights.dataset.l = car.lights;
+    E.lightLv.textContent = ['OFF', 'POS', 'LOW', 'HIGH'][car.lights];
+    E.eng.classList.toggle('off', !car.engineOn && car.starting <= 0);
+    E.eng.classList.toggle('starting', car.starting > 0);
+
+    // speed limit badge
+    const lim = s.mode === 'test' ? s.speedLimit : null;
+    E.limit.hidden = lim == null;
+    if (lim != null) {
+      E.limNum.textContent = lim;
+      E.limit.classList.toggle('over', Math.abs(car.v) * 3.6 > lim + C.test.speedTolerance);
     }
-    const lim = state.mode === 'test' ? state.speedLimit : null;
-    if (lim !== lastLimit) {
-      limit.hidden = lim == null;
-      if (lim != null) limNum.textContent = lim;
-      lastLimit = lim;
+    E.wrong.hidden = !(s.mode === 'test' && s.wrongWay);
+
+    // progress pill
+    if (s.mode === 'test' && s.test) {
+      const done = s.test.tasks.filter((t) => t.status === 'done').length;
+      E.progTxt.textContent = `${done}/${s.test.tasks.length}`;
+      E.progK.textContent = 'checks';
+    } else {
+      E.progTxt.textContent = `${Math.round(clamp(s.prog.s / G.world.route.length, 0, 1) * 100)}%`;
+      E.progK.textContent = 'route';
     }
-    speedo.classList.toggle('over', lim != null && kmh > lim + C.test.speedTolerance);
-    wrongWay.hidden = !(state.mode === 'test' && state.wrongWay);
+
+    // sign alert pill
+    const a = s.activeSign;
+    E.alert.hidden = !(a && s.mode === 'test');
+    if (a && E.alert.dataset.k !== a.key + s.mode + lang()) {
+      E.alert.dataset.k = a.key + s.mode + lang();
+      E.alertImg.src = img(a.key, 96);
+      E.alertTxt.textContent = s.mode === 'learn' ? tr(a.def.name, lang()) : '';
+      E.alertTxt.hidden = s.mode !== 'learn';
+    }
+
+    updateNav(s);
+    updateStation(s);
+    updateScore();
 
     // the Learn-mode card follows the sign you are approaching
-    if (state.mode === 'learn' && !modals.length) {
+    if (s.mode === 'learn' && !modals.length) {
       const now = performance.now();
-      const a = state.activeSign;
       if (a) {
         cardLastSeen = now;
         if (cardSign !== a) showCard(a);
       } else if (cardSign && !pinned && now - cardLastSeen > 4500) hideCard();
-    } else if (state.mode !== 'learn' && !card.hidden) hideCard();
+    } else if (s.mode !== 'learn' && !card.hidden) hideCard();
   }
 
+  function checkOrientation() {
+    const portrait = window.innerHeight > window.innerWidth * 1.02;
+    E.rotate.hidden = !(portrait && !rotateSkipped);
+  }
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 150));
+  $('#rotateSkip').addEventListener('click', () => {
+    rotateSkipped = true;
+    checkOrientation();
+  });
+
   // ------------------------------------------------------------ sign library
-  function openLibrary() {
+  function openLibrary(startKey = null) {
     let filter = 'all';
-    let openKey = null;
+    let openKey = startKey;
     const m = openModal(`
-      <div class="sheet" role="dialog" aria-label="Road sign library">
-        <div class="sheet-head"><h2 id="libTitle">Road Sign Library</h2>
-          <button type="button" class="x" id="libLang" style="font-size:14px;font-weight:800"></button>
-          <button type="button" class="x" data-close aria-label="Close">&times;</button></div>
+      <div class="sheet wide" role="dialog" aria-label="Road sign library">
+        ${head('<span id="libTitle">Road Sign Library</span>', '<button type="button" class="x" id="libLang" style="font-size:13px;font-weight:800"></button>')}
         <div class="chips" id="libChips"></div>
         <div class="sheet-body" id="libBody"></div>
       </div>`);
     const chips = $('#libChips', m.el);
     const body = $('#libBody', m.el);
-    const langBtn = $('#libLang', m.el);
-
     function render() {
-      langBtn.textContent = lang().toUpperCase();
+      $('#libLang', m.el).textContent = lang().toUpperCase();
       $('#libTitle', m.el).textContent = openKey ? tr(SIGNS[openKey].name, lang()) : 'Road Sign Library';
       chips.hidden = !!openKey;
       if (openKey) return renderDetail();
-      const cats = ['all', ...CAT_ORDER];
-      chips.innerHTML = cats
-        .map((k) => `<button type="button" class="fchip ${k === filter ? 'on' : ''}" data-f="${k}">${k === 'all' ? 'All' : esc(tr(CATEGORIES[k], lang()))}</button>`)
-        .join('');
-      const keys = Object.keys(SIGNS)
+      chips.innerHTML = ['all', ...CAT_ORDER].map((k) => `<button type="button" class="fchip ${k === filter ? 'on' : ''}" data-f="${k}">${k === 'all' ? 'All' : esc(tr(CATEGORIES[k], lang()))}</button>`).join('');
+      const keys = visibleSignKeys()
         .filter((k) => filter === 'all' || SIGNS[k].category === filter)
         .sort((a, b) => CAT_ORDER.indexOf(SIGNS[a].category) - CAT_ORDER.indexOf(SIGNS[b].category));
-      body.innerHTML = keys.length
-        ? `<div class="grid">${keys
-            .map((k) => {
-              const s = SIGNS[k];
-              return `<button type="button" class="tile" data-k="${k}" style="--cat:${CATEGORIES[s.category].color}">
-                <img src="${img(k, 192)}" alt="" /><b>${esc(s.name.ro)}</b><small>${esc(s.name.en)}</small></button>`;
-            })
-            .join('')}</div>`
-        : '<p class="empty">No signs in this category yet.</p>';
+      body.innerHTML = `<div class="grid">${keys
+        .map((k) => `<button type="button" class="tile" data-k="${k}" style="--cat:${CATEGORIES[SIGNS[k].category].color}"><img src="${img(k, 192)}" alt="" /><b>${esc(SIGNS[k].name.ro)}</b><small>${esc(SIGNS[k].name.en)}</small></button>`)
+        .join('')}</div>`;
       body.scrollTop = 0;
     }
     function renderDetail() {
       const s = SIGNS[openKey];
       const other = lang() === 'en' ? 'ro' : 'en';
       body.innerHTML = `
-        <button type="button" class="btn ghost" data-back style="min-height:44px;margin-bottom:6px">&larr; All signs</button>
-        <div class="detail">
+        <button type="button" class="btn ghost" data-back style="min-height:40px;margin-bottom:6px">&larr; All signs</button>
+        <div class="detail row">
           <img src="${img(openKey, 320)}" alt="${esc(s.name.en)}" />
-          <div>${catPill(s.category)}</div>
-          <div class="nameRo">${esc(s.name.ro)}</div>
-          <div class="nameEn">${esc(s.name.en)}</div>
-          <p class="rule">${esc(tr(s.rule, lang()))}</p>
-          <p class="rule">${esc(tr(s.rule, other))}</p>
+          <div class="dtxt">
+            <div>${catPill(s.category)}</div>
+            <div class="nameRo">${esc(s.name.ro)}</div>
+            <div class="nameEn">${esc(s.name.en)}</div>
+            <p class="rule">${esc(tr(s.rule, lang()))}</p>
+            <p class="rule">${esc(tr(s.rule, other))}</p>
+          </div>
         </div>`;
       body.scrollTop = 0;
     }
@@ -255,9 +492,7 @@ export function createUI({ game, world, settings, saveSettings, controls }) {
       } else if (e.target.closest('[data-back]')) {
         openKey = null;
         render();
-      } else if (e.target.closest('#libLang')) {
-        setLang(lang() === 'en' ? 'ro' : 'en');
-      }
+      } else if (e.target.closest('#libLang')) setLang(lang() === 'en' ? 'ro' : 'en');
     });
     m.rerender = render;
     render();
@@ -269,186 +504,368 @@ export function createUI({ game, world, settings, saveSettings, controls }) {
     saveSettings();
     modals.forEach((mm) => mm.rerender && mm.rerender());
     if (cardSign && !card.hidden) renderCard(cardSign);
+    lastNav = '';
   }
 
   // -------------------------------------------------------------------- quiz
-  game.on('quiz', (q) => {
+  function onQuiz(q) {
     const m = openModal(
-      `<div class="sheet" role="dialog" aria-label="Quiz question">
+      `<div class="sheet quizsheet" role="dialog" aria-label="Quiz question">
         <div class="quiz">
           <img src="${img(q.signKey, 300)}" alt="Road sign" />
-          <h2>What does this sign mean?</h2>
-          ${q.options
-            .map((k) => `<button type="button" class="opt" data-key="${k}"><b>${esc(SIGNS[k].name.ro)}</b><small>${esc(SIGNS[k].name.en)}</small></button>`)
-            .join('')}
-          <div id="qres" style="width:100%"></div>
-        </div>
-      </div>`,
-      { center: true, dismiss: false }
-    );
-    m.el.addEventListener('click', (e) => {
-      const b = e.target.closest('.opt');
-      if (b && !q.answered) {
-        const res = game.answerQuiz(b.dataset.key);
-        if (!res) return;
-        for (const o of m.el.querySelectorAll('.opt')) {
-          if (o.dataset.key === res.right) o.classList.add('right');
-          else if (o === b) o.classList.add('wrong');
-        }
-        const right = SIGNS[res.right];
-        $('#qres', m.el).innerHTML = `
-          <div class="explain">
-            <div class="verdict ${res.ok ? 'ok' : 'bad'}">${res.ok ? ICON_OK : ICON_BAD}<span>${res.ok ? 'Correct!' : 'Not quite'}</span><span class="pts">${res.ok ? '+' + C.test.pointsPerSign : '0'}</span></div>
-            <div><b>${esc(right.name.ro)}</b>. ${esc(tr(right.rule, lang()))}</div>
-          </div>
-          <button type="button" class="btn block" id="qnext" style="margin-top:10px">Continue driving</button>`;
-        $('#qnext', m.el).addEventListener('click', () => {
-          game.closeQuiz();
-          m.close();
-        });
-      }
-    });
-  });
-
-  // ----------------------------------------------------------------- results
-  game.on('finish', (sum) => openResults(sum));
-
-  function openResults(sum) {
-    const pct = sum.max ? Math.round((sum.score / sum.max) * 100) : 0;
-    const verdict = pct >= 90 ? 'Excellent driving!' : pct >= 75 ? 'Good, a few signs to review' : 'Keep practising, you will get there';
-    const mins = Math.floor(sum.seconds / 60);
-    const secs = String(Math.round(sum.seconds % 60)).padStart(2, '0');
-    const catRows = CAT_ORDER.filter((k) => sum.cats[k].total)
-      .map((k) => {
-        const c = sum.cats[k];
-        const w = Math.round((c.correct / c.total) * 100);
-        return `<div class="catrow" style="--cat:${CATEGORIES[k].color}"><span class="label">${esc(tr(CATEGORIES[k], lang()))}</span><span class="val">${c.correct}/${c.total}</span><div class="bar"><i style="width:${w}%"></i></div></div>`;
-      })
-      .join('');
-    const wrong = sum.tasks.filter((t) => !t.ok);
-    const mistakes = wrong.length
-      ? wrong
-          .map(
-            (t) => `<div class="miss"><img src="${img(t.key, 128)}" alt="" /><div><b>${esc(t.def.name.ro)}</b><p>${t.missed ? 'Not reached. ' : ''}${esc(tr(t.def.rule, lang()))}</p></div></div>`
-          )
-          .join('')
-      : '<p class="empty">No mistakes. Perfect lap!</p>';
-    const m = openModal(
-      `<div class="sheet" role="dialog" aria-label="Test results">
-        <div class="sheet-head"><h2>Test finished</h2></div>
-        <div class="sheet-body">
-          <div class="score"><div class="big">${sum.score}<span> / ${sum.max}</span></div><div class="pct">${pct}% &middot; ${mins}:${secs} &middot; ${esc(verdict)}</div></div>
-          <div class="sectionTitle">Score by category</div>
-          ${catRows}
-          <div class="sectionTitle">Signs to review</div>
-          ${mistakes}
-          <div class="stack" style="margin-top:16px">
-            <button type="button" class="btn" id="again">Try again</button>
-            <button type="button" class="btn ghost" id="toLearn">Back to Learn mode</button>
+          <div class="qcol">
+            <h2>What does this sign mean?</h2>
+            ${q.options.map((k) => `<button type="button" class="opt" data-key="${k}"><b>${esc(SIGNS[k].name.ro)}</b><small>${esc(SIGNS[k].name.en)}</small></button>`).join('')}
+            <div id="qres" style="width:100%"></div>
           </div>
         </div>
       </div>`,
       { dismiss: false }
     );
-    $('#again', m.el).addEventListener('click', () => {
-      m.close();
-      game.restart();
-    });
-    $('#toLearn', m.el).addEventListener('click', () => {
-      m.close();
-      switchMode('learn');
+    m.el.addEventListener('click', (e) => {
+      const b = e.target.closest('.opt');
+      if (!b || q.answered) return;
+      const res = G.game.answerQuiz(b.dataset.key);
+      if (!res) return;
+      for (const o of m.el.querySelectorAll('.opt')) {
+        if (o.dataset.key === res.right) o.classList.add('right');
+        else if (o === b) o.classList.add('wrong');
+      }
+      const right = SIGNS[res.right];
+      $('#qres', m.el).innerHTML = `
+        <div class="explain">
+          <div class="verdict ${res.ok ? 'ok' : 'bad'}">${res.ok ? ICON_OK : ICON_BAD}<span>${res.ok ? 'Correct!' : 'Not quite'}</span><span class="pts">${res.ok ? '+' + C.test.pointsPerSign : 'Pen +' + C.exam.penalty.quiz}</span></div>
+          <div><b>${esc(right.name.ro)}</b>. ${esc(tr(right.rule, lang()))}</div>
+        </div>
+        <button type="button" class="btn block" id="qnext" style="margin-top:8px">Continue driving</button>`;
+      $('#qnext', m.el).addEventListener('click', () => {
+        G.game.closeQuiz();
+        m.close();
+      });
     });
   }
 
-  // ------------------------------------------------------------- menu & help
+  // ------------------------------------------------- "My Mistakes" flash drill
+  function openDrill() {
+    const keys = visibleSignKeys();
+    const picks = topMistakes(5).map((x) => x.key).filter((k) => SIGNS[k] && !SIGNS[k].hidden);
+    const pool = keys.filter((k) => !picks.includes(k)).sort(() => Math.random() - 0.5);
+    const list = [...picks, ...pool].slice(0, 5);
+    const hadMistakes = picks.length > 0;
+    let i = 0;
+    let right = 0;
+    const m = openModal(`<div class="sheet quizsheet" role="dialog" aria-label="My mistakes"><div class="quiz" id="drillBody"></div></div>`, { dismiss: true });
+    const body = $('#drillBody', m.el);
+    function ask() {
+      if (i >= list.length) {
+        body.innerHTML = `<div class="qcol" style="text-align:center;grid-column:1/-1"><h2>${right} / ${list.length} correct</h2><p class="empty">${hadMistakes ? 'Signs you got right are removed from your mistakes list.' : 'No mistakes saved yet, so this was a random round. Mistakes you make in Test mode show up here.'}</p><button type="button" class="btn block" data-close>Done</button></div>`;
+        return;
+      }
+      const key = list[i];
+      const others = keys.filter((k) => k !== key).sort(() => Math.random() - 0.5);
+      const same = others.filter((k) => SIGNS[k].category === SIGNS[key].category);
+      const opts = [key, same[0] || others[0], others.find((k) => k !== same[0]) || others[1]].filter(Boolean).sort(() => Math.random() - 0.5);
+      body.innerHTML = `<img src="${img(key, 300)}" alt="Road sign" />
+        <div class="qcol"><div class="pin" style="text-align:left">${hadMistakes && picks.includes(key) ? 'From your mistakes · ' : ''}Question ${i + 1} of ${list.length}</div>
+          <h2>What does this sign mean?</h2>
+          ${opts.map((k) => `<button type="button" class="opt" data-key="${k}"><b>${esc(SIGNS[k].name.ro)}</b><small>${esc(SIGNS[k].name.en)}</small></button>`).join('')}
+          <div id="dres" style="width:100%"></div></div>`;
+      let done = false;
+      body.onclick = (e) => {
+        const b = e.target.closest('.opt');
+        if (!b || done) return;
+        done = true;
+        const ok = b.dataset.key === key;
+        if (ok) {
+          right++;
+          forgiveMistake(key);
+          sfx.ok();
+        } else {
+          addMistake(key);
+          sfx.bad();
+        }
+        for (const o of body.querySelectorAll('.opt')) {
+          if (o.dataset.key === key) o.classList.add('right');
+          else if (o === b) o.classList.add('wrong');
+        }
+        $('#dres', body).innerHTML = `<div class="explain"><b>${esc(SIGNS[key].name.ro)}</b>. ${esc(tr(SIGNS[key].rule, lang()))}</div><button type="button" class="btn block" id="dnext" style="margin-top:8px">${i + 1 < list.length ? 'Next' : 'See result'}</button>`;
+        $('#dnext', body).onclick = () => {
+          i++;
+          ask();
+        };
+      };
+    }
+    ask();
+  }
+
+  // ----------------------------------------------------------------- results
+  function onFinish(sum) {
+    const level = G.level;
+    if (level) {
+      const prev = settings.progress[level.id] || { best: 0, passed: false };
+      settings.progress[level.id] = { best: Math.max(prev.best, sum.score), passed: prev.passed || sum.passed };
+      saveSettings();
+    }
+    if (sum.boss && sum.passed && sum.reachedFinish) return openEnding(sum);
+    const pct = sum.max ? Math.round((sum.score / sum.max) * 100) : 0;
+    const mins = Math.floor(sum.seconds / 60);
+    const secs = String(Math.round(sum.seconds % 60)).padStart(2, '0');
+    const catRows = CAT_ORDER.filter((k) => sum.cats[k].total)
+      .map((k) => {
+        const c = sum.cats[k];
+        return `<div class="catrow" style="--cat:${CATEGORIES[k].color}"><span class="label">${esc(tr(CATEGORIES[k], lang()))}</span><span class="val">${c.correct}/${c.total}</span><div class="bar"><i style="width:${Math.round((c.correct / c.total) * 100)}%"></i></div></div>`;
+      })
+      .join('');
+    const wrong = sum.tasks.filter((t) => !t.ok);
+    const mistakes = [
+      ...wrong.map((t) => `<div class="miss"><img src="${img(t.key, 96)}" alt="" /><div><b>${esc(t.def.name.ro)}</b> <span class="pn">${t.missed ? 'not reached' : 'Pen +' + t.penalty}</span><p>${esc(t.message ? tr(t.message, lang()) : tr(t.def.rule, lang()))}</p></div></div>`),
+      ...sum.issues.map((i) => `<div class="miss noimg"><div><b>${esc(i.title ? tr(i.title, lang()) : 'Penalty')}</b> <span class="pn">Pen +${i.pts}</span><p>${esc(tr(i.message, lang()))}</p></div></div>`),
+    ].join('');
+    const wellCount = sum.tasks.filter((t) => t.ok).length;
+    const next = level ? LEVELS.find((l) => l.n === level.n + 1 && l.playable) : null;
+    const verdict = sum.eliminated ? 'Exam stopped: 21 penalty points reached' : sum.passed ? (sum.reachedFinish ? 'Passed' : 'Ended early') : 'Not passed';
+    const m = openModal(
+      `<div class="sheet wide" role="dialog" aria-label="Level result">
+        ${head(`${level ? esc(name(level.title)) : 'Test'} · result`)}
+        <div class="sheet-body cols">
+          <div class="c1">
+            <div class="score"><div class="big ${sum.passed ? 'okc' : 'badc'}">${sum.passed ? 'PASSED' : 'FAILED'}</div><div class="pct">${esc(verdict)}</div></div>
+            <div class="stats">
+              <div><b>${sum.score}</b><span>points</span></div>
+              <div><b class="${sum.penalty >= sum.failAt ? 'badc' : ''}">${sum.penalty}</b><span>penalty / ${sum.failAt}</span></div>
+              <div><b>${wellCount}/${sum.total}</b><span>checks ok</span></div>
+              <div><b>${mins}:${secs}</b><span>time</span></div>
+            </div>
+            <div class="stack">
+              ${next && sum.passed ? '<button type="button" class="btn" id="rNext">Next level</button>' : ''}
+              <button type="button" class="btn ${next && sum.passed ? 'ghost' : ''}" id="rAgain">Try again</button>
+              <button type="button" class="btn ghost" id="rLevels">All levels</button>
+            </div>
+          </div>
+          <div class="c2">
+            <div class="sectionTitle" style="margin-top:0">Score by category</div>
+            ${catRows}
+            <div class="sectionTitle">What to review</div>
+            ${mistakes || '<p class="empty">Nothing to review. Clean run!</p>'}
+          </div>
+        </div>
+      </div>`,
+      { dismiss: false }
+    );
+    $('#rAgain', m.el).addEventListener('click', () => {
+      m.close();
+      G.game.restart();
+    });
+    $('#rLevels', m.el).addEventListener('click', () => {
+      m.close();
+      openLevels();
+    });
+    const nx = $('#rNext', m.el);
+    if (nx)
+      nx.addEventListener('click', () => {
+        m.close();
+        actions.startLevel(next.id, { mode: 'test' });
+      });
+  }
+
+  function openEnding(sum) {
+    const car = CARS[sum.carId];
+    const who = C.story.passenger;
+    const acc = sum.total ? Math.round((sum.correct / sum.total) * 100) : 0;
+    const m = openModal(
+      `<div class="sheet wide ending" role="dialog" aria-label="Final Boss ending">
+        <div class="sheet-body cols endcols">
+          <div class="c1">
+            <div class="licence">
+              <div class="lhead"><span>ROMÂNIA</span><b>PERMIS DE CONDUCERE</b></div>
+              <div class="lbody"><div class="lphoto">B</div>
+                <div><div class="lk">Categoria</div><b>B</b><div class="lk">Autoturism</div><b>${esc(car.name)}</b><div class="lk">Penalizări</div><b>${sum.penalty} / ${sum.failAt}</b></div></div>
+            </div>
+          </div>
+          <div class="c2">
+            <h2 class="endtitle">Ai ajuns acasă.</h2>
+            <p class="endmsg">${esc(who)} a ajuns cu bine în Sânpetru, la ${esc('Str. Sfinții Constantin și Elena 41')}. Ai fost atent la semne, la viteză și la semnalizare. Drum bun mereu.</p>
+            <p class="endmsg en">${esc(who)} is home safe in Sânpetru. You watched the signs, your speed and your signals the whole way.</p>
+            <div class="stats">
+              <div><b>${sum.score}</b><span>points</span></div>
+              <div><b>${acc}%</b><span>accuracy</span></div>
+              <div><b>${Math.floor(sum.seconds / 60)}:${String(Math.round(sum.seconds % 60)).padStart(2, '0')}</b><span>time</span></div>
+              <div><b>${sum.fuelSpent.toFixed(0)}</b><span>RON fuel</span></div>
+            </div>
+            <p class="route">Livada Poștei &rarr; Sânpetru, Str. Sfinții Constantin și Elena 41</p>
+            <div class="stack"><button type="button" class="btn" id="eAgain">Drive again</button><button type="button" class="btn ghost" id="eLevels">All levels</button></div>
+          </div>
+        </div>
+      </div>`,
+      { dismiss: false }
+    );
+    $('#eAgain', m.el).addEventListener('click', () => {
+      m.close();
+      G.game.restart();
+    });
+    $('#eLevels', m.el).addEventListener('click', () => {
+      m.close();
+      openLevels();
+    });
+  }
+
+  // ------------------------------------------------------------ car selector
+  function openCars() {
+    const bar = (n) => `<span class="sb">${[1, 2, 3, 4, 5].map((i) => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`;
+    const m = openModal(`
+      <div class="sheet wide" role="dialog" aria-label="Choose a car">
+        ${head('Choose your car')}
+        <div class="sheet-body"><div class="cargrid">
+          ${CAR_ORDER.map((id) => {
+            const c = CARS[id];
+            return `<button type="button" class="carcard ${settings.car === id ? 'sel' : ''}" data-car="${id}">
+              <div class="chead"><b>${esc(c.name)}</b><span class="diff ${c.difficulty.toLowerCase()}">${c.difficulty}</span></div>
+              <div class="csub">${esc(c.engine)} · ${c.massKg} kg</div>
+              <p class="cblurb">${esc(c.blurb)}</p>
+              <div class="cstats"><span>Acceleration</span>${bar(c.stats.accel)}<span>Top speed</span>${bar(c.stats.top)}<span>Handling</span>${bar(c.stats.handling)}<span>Braking</span>${bar(c.stats.braking)}<span>Fuel economy</span>${bar(c.stats.economy)}</div>
+            </button>`;
+          }).join('')}
+        </div></div>
+      </div>`);
+    m.el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-car]');
+      if (!b) return;
+      sfx.tap();
+      m.close();
+      actions.changeCar(b.dataset.car);
+    });
+  }
+
+  // ---------------------------------------------------------- level selector
+  function openLevels() {
+    const done = (l) => settings.progress[l.id] && settings.progress[l.id].passed;
+    const m = openModal(`
+      <div class="sheet wide" role="dialog" aria-label="Choose a level">
+        ${head('Driving school levels')}
+        <div class="sheet-body"><div class="lvgrid">
+          ${LEVELS.map((l) => {
+            const tag = l.id === 'free' ? 'FREE' : l.boss ? 'BOSS' : `L${l.n}`;
+            return `<button type="button" class="lvtile ${l.playable ? 'play' : 'soon'} ${G.level && G.level.id === l.id ? 'sel' : ''}" data-lv="${l.id}">
+              <span class="lvtag">${tag}</span><b>${esc(name(l.title))}</b><span class="lvd">${esc(l.district)}</span>
+              <span class="lvm">${WEATHER[l.weather]} · ${l.playable ? (done(l) ? 'Passed ✓' : 'Play') : 'Coming next'}</span></button>`;
+          }).join('')}
+        </div>
+        <p class="empty" style="text-align:left">The city is stylised. Level 6-15 are planned and already have their topic, district and weather. Open one to preview its conditions.</p></div>
+      </div>`);
+    m.el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-lv]');
+      if (!b) return;
+      const l = LEVELS.find((x) => x.id === b.dataset.lv);
+      sfx.tap();
+      m.close();
+      if (l.playable) actions.startLevel(l.id, { mode: l.id === 'free' ? 'learn' : settings.mode });
+      else openSoon(l);
+    });
+  }
+  function openSoon(l) {
+    const m = openModal(`
+      <div class="sheet" role="dialog" aria-label="Level preview">
+        ${head(`Level ${l.n}: ${esc(name(l.title))}`)}
+        <div class="sheet-body">
+          <p><b>${esc(l.district)}</b> · ${WEATHER[l.weather]}</p>
+          <p class="rule" style="margin:8px 0 12px">${esc(name(l.goal))}</p>
+          <p class="empty" style="text-align:left">This level is scaffolded (topic, district and conditions are set) but its map and checks are not built yet.</p>
+          <div class="stack" style="margin-top:12px"><button type="button" class="btn" id="soonTry">Try ${WEATHER[l.weather].toLowerCase()} conditions in Free Roam</button><button type="button" class="btn ghost" data-close>Close</button></div>
+        </div>
+      </div>`);
+    $('#soonTry', m.el).addEventListener('click', () => {
+      m.close();
+      actions.startLevel('free', { mode: 'learn', weather: l.weather });
+    });
+  }
+
+  // ----------------------------------------------------------- menu & help
   function openMenu() {
+    const s = st();
     const m = openModal(`
       <div class="sheet" role="dialog" aria-label="Menu">
-        <div class="sheet-head"><h2>Menu</h2><button type="button" class="x" data-close aria-label="Close">&times;</button></div>
+        ${head('Paused')}
         <div class="sheet-body">
-          <div class="row"><span>Rule language<small>Sign names are always shown in Romanian and English</small></span>
-            <div class="seg2" data-set="lang"><button type="button" data-v="en">EN</button><button type="button" data-v="ro">RO</button></div></div>
-          <div class="row"><span>Camera<small>Turn with the car, or keep north at the top</small></span>
-            <div class="seg2" data-set="rotate"><button type="button" data-v="1">Turning</button><button type="button" data-v="0">Fixed</button></div></div>
-          <div class="row"><span>Sound &amp; vibration</span>
-            <div class="seg2" data-set="sound"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
-          <div class="stack" style="margin-top:16px">
-            <button type="button" class="btn ghost" id="mRestart">Restart from the start line</button>
-            <button type="button" class="btn warn" id="mFinish" ${state.mode === 'test' ? '' : 'hidden'}>Finish the test now</button>
+          <div class="row"><span>Rule language<small>Sign names show in Romanian and English</small></span><div class="seg2" data-set="lang"><button type="button" data-v="en">EN</button><button type="button" data-v="ro">RO</button></div></div>
+          <div class="row"><span>Conditions<small>Night, rain and fog need low beams (L key)</small></span><div class="seg2" data-set="weather">${Object.keys(WEATHER).map((w) => `<button type="button" data-v="${w}">${WEATHER[w]}</button>`).join('')}</div></div>
+          <div class="row"><span>Camera</span><div class="seg2" data-set="rotate"><button type="button" data-v="1">Turning</button><button type="button" data-v="0">Fixed</button></div></div>
+          <div class="row"><span>Sound &amp; vibration</span><div class="seg2" data-set="sound"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
+          <div class="stack two" style="margin-top:12px">
+            <button type="button" class="btn ghost" id="mLib">Sign library</button>
+            <button type="button" class="btn ghost" id="mDrill">My Mistakes drill</button>
+            <button type="button" class="btn ghost" id="mRestart">Restart level</button>
             <button type="button" class="btn ghost" id="mHelp">How to play</button>
+            <button type="button" class="btn warn" id="mFinish" ${s.mode === 'test' ? '' : 'hidden'}>Finish test now</button>
+            <button type="button" class="btn" data-close>Resume</button>
           </div>
         </div>
       </div>`);
     const sync = () => {
-      const vals = { lang: settings.lang, rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
-      for (const g of m.el.querySelectorAll('[data-set]'))
-        for (const b of g.querySelectorAll('button')) b.classList.toggle('on', b.dataset.v === vals[g.dataset.set]);
+      const vals = { lang: settings.lang, weather: st().weather, rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
+      for (const g of m.el.querySelectorAll('[data-set]')) for (const b of g.querySelectorAll('button')) b.classList.toggle('on', b.dataset.v === vals[g.dataset.set]);
     };
     sync();
     m.el.addEventListener('click', (e) => {
       const b = e.target.closest('.seg2 button');
-      if (b) {
-        const key = b.parentElement.dataset.set;
-        if (key === 'lang') setLang(b.dataset.v);
-        if (key === 'rotate') settings.rotate = b.dataset.v === '1';
-        if (key === 'sound') {
-          settings.sound = b.dataset.v === '1';
-          setSoundEnabled(settings.sound);
-        }
-        saveSettings();
-        sync();
-        sfx.tap();
+      if (!b) return;
+      const key = b.parentElement.dataset.set;
+      if (key === 'lang') setLang(b.dataset.v);
+      if (key === 'weather') G.game.setWeather(b.dataset.v);
+      if (key === 'rotate') settings.rotate = b.dataset.v === '1';
+      if (key === 'sound') {
+        settings.sound = b.dataset.v === '1';
+        setSoundEnabled(settings.sound);
       }
+      saveSettings();
+      sync();
+      sfx.tap();
     });
-    $('#mRestart', m.el).addEventListener('click', () => {
-      m.close();
-      game.restart();
-      if (state.mode === 'test') showInfo('Test restarted', 'Drive one lap and follow every sign.');
-    });
-    $('#mFinish', m.el).addEventListener('click', () => {
-      m.close();
-      game.endTest();
-    });
-    $('#mHelp', m.el).addEventListener('click', () => {
-      m.close();
-      openHelp();
-    });
+    const go = (id, fn) => $(id, m.el).addEventListener('click', () => (m.close(), fn()));
+    go('#mLib', () => openLibrary());
+    go('#mDrill', openDrill);
+    go('#mHelp', openHelp);
+    go('#mRestart', () => restartLevel());
+    go('#mFinish', () => G.game.endTest());
   }
 
   function openHelp() {
     openModal(`
       <div class="sheet" role="dialog" aria-label="How to play">
-        <div class="sheet-head"><h2>How to play</h2><button type="button" class="x" data-close aria-label="Close">&times;</button></div>
+        ${head('How to play')}
         <div class="sheet-body">
           <ol class="howto">
-            <li><b>Steer</b> with the two arrow buttons on the left.</li>
-            <li><b>Gas</b> and <b>Brake</b> are the pedals on the right. Hold Brake when stopped to reverse.</li>
-            <li><b>Reset</b> puts the car back on the road if you get stuck.</li>
-            <li><b>Learn mode:</b> drive anywhere. A card appears when you get close to a sign. Tap it to keep it open.</li>
-            <li><b>Test mode:</b> drive one lap and obey every sign. You get a green or red message and a score by category.</li>
-            <li>The <b>Signs</b> button opens the full library with filters.</li>
+            <li><b>Wheel</b> (bottom left): drag it round with a finger. It springs back to centre when you let go.</li>
+            <li><b>Gas</b> and <b>Brake / Reverse</b> are the pedals (bottom right). <b>Reset</b> puts the car back on the road.</li>
+            <li><b>Blinkers</b> and <b>hazards</b> are the top buttons. Signal before every turn. They switch off by themselves after the turn.</li>
+            <li>The <b>purple line</b> and the <b>round map</b> show your route. The banner tells you the next turn.</li>
+            <li><b>Learn</b>: drive anywhere, signs explain themselves. <b>Test</b>: exam rules with penalty points, 21 = failed.</li>
+            <li>At night or in fog use <b>low beams</b>. Gas stations: stop in the bay, switch the engine off, refuel.</li>
           </ol>
-          <p class="empty" style="text-align:left;padding-bottom:0">Keyboard: arrows or WASD to drive, Space to brake, R to reset.</p>
+          <p class="empty" style="text-align:left;padding-bottom:0">Keyboard: WASD or arrows, Space brake, Q / E blinkers, H hazards, L lights, I ignition, R reset.</p>
         </div>
       </div>`);
   }
 
+  function restartLevel() {
+    hideToast();
+    hideCard();
+    G.game.restart();
+    if (st().mode === 'test') showInfo('Test restarted', 'Follow the purple route and obey every sign. 21 penalty points means failed.');
+  }
+
   // ---------------------------------------------------------------- welcome
-  function openWelcome() {
+  function openWelcome(onStart) {
     const keys = ['stop', 'giveWay', 'priorityRoad', 'speed50', 'roundabout'];
     const m = openModal(
-      `<div class="sheet" role="dialog" aria-label="Welcome">
-        <div class="welcome">
-          <div class="signrow">${keys.map((k) => `<img src="${img(k, 128)}" alt="" />`).join('')}</div>
-          <h1>DRPCIV Road Signs</h1>
-          <p>Drive a training track and learn the Romanian road signs.</p>
-          <div class="stack">
-            <button type="button" class="btn big" data-go="learn">Learn mode<small>Drive freely. Signs explain themselves.</small></button>
-            <button type="button" class="btn big ghost" data-go="test">Test mode<small>Follow the signs and get a score.</small></button>
-          </div>
-        </div>
-      </div>`,
-      { center: true, dismiss: false }
+      `<div class="sheet" role="dialog" aria-label="Welcome"><div class="welcome">
+        <div class="signrow">${keys.map((k) => `<img src="${img(k, 128)}" alt="" />`).join('')}</div>
+        <h1>DRPCIV Road Signs</h1>
+        <p>Learn the Romanian road signs in a driving school with 15 levels.</p>
+        <div class="stack two">
+          <button type="button" class="btn big" data-go="learn">Learn mode<small>Signs explain themselves</small></button>
+          <button type="button" class="btn big ghost" data-go="test">Test mode<small>Penalty points like the exam</small></button>
+        </div></div></div>`,
+      { dismiss: false }
     );
     m.el.addEventListener('click', (e) => {
       const b = e.target.closest('[data-go]');
@@ -461,51 +878,94 @@ export function createUI({ game, world, settings, saveSettings, controls }) {
         /* ignore */
       }
       m.close();
-      switchMode(b.dataset.go);
+      onStart(b.dataset.go);
     });
   }
 
   // ------------------------------------------------------------- mode switch
   const modeButtons = [...document.querySelectorAll('#modeSeg [data-mode]')];
   function syncMode() {
-    for (const b of modeButtons) b.classList.toggle('on', b.dataset.mode === state.mode);
+    document.body.classList.toggle('mode-test', st().mode === 'test');
+    for (const b of modeButtons) b.classList.toggle('on', b.dataset.mode === st().mode);
     updateScore();
   }
   function switchMode(mode) {
     hideToast();
     hideCard();
-    game.setMode(mode);
+    G.game.setMode(mode);
     settings.mode = mode;
     saveSettings();
     syncMode();
-    if (mode === 'test') showInfo('Test started', 'Drive one lap. Obey every sign and watch your speed.');
+    if (mode === 'test') showInfo('Test started', 'Follow the purple route and obey every sign. 21 penalty points means failed.');
   }
-  for (const b of modeButtons) {
+  for (const b of modeButtons)
     b.addEventListener('click', () => {
       unlock();
-      if (b.dataset.mode !== state.mode) switchMode(b.dataset.mode);
+      if (b.dataset.mode !== st().mode) switchMode(b.dataset.mode);
     });
+
+  // ---------------------------------------------------- top buttons + keys
+  function act(name) {
+    if (!G.game || modals.length) return;
+    unlock();
+    const g = G.game;
+    if (name === 'signalLeft') g.toggleSignal('left');
+    else if (name === 'signalRight') g.toggleSignal('right');
+    else if (name === 'hazard') g.toggleHazard();
+    else if (name === 'lights') g.cycleLights();
+    else if (name === 'engine') g.toggleEngine();
   }
-  game.on('mode', syncMode);
-  game.on('feedback', showFeedback);
-  game.on('bump', (vn) => {
-    sfx.bump(vn);
-    if (vn > 3) vibrate(18);
+  E.sigL.addEventListener('click', () => act('signalLeft'));
+  E.sigR.addEventListener('click', () => act('signalRight'));
+  E.haz.addEventListener('click', () => act('hazard'));
+  E.lights.addEventListener('click', () => act('lights'));
+  E.eng.addEventListener('click', () => act('engine'));
+  $('#bCar').addEventListener('click', () => (unlock(), openCars()));
+  $('#bLevel').addEventListener('click', () => (unlock(), openLevels()));
+  $('#bRestart').addEventListener('click', () => (unlock(), restartLevel()));
+  $('#bMenu').addEventListener('click', () => (unlock(), openMenu()));
+  E.alert.addEventListener('click', () => {
+    if (st().activeSign && st().mode === 'learn') openLibrary(st().activeSign.key);
   });
 
-  $('#btnSigns').addEventListener('click', () => {
-    unlock();
-    openLibrary();
-  });
-  $('#btnMenu').addEventListener('click', () => {
-    unlock();
-    openMenu();
-  });
+  // ------------------------------------------------------------ attach a game
+  function attach(game, world, level) {
+    G = { game, world, level };
+    lastNav = '';
+    lastStationKey = '';
+    E.alert.dataset.k = '';
+    hideCard();
+    hideToast();
+    const tag = level.id === 'free' ? 'FREE' : level.boss ? 'BOSS' : `L${level.n}`;
+    E.lvName.textContent = `${tag} · ${level.district}`;
+    game.on('quiz', onQuiz);
+    game.on('finish', onFinish);
+    game.on('feedback', showFeedback);
+    game.on('mode', syncMode);
+    game.on('bump', (vn) => {
+      sfx.bump(vn);
+      if (vn > 3) vibrate(18);
+    });
+    game.on('blink', (ph) => sfx.tick(ph));
+    game.on('lowfuel', () => {
+      sfx.lowfuel();
+      showInfo('Low fuel', 'Head for the nearest fuel station (green pin on the map).');
+    });
+    game.on('stall', () => {
+      sfx.stall();
+      showInfo('Engine stopped', st().car.fuel <= 0 ? 'Out of fuel. Switch on the hazard lights.' : 'Engine is off.');
+    });
+    syncMode();
+    checkOrientation();
+  }
 
-  syncMode();
+  checkOrientation();
   return {
+    attach,
     update,
-    isBlocking: () => modals.length > 0 || !!state.quiz,
+    act,
+    showInfo,
+    isBlocking: () => modals.length > 0 || !!(G.game && st().quiz) || !E.rotate.hidden,
     openWelcome,
     switchMode,
     closeAll,

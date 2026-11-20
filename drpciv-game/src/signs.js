@@ -79,7 +79,7 @@ export const SIGNS = {
     },
     art: { shape: 'triangleDown', fill: '#ffffff', border: '#d62828', borderW: 0.2 },
     paint: 'yieldLine',
-    test: { type: 'slow', maxKmh: 25, lineOffset: 12 },
+    test: { type: 'slow', maxKmh: 25, lineOffset: 12, penalty: 21 },
   },
 
   priorityRoad: {
@@ -197,6 +197,51 @@ export const SIGNS = {
     test: { type: 'zones', expire: 60 },
   },
 
+
+  noParking: {
+    category: 'prohibition',
+    name: { ro: 'Staționarea interzisă', en: 'No parking' },
+    rule: {
+      ro: 'Este interzis să staționezi (să parchezi) pe sectorul care urmează. Oprirea scurtă este permisă.',
+      en: 'You may not park on the stretch ahead. A short stop is still allowed.',
+    },
+    art: { shape: 'circle', fill: '#1d6fd1', border: '#d62828', borderW: 0.15, symbol: { type: 'slash', color: '#d62828' } },
+    test: { type: 'quiz' },
+  },
+
+  turnLeft: {
+    category: 'mandatory',
+    name: { ro: 'Direcție obligatorie: la stânga', en: 'Turn left (mandatory)' },
+    rule: {
+      ro: 'Trebuie să virezi la stânga. Nu poți merge înainte sau la dreapta.',
+      en: 'You must turn left. You may not go straight on or turn right.',
+    },
+    art: { shape: 'circle', fill: '#1d6fd1', border: '#ffffff', borderW: 0.05, symbol: { type: 'arrowLeft' } },
+    test: { type: 'zones', expire: 80 },
+  },
+
+  curveLeft: {
+    category: 'warning',
+    name: { ro: 'Curbă periculoasă la stânga', en: 'Dangerous curve to the left' },
+    rule: {
+      ro: 'Urmează o curbă periculoasă la stânga. Redu viteza înainte de curbă și rămâi pe banda ta.',
+      en: 'A dangerous left-hand curve is ahead. Slow down before the curve and stay in your lane.',
+    },
+    art: { shape: 'triangleUp', fill: '#ffffff', border: '#d62828', borderW: 0.2, symbol: { type: 'curveLeft' } },
+    test: { type: 'slow', maxKmh: 40, lineOffset: 30 },
+  },
+
+  narrowRoad: {
+    category: 'warning',
+    name: { ro: 'Drum îngustat', en: 'Narrow road' },
+    rule: {
+      ro: 'Drumul se îngustează pe ambele sensuri. Redu viteza și fii pregătit să acorzi prioritate vehiculelor din sens opus.',
+      en: 'The road narrows on both sides. Slow down and be ready to give way to oncoming vehicles.',
+    },
+    art: { shape: 'triangleUp', fill: '#ffffff', border: '#d62828', borderW: 0.2, symbol: { type: 'narrow' } },
+    test: { type: 'slow', maxKmh: 30, lineOffset: 20 },
+  },
+
   // ----------------------------------------------------------------- MANDATORY
   roundabout: {
     category: 'mandatory',
@@ -302,6 +347,31 @@ export const SIGNS = {
     test: { type: 'quiz' },
   },
 };
+
+// Not road signs: used so signalling / pick-up checks can be listed in results.
+SIGNS.signalling = {
+  hidden: true,
+  category: 'mandatory',
+  name: { ro: 'Semnalizare', en: 'Signalling' },
+  rule: {
+    ro: 'Semnalizează din timp, înainte de a vira sau de a schimba banda, și oprește semnalizarea după manevră.',
+    en: 'Signal in good time before turning or changing lane, and cancel the signal after the manoeuvre.',
+  },
+  art: { shape: 'circle', fill: '#1d6fd1', border: '#ffffff', borderW: 0.05, symbol: { type: 'arrowRight' } },
+};
+SIGNS.pickup = {
+  hidden: true,
+  category: 'information',
+  name: { ro: 'Preluare pasager', en: 'Passenger pick-up' },
+  rule: {
+    ro: 'Oprește în siguranță, în dreptul locului de întâlnire, pentru a lua pasagerul.',
+    en: 'Stop safely at the meeting point to pick up your passenger.',
+  },
+  art: { shape: 'square', fill: '#2a9d5c', border: '#ffffff', borderW: 0.05, symbol: { type: 'text', text: 'P', color: '#ffffff', size: 1.35, maxW: 1.2 } },
+};
+
+/** The signs you can see in the library and quizzes (hides the pseudo-signs). */
+export const visibleSignKeys = () => Object.keys(SIGNS).filter((k) => !SIGNS[k].hidden);
 
 /** Handy helper: pick the text in the chosen language. */
 export const tr = (obj, lang) => (obj ? obj[lang] ?? obj.en ?? obj.ro ?? '' : '');

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#16302a" />
+    <meta name="theme-color" content="#0d1418" />
     <title>DRPCIV Road Signs</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -16,56 +16,85 @@
     <div id="app">
       <canvas id="game" aria-label="Driving view"></canvas>
 
-      <!-- HUD: everything that floats above the road -->
       <div id="hud">
-        <div id="topbar">
-          <div class="seg" id="modeSeg" role="group" aria-label="Game mode">
-            <button type="button" data-mode="learn" class="on">Learn</button>
-            <button type="button" data-mode="test">Test</button>
+        <!-- top-left: points, level, fuel -->
+        <div id="tl">
+          <div class="trow">
+            <div class="pill" id="pillScore"><span class="k">PTS</span><b id="pts">0</b><span class="pen" id="pen" hidden>Pen 0/21</span></div>
           </div>
-          <button type="button" class="chip" id="btnSigns" aria-label="Open the road sign library">
-            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 9h5M9 13h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-            <span>Signs</span>
-          </button>
-          <button type="button" class="chip icon" id="btnMenu" aria-label="Menu">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
-          </button>
+          <div class="pill" id="pillFuel">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 20h12M15 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V8l-3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="fbar"><i id="fuelFill"></i></span><span id="fuelTxt">60%</span>
+          </div>
+          <div class="pill zone" id="pillZone"><span id="lvName">Bartolomeu</span></div>
         </div>
 
-        <div id="readouts">
-          <div id="speedo" aria-live="off"><span id="spdNum">0</span><span class="u">km/h</span></div>
-          <div id="limit" hidden aria-label="Speed limit"><span id="limNum">50</span></div>
-          <div id="scoreBox" hidden><span class="lbl">Score</span><b id="scoreNum">0</b><span id="scoreOf">/ 0</span></div>
+        <!-- top-centre: signals, lights, engine, car / level / mode / restart -->
+        <div id="tc">
+          <button type="button" class="tb sig" id="bSigL" aria-label="Left turn signal"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M13 5L4 12l9 7v-4.5h7v-5h-7z" fill="currentColor"/></svg></button>
+          <button type="button" class="tb haz" id="bHaz" aria-label="Hazard lights"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3L2 20h20z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9.5L7.2 17.5h9.6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="tb sig" id="bSigR" aria-label="Right turn signal"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M11 5l9 7-9 7v-4.5H4v-5h7z" fill="currentColor"/></svg></button>
+          <button type="button" class="tb" id="bLights" aria-label="Headlights"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M13 5a7 7 0 0 0 0 14c1 0 1-1 1-2V7c0-1 0-2-1-2z" fill="currentColor"/><path d="M3 8l5 1.2M3 12h5M3 16l5-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="lv" id="lightLv">OFF</span></button>
+          <button type="button" class="tb" id="bEng" aria-label="Engine start or stop"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v9M6.6 6.6a8 8 0 1 0 10.8 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+          <span class="sep"></span>
+          <button type="button" class="tb txt" id="bCar" aria-label="Choose a car"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 15v-3l2-4.5A2 2 0 0 1 6.8 6h10.4a2 2 0 0 1 1.8 1.5L21 12v3M3 15h18M3 15v2.5h3V15M18 15v2.5h3V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7.5" cy="12.3" r="1.1" fill="currentColor"/><circle cx="16.5" cy="12.3" r="1.1" fill="currentColor"/></svg><span>Car</span></button>
+          <button type="button" class="tb txt" id="bLevel" aria-label="Choose a level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 21V4M6 5h12l-2.5 4L18 13H6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Level</span></button>
+          <div class="seg mini" id="modeSeg" role="group" aria-label="Game mode"><button type="button" data-mode="learn" class="on">Learn</button><button type="button" data-mode="test">Test</button></div>
+          <button type="button" class="tb" id="bRestart" aria-label="Restart level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M3.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="tb" id="bMenu" aria-label="Menu and pause"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
         </div>
 
+        <!-- top-right: progress + sign alert -->
+        <div id="tr">
+          <div class="pill" id="pillProg"><span id="progTxt">0/0</span><span class="k" id="progK">checks</span></div>
+          <button type="button" class="pill alert" id="alertPill" hidden><img id="alertImg" alt="" /><span id="alertTxt"></span></button>
+        </div>
+
+        <div id="limit" hidden aria-label="Speed limit"><span id="limNum">50</span></div>
+        <div id="nav" hidden><svg id="navIcon" viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"></svg><span id="navTxt"></span></div>
         <div id="wrongWay" hidden>Wrong way. Turn around.</div>
 
         <div id="stage">
           <article id="card" hidden></article>
           <div id="toast" hidden></div>
         </div>
+
+        <div id="station" hidden></div>
       </div>
 
-      <!-- On-screen controls -->
-      <div id="controls">
-        <div class="pad steer">
-          <button type="button" class="ctl" data-btn="left" aria-label="Steer left">
-            <svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button type="button" class="ctl" data-btn="right" aria-label="Steer right">
-            <svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path d="M9 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
+      <!-- bottom-left: steering wheel + minimap -->
+      <div id="bl">
+        <div id="wheel" aria-label="Steering wheel: drag to turn" role="slider">
+          <svg id="wheelImg" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="44" fill="rgba(10,16,20,0.55)" stroke="#1a1f24" stroke-width="12"/>
+            <circle cx="50" cy="50" r="44" fill="none" stroke="#3b434b" stroke-width="8"/>
+            <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="1.5"/>
+            <path d="M12 56h26l12 9 12-9h26M50 65v30" fill="none" stroke="#3b434b" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="50" cy="52" r="11" fill="#252b31" stroke="#505a64" stroke-width="2"/>
+            <path d="M50 6v10" stroke="#ff4d4d" stroke-width="5" stroke-linecap="round"/>
+          </svg>
         </div>
+        <div id="minimap"><canvas id="minimapCv"></canvas><span class="north">N</span></div>
+      </div>
 
+      <!-- bottom-right: speedometer + gear + pedals -->
+      <div id="br">
         <button type="button" class="ctl round" id="btnReset" data-action="reset" aria-label="Reset car onto the road">
-          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M3.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M3.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span>Reset</span>
         </button>
-
-        <div class="pad pedals">
+        <div id="speedo"><canvas id="speedoCv"></canvas></div>
+        <div class="pedals">
           <button type="button" class="ctl pedal brake" data-btn="brake" aria-label="Brake and reverse"><span>Brake</span><small>reverse</small></button>
           <button type="button" class="ctl pedal gas" data-btn="gas" aria-label="Accelerate"><span>Gas</span></button>
         </div>
+      </div>
+
+      <div id="rotate" hidden>
+        <svg viewBox="0 0 64 64" width="72" height="72" aria-hidden="true"><rect x="18" y="6" width="28" height="48" rx="5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M50 40c8-2 12-8 12-14M58 22l4 4-5 3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+        <b>Turn your phone sideways</b>
+        <span>The game is built for landscape.</span>
+        <button type="button" class="btn ghost" id="rotateSkip">Play anyway</button>
       </div>
 
       <div id="overlays"></div>

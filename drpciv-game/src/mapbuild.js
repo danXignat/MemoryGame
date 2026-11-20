@@ -308,6 +308,110 @@ export function buildWorld(MAP) {
     color: t.color || '#2b6fd6',
   }));
 
+
+  // ---------------------------------------------------- other cars with their own path
+  const makePath = (points) => {
+    const cumL = [0];
+    for (let i = 1; i < points.length; i++) cumL.push(cumL[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
+    const total = cumL[cumL.length - 1];
+    return {
+      length: total,
+      at(sv, out = {}) {
+        const sc = clamp(sv, 0, total);
+        let j = 0;
+        while (j < points.length - 2 && cumL[j + 1] < sc) j++;
+        const l = cumL[j + 1] - cumL[j] || 1;
+        const t = (sc - cumL[j]) / l;
+        out.x = points[j][0] + (points[j + 1][0] - points[j][0]) * t;
+        out.y = points[j][1] + (points[j + 1][1] - points[j][1]) * t;
+        out.dx = (points[j + 1][0] - points[j][0]) / l;
+        out.dy = (points[j + 1][1] - points[j][1]) / l;
+        return out;
+      },
+    };
+  };
+  const npcDefs = (MAP.npcs || []).map((n, i) => ({
+    id: n.id || `npc${i}`,
+    path: makePath(n.points),
+    kmh: n.kmh,
+    every: n.every ?? 12,
+    color: n.color || '#8c6bd6',
+    lane: n.lane ?? C.traffic.laneOffset,
+  }));
+  // also let other cars' roads be drivable & drawn
+  for (const n of MAP.npcs || []) {
+    if (n.road === false) continue;
+    const segs = [];
+    for (let i = 1; i < n.points.length; i++) segs.push({ type: 'line', x0: n.points[i - 1][0], y0: n.points[i - 1][1], x1: n.points[i][0], y1: n.points[i][1] });
+    roads.push({ id: 'npc-road', segs, lane: true });
+  }
+
+  // ------------------------------------------------------------- pedestrians
+  const peds = (MAP.peds || []).map((p, i) => {
+    const s = resolveAt(p.at, `pedestrian ${i + 1}`);
+    const pt = routeAt(s, {});
+    return {
+      id: p.id || `ped${i}`,
+      s,
+      x: pt.x,
+      y: pt.y,
+      dx: pt.dx,
+      dy: pt.dy,
+      nx: -pt.dy, // "right" of the road direction
+      ny: pt.dx,
+      reach: half + 2.2, // how far from the centre line the kerb waiting spots are
+      startSide: p.side === 'right' ? 1 : -1,
+      speed: p.speed ?? 1.4,
+    };
+  });
+
+  // ------------------------------------------------------------ gas stations
+  const stations = (MAP.stations || []).map((st, i) => ({ id: `station${i}`, name: st.name || 'Fuel', x: st.x, y: st.y, bay: st.bay || { x: st.x, y: st.y, r: 3.5 }, zone: st.zone || { x: st.x, y: st.y, r: 40 }, heading: st.heading ?? 0 }));
+  for (const st of MAP.stations || []) {
+    if (st.road) {
+      const segs = [];
+      for (let i = 1; i < st.road.length; i++) segs.push({ type: 'line', x0: st.road[i - 1][0], y0: st.road[i - 1][1], x1: st.road[i][0], y1: st.road[i][1] });
+      roads.push({ id: 'station-road', segs, lane: false });
+    }
+  }
+
+  // --------------------------------------------------------------- map pins
+  const pins = [];
+  for (const p of MAP.pins || []) {
+    if (p.at) {
+      const s = resolveAt(p.at, `pin ${p.type}`);
+      const pt = routeAt(s, {});
+      const side = p.side === 'left' ? -1 : 1;
+      pins.push({ type: p.type, label: p.label || '', x: pt.x - pt.dy * side * (p.offset ?? 6), y: pt.y + pt.dx * side * (p.offset ?? 6), s });
+    } else pins.push({ type: p.type, label: p.label || '', x: p.x, y: p.y, s: null });
+  }
+  for (const st of stations) pins.push({ type: 'station', label: st.name, x: st.x, y: st.y, s: null });
+  for (const pd of peds) pins.push({ type: 'crosswalk', label: '', x: pd.x, y: pd.y, s: pd.s });
+
+  // ----------------------------------------- "signal before turning" checks
+  const signalTasks = (MAP.turns || []).map((t, i) => ({ id: `turn${i}`, side: t.side, s: resolveAt(t.at, `turn ${i + 1}`), lead: t.lead ?? 8 }));
+
+  // ----------------------------------------------- turn-by-turn instructions
+  const maneuvers = [];
+  for (const seg of MAP.route.segments) {
+    if (seg.type !== 'arc') continue;
+    const sweep = Math.abs(seg.to - seg.from);
+    if (sweep < 28) continue;
+    const kind = seg.roundabout ? 'roundabout' : seg.to > seg.from ? 'right' : 'left';
+    maneuvers.push({ s: segRanges[seg.id][0], type: kind, id: seg.id });
+  }
+  const mission = MAP.mission
+    ? {
+        ...MAP.mission,
+        pickup: MAP.mission.pickup ? { ...MAP.mission.pickup, s: resolveAt(MAP.mission.pickup.at, 'pickup'), ...(() => { const q = routeAt(resolveAt(MAP.mission.pickup.at, 'pickup'), {}); return { x: q.x - q.dy * 6, y: q.y + q.dx * 6 }; })() } : null,
+      }
+    : null;
+  if (mission && mission.pickup) pins.push({ type: 'pickup', label: mission.pickup.name, x: mission.pickup.x, y: mission.pickup.y, s: mission.pickup.s });
+  if (mission && mission.dest) {
+    const q = routeAt(length, {});
+    pins.push({ type: 'home', label: mission.dest.name, x: q.x - q.dy * 7, y: q.y + q.dx * 7, s: length });
+  }
+
   // ------------------------------------------------------ scenery (decoration)
   const rnd = mulberry32(20240611);
   const rings = (MAP.rings || []).map((r) => ({ ...r, island: Math.max(1, r.r - half - 0.7) }));
@@ -357,6 +461,14 @@ export function buildWorld(MAP) {
     signs,
     paint,
     traffic,
+    npcDefs,
+    peds,
+    stations,
+    pins,
+    signalTasks,
+    maneuvers,
+    mission,
+    weather: MAP.weather || 'day',
     houses,
     trees,
     bounds: { minX, minY, maxX, maxY },

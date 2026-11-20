@@ -195,6 +195,45 @@ const SYMBOLS = {
     ctx.fill();
   },
 
+  arrowLeft(ctx) {
+    ctx.save();
+    ctx.scale(-1, 1);
+    SYMBOLS.arrowRight(ctx);
+    ctx.restore();
+  },
+
+  slash(ctx, s) {
+    ctx.strokeStyle = s.color || '#d62828';
+    ctx.lineWidth = 0.24;
+    ctx.lineCap = 'butt';
+    ctx.beginPath();
+    ctx.moveTo(-0.62, 0.62);
+    ctx.lineTo(0.62, -0.62);
+    ctx.stroke();
+  },
+
+  curveLeft(ctx) {
+    ctx.save();
+    ctx.scale(-1, 1);
+    SYMBOLS.curveRight(ctx);
+    ctx.restore();
+  },
+
+  narrow(ctx) {
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 0.2;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+    for (const sx of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(sx * 0.5, 0.75);
+      ctx.lineTo(sx * 0.5, 0.15);
+      ctx.lineTo(sx * 0.28, -0.1);
+      ctx.lineTo(sx * 0.28, -0.75);
+      ctx.stroke();
+    }
+  },
+
   arrowUp(ctx) {
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();

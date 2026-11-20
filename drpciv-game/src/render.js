@@ -1,7 +1,7 @@
 // ============================================================================
-//  render.js  —  DRAWS THE WORLD on the canvas (grass, roads, signs, cars)
+//  render.js  —  DRAWS THE WORLD on the canvas (roads, route line, signs, cars,
+//  pedestrians, night / fog / rain) and the little round minimap.
 //  It only reads the game state, it never changes it.
-//  Colours of the scenery are in the COL table just below.
 // ============================================================================
 
 import { CONFIG as C } from './config.js';
@@ -26,6 +26,7 @@ const COL = {
   tree: ['#2f7d3a', '#3a8c43', '#27703a'],
   treeLight: 'rgba(255,255,255,0.12)',
   shadow: 'rgba(0,0,0,0.22)',
+  route: '#8f5bff',
 };
 
 function buildPaths(world) {
@@ -36,6 +37,7 @@ function buildPaths(world) {
     for (const s of road.segs) {
       if (s.type === 'line') {
         if (first) path.moveTo(s.x0, s.y0);
+        else path.lineTo(s.x0, s.y0);
         path.lineTo(s.x1, s.y1);
       } else {
         if (first) path.moveTo(s.cx + s.r * Math.cos(s.a0), s.cy + s.r * Math.sin(s.a0));
@@ -47,7 +49,7 @@ function buildPaths(world) {
   });
 }
 
-function roundRectPath(ctx, x, y, w, h, r) {
+function rr(ctx, x, y, w, h, r) {
   ctx.beginPath();
   ctx.moveTo(x + r, y);
   ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -57,15 +59,34 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-export function createRenderer(canvas, world) {
+export function createRenderer(canvas, initialWorld) {
   const ctx = canvas.getContext('2d', { alpha: false });
-  const paths = buildPaths(world);
-  const half = world.half;
+  const off = document.createElement('canvas'); // darkness layer for night
+  const octx = off.getContext('2d');
+  let world = initialWorld;
+  let paths = buildPaths(world);
   let W = 1;
   let H = 1;
   let dpr = 1;
-  let portrait = true;
-  const cam = { x: world.start.x, y: world.start.y, angle: -Math.PI / 2 - world.start.heading, scale: 10, ready: false };
+  let portrait = false;
+  const cam = { x: 0, y: 0, angle: 0, scale: 10, ready: false };
+  let anchorY = 0.5;
+  let passengerImg = null;
+  let rain = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), v: 0.8 + Math.random() * 0.8 }));
+
+  // optional portrait of the passenger (public/assets/passenger.png). Falls back to a drawn figure.
+  function loadPassenger(url) {
+    const im = new Image();
+    im.onload = () => (passengerImg = im);
+    im.onerror = () => (passengerImg = null);
+    im.src = url;
+  }
+
+  function setWorld(w) {
+    world = w;
+    paths = buildPaths(w);
+    cam.ready = false;
+  }
 
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
@@ -73,14 +94,16 @@ export function createRenderer(canvas, world) {
     H = Math.max(1, canvas.clientHeight);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
-    portrait = H >= W;
+    off.width = canvas.width;
+    off.height = canvas.height;
+    portrait = H > W;
   }
 
   // -------------------------------------------------------------- camera
   function updateCamera(state, dt, settings) {
     const car = state.car;
     const K = C.camera;
-    const vmax = C.car.maxSpeedKmh / 3.6;
+    const vmax = Math.min(state.spec.topKmh, C.car2.capKmh) / 3.6;
     const meters = portrait ? K.portraitMeters : K.landscapeMeters;
     const wantScale = (H / meters) * (1 - K.zoomOutAtTopSpeed * clamp(Math.abs(car.v) / vmax, 0, 1));
     const look = clamp(car.v * K.lookAhead, -3, K.maxLookAhead);
@@ -88,11 +111,7 @@ export function createRenderer(canvas, world) {
     const ty = car.y + Math.sin(car.heading) * look;
     const wantAngle = settings.rotate ? -Math.PI / 2 - car.heading : 0;
     if (!cam.ready) {
-      cam.x = tx;
-      cam.y = ty;
-      cam.angle = wantAngle;
-      cam.scale = wantScale;
-      cam.ready = true;
+      Object.assign(cam, { x: tx, y: ty, angle: wantAngle, scale: wantScale, ready: true });
       return;
     }
     const f = (rate) => 1 - Math.exp(-rate * Math.min(dt, 0.1));
@@ -102,33 +121,48 @@ export function createRenderer(canvas, world) {
     cam.angle += wrap(wantAngle - cam.angle) * f(K.rotateFollow);
   }
 
+  const applyView = (c, sx = 0, sy = 0) => {
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    c.translate(W / 2 + sx, H * anchorY + sy);
+    c.rotate(cam.angle);
+    c.scale(cam.scale, cam.scale);
+    c.translate(-cam.x, -cam.y);
+  };
+
   // ---------------------------------------------------------------- draw
   function draw(state, settings, time) {
-    const anchorY = settings.rotate ? (portrait ? C.camera.anchorYPortrait : C.camera.anchorYLandscape) : 0.5;
+    anchorY = settings.rotate ? (portrait ? C.camera.anchorYPortrait : C.camera.anchorYLandscape) : 0.5;
     const k = state.shake;
     const sx = (Math.random() - 0.5) * k * 10;
     const sy = (Math.random() - 0.5) * k * 10;
+    const weather = state.weather;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = COL.grassA;
     ctx.fillRect(0, 0, W, H);
-
-    ctx.translate(W / 2 + sx, H * anchorY + sy);
-    ctx.rotate(cam.angle);
-    ctx.scale(cam.scale, cam.scale);
-    ctx.translate(-cam.x, -cam.y);
-
-    const R = Math.hypot(W, H) / cam.scale + 6; // radius that surely covers the screen
+    applyView(ctx, sx, sy);
+    const R = Math.hypot(W, H) / cam.scale + 6;
+    const blinkOn = state.blink === 1;
 
     drawGrass(R);
     drawRoads();
     drawIslands();
+    drawStations(state);
+    drawRoute(0.9);
     drawPaint();
     drawHouses(R);
-    drawTraffic(state);
-    drawCar(state.car, '#e0382f', state.car.braking, state.car.reversing, true);
+    for (const ai of state.traffic) drawCar(ai, null, ai.color, {});
+    for (const n of state.npcs) drawCar(n, null, n.color, {});
+    drawPeds(state, time);
+    drawBeams(state.car, state.spec);
+    drawCar(state.car, state.spec, state.spec.color, { braking: state.car.braking, reversing: state.car.reversing, signal: state.car.signal, hazard: state.car.hazard, blinkOn, lights: state.car.lights, player: true, passenger: state.passenger, mood: state.mood, engineOn: state.car.engineOn });
     drawTrees(R);
+    drawPins(R);
     drawSigns(state, R, time);
+
+    if (weather === 'fog') drawFog(state);
+    if (weather === 'night') drawNight(state, sx, sy);
+    if (weather === 'rain') drawRain(time);
   }
 
   function drawGrass(R) {
@@ -138,11 +172,7 @@ export function createRenderer(canvas, world) {
     const x1 = Math.ceil((cam.x + R) / G);
     const y0 = Math.floor((cam.y - R) / G);
     const y1 = Math.ceil((cam.y + R) / G);
-    for (let gx = x0; gx < x1; gx++) {
-      for (let gy = y0; gy < y1; gy++) {
-        if ((gx + gy) & 1) ctx.fillRect(gx * G, gy * G, G, G);
-      }
-    }
+    for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) if ((gx + gy) & 1) ctx.fillRect(gx * G, gy * G, G, G);
   }
 
   function drawRoads() {
@@ -162,6 +192,19 @@ export function createRenderer(canvas, world) {
     ctx.setLineDash([]);
   }
 
+  /** the glowing purple navigation line (Waze style) */
+  function drawRoute(alpha) {
+    if (!paths.length) return;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(143,91,255,${0.28 * alpha})`;
+    ctx.lineWidth = 3.4;
+    ctx.stroke(paths[0].path);
+    ctx.strokeStyle = `rgba(160,120,255,${0.92 * alpha})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke(paths[0].path);
+  }
+
   function drawIslands() {
     for (const r of world.rings) {
       ctx.fillStyle = COL.curb;
@@ -175,6 +218,28 @@ export function createRenderer(canvas, world) {
     }
   }
 
+  function drawStations(state) {
+    for (const st of world.stations) {
+      if (Math.hypot(st.x - cam.x, st.y - cam.y) > 120) continue;
+      ctx.fillStyle = '#2d343c';
+      ctx.beginPath();
+      ctx.arc(st.bay.x, st.bay.y, st.bay.r + 1.4, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#2a9d8f';
+      ctx.beginPath();
+      ctx.arc(st.bay.x, st.bay.y, st.bay.r, 0, TAU);
+      ctx.globalAlpha = 0.35;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // pump
+      ctx.fillStyle = '#e63946';
+      rr(ctx, st.bay.x + 2.2, st.bay.y - 6.2, 1.5, 2.8, 0.3);
+      ctx.fill();
+      ctx.fillStyle = '#f1f3f5';
+      ctx.fillRect(st.bay.x + 2.5, st.bay.y - 5.8, 0.9, 1);
+    }
+  }
+
   function drawPaint() {
     for (const p of world.paint) {
       if (Math.hypot(p.x - cam.x, p.y - cam.y) > 120) continue;
@@ -182,6 +247,7 @@ export function createRenderer(canvas, world) {
       ctx.translate(p.x, p.y);
       ctx.rotate(Math.atan2(p.dy, p.dx));
       ctx.fillStyle = COL.paint;
+      const half = world.half;
       if (p.kind === 'crosswalk') {
         for (let l = -3.3; l <= 3.4; l += 1.1) ctx.fillRect(-1.7, l - 0.3, 3.4, 0.6);
       } else if (p.kind === 'stopLine') {
@@ -217,7 +283,7 @@ export function createRenderer(canvas, world) {
       ctx.fillStyle = h.roof;
       ctx.fillRect(x, y, h.w, h.h);
       ctx.fillStyle = 'rgba(0,0,0,0.16)';
-      ctx.fillRect(x, y + h.h / 2 - 0.25, h.w, 0.5); // roof ridge
+      ctx.fillRect(x, y + h.h / 2 - 0.25, h.w, 0.5);
       ctx.fillStyle = 'rgba(255,255,255,0.14)';
       ctx.fillRect(x, y, h.w, h.h / 2 - 0.25);
     }
@@ -226,7 +292,6 @@ export function createRenderer(canvas, world) {
   function drawTrees(R) {
     for (const t of world.trees) {
       if (Math.abs(t.x - cam.x) > R + 5 || Math.abs(t.y - cam.y) > R + 5) continue;
-      if (Math.hypot(t.x - cam.x, t.y - cam.y) > R + 5) continue;
       ctx.fillStyle = COL.shadow;
       ctx.beginPath();
       ctx.arc(t.x + t.r * 0.35, t.y + t.r * 0.4, t.r, 0, TAU);
@@ -242,29 +307,88 @@ export function createRenderer(canvas, world) {
     }
   }
 
-  function drawTraffic(state) {
-    for (const ai of state.traffic) drawCar(ai, ai.color, false, false, false);
+  // ---------------------------------------------------------- pedestrians
+  function drawPeds(state, time) {
+    for (const p of state.peds) {
+      if (Math.hypot(p.px - cam.x, p.py - cam.y) > 90) continue;
+      const moving = p.phase === 'cross';
+      ctx.save();
+      ctx.translate(p.px, p.py);
+      ctx.rotate(Math.atan2(-p.side * p.ny, -p.side * p.nx)); // face the way they are walking
+      ctx.fillStyle = COL.shadow;
+      ctx.beginPath();
+      ctx.ellipse(0.2, 0.2, 0.55, 0.8, 0, 0, TAU);
+      ctx.fill();
+      const swing = moving ? Math.sin(time * 9) * 0.25 : 0;
+      ctx.fillStyle = '#2b4c8c';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 0.32, 0.8, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#e8b89a';
+      ctx.beginPath();
+      ctx.arc(0.05, swing * 0.4, 0.34, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#4a2f23';
+      ctx.beginPath();
+      ctx.arc(-0.05, swing * 0.4, 0.3, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+      if (p.phase === 'wait' || p.phase === 'cross') {
+        ctx.save();
+        ctx.translate(p.px, p.py);
+        ctx.rotate(-cam.angle);
+        ctx.strokeStyle = 'rgba(255,170,40,0.85)';
+        ctx.lineWidth = 0.25;
+        ctx.beginPath();
+        ctx.arc(0, 0, 1.5 + 0.2 * Math.sin(time * 6), 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+  }
+
+  // ----------------------------------------------------------------- cars
+  function drawBeams(car, spec) {
+    if (car.lights < 1) return;
+    const front = spec.length / 2 - 0.15;
+    const len = car.lights === 3 ? 36 : car.lights === 2 ? 17 : 5;
+    const hw = car.lights === 3 ? 7 : car.lights === 2 ? 8 : 3;
+    ctx.save();
+    ctx.translate(car.x, car.y);
+    ctx.rotate(car.heading);
+    const g = ctx.createRadialGradient(front, 0, 1, front, 0, len);
+    const a = car.lights === 3 ? 0.34 : car.lights === 2 ? 0.26 : 0.12;
+    g.addColorStop(0, `rgba(255,244,190,${a})`);
+    g.addColorStop(1, 'rgba(255,244,190,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(front, -0.8);
+    ctx.lineTo(front + len, -hw);
+    ctx.lineTo(front + len, hw);
+    ctx.lineTo(front, 0.8);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   // The car: x = forward, y = right (in its own little coordinate system)
-  function drawCar(car, color, braking, reversing, player) {
-    const L = C.car.length;
-    const Wd = C.car.width;
+  function drawCar(car, spec, color, o) {
+    const L = spec ? spec.length : car.length || 4.3;
+    const Wd = spec ? spec.width : car.width || 1.8;
     ctx.save();
     ctx.translate(car.x, car.y);
     ctx.rotate(car.heading);
 
     ctx.fillStyle = COL.shadow;
-    roundRectPath(ctx, -L / 2 + 0.25, -Wd / 2 + 0.3, L, Wd, 0.6);
+    rr(ctx, -L / 2 + 0.25, -Wd / 2 + 0.3, L, Wd, 0.6);
     ctx.fill();
 
-    // wheels (front pair turns with the steering)
     ctx.fillStyle = '#16181b';
     const wl = 0.85;
     const ww = 0.34;
     const wx = L * 0.3;
     const wy = Wd / 2 - 0.02;
-    const steer = player ? car.steer : 0;
+    const steer = o.player ? car.steer : 0;
     for (const [x, y, s] of [[wx, -wy, steer], [wx, wy, steer], [-wx, -wy, 0], [-wx, wy, 0]]) {
       ctx.save();
       ctx.translate(x, y);
@@ -273,51 +397,161 @@ export function createRenderer(canvas, world) {
       ctx.restore();
     }
 
-    // body
     ctx.fillStyle = color;
-    roundRectPath(ctx, -L / 2, -Wd / 2 + 0.08, L, Wd - 0.16, 0.65);
+    rr(ctx, -L / 2, -Wd / 2 + 0.08, L, Wd - 0.16, 0.65);
     ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    roundRectPath(ctx, -L / 2 + 0.2, -Wd / 2 + 0.2, L - 0.4, 0.5, 0.25);
+    rr(ctx, -L / 2 + 0.2, -Wd / 2 + 0.2, L - 0.4, 0.5, 0.25);
     ctx.fill();
 
-    // glass + roof
+    const cab = L * 0.26;
     ctx.fillStyle = '#1d2a35';
-    roundRectPath(ctx, 0.15, -Wd / 2 + 0.28, 1.15, Wd - 0.56, 0.3); // windscreen
+    rr(ctx, 0.15, -Wd / 2 + 0.28, cab, Wd - 0.56, 0.3);
     ctx.fill();
-    roundRectPath(ctx, -1.55, -Wd / 2 + 0.3, 0.85, Wd - 0.6, 0.25); // rear window
+    rr(ctx, -L / 2 + 0.7, -Wd / 2 + 0.3, 0.85, Wd - 0.6, 0.25);
     ctx.fill();
     ctx.fillStyle = color;
     ctx.globalAlpha = 0.9;
-    roundRectPath(ctx, -0.75, -Wd / 2 + 0.22, 0.95, Wd - 0.44, 0.2); // roof
+    rr(ctx, -0.75, -Wd / 2 + 0.22, 0.95, Wd - 0.44, 0.2);
     ctx.fill();
     ctx.globalAlpha = 1;
     ctx.fillStyle = 'rgba(255,255,255,0.2)';
-    roundRectPath(ctx, -0.7, -Wd / 2 + 0.28, 0.8, 0.3, 0.12);
+    rr(ctx, -0.7, -Wd / 2 + 0.28, 0.8, 0.3, 0.12);
     ctx.fill();
 
+    // people in the cabin (player's car only): driver left, passenger on the right
+    if (o.player) {
+      ctx.fillStyle = '#c9a98f';
+      ctx.beginPath();
+      ctx.arc(0.0, -Wd * 0.22, 0.26, 0, TAU);
+      ctx.fill();
+      if (o.passenger) {
+        ctx.save();
+        ctx.translate(0.0, Wd * 0.22);
+        ctx.rotate(-(car.heading + cam.angle)); // keep the face upright on screen
+        if (passengerImg) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(0, 0, 0.42, 0, TAU);
+          ctx.clip();
+          ctx.drawImage(passengerImg, -0.42, -0.42, 0.84, 0.84);
+          ctx.restore();
+        } else {
+          ctx.fillStyle = '#3b2418';
+          ctx.beginPath();
+          ctx.arc(0, 0, 0.42, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#e8b89a';
+          ctx.beginPath();
+          ctx.arc(0, 0.04, 0.27, 0, TAU);
+          ctx.fill();
+        }
+        ctx.strokeStyle = o.mood === 'wince' ? '#ff9f1c' : '#2fbf71';
+        ctx.lineWidth = 0.12;
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.46, 0, TAU);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
     // lights
-    ctx.fillStyle = '#fff6c4';
+    const lit = o.lights >= 1;
+    ctx.fillStyle = lit ? '#fff6c4' : '#d9dbd0';
     ctx.fillRect(L / 2 - 0.22, -Wd / 2 + 0.22, 0.2, 0.36);
     ctx.fillRect(L / 2 - 0.22, Wd / 2 - 0.58, 0.2, 0.36);
-    ctx.fillStyle = braking ? '#ff2a1f' : '#8a1712';
+    ctx.fillStyle = o.braking ? '#ff2a1f' : lit ? '#c0261b' : '#8a1712';
     ctx.fillRect(-L / 2 + 0.02, -Wd / 2 + 0.22, 0.2, 0.4);
     ctx.fillRect(-L / 2 + 0.02, Wd / 2 - 0.62, 0.2, 0.4);
-    if (braking) {
+    if (o.braking) {
       ctx.fillStyle = 'rgba(255,40,30,0.28)';
       ctx.beginPath();
       ctx.arc(-L / 2 - 0.2, 0, 1.9, 0, TAU);
       ctx.fill();
     }
-    if (reversing) {
+    if (o.reversing) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(-L / 2 + 0.02, -0.18, 0.2, 0.36);
+    }
+    // blinkers: orange lamps on the side that is signalling (both for hazard lights)
+    if (o.blinkOn && (o.signal || o.hazard)) {
+      const sides = o.hazard ? [-1, 1] : [o.signal === 'left' ? -1 : 1];
+      for (const sd of sides) {
+        for (const x of [L / 2 - 0.2, -L / 2 + 0.2]) {
+          const y = sd * (Wd / 2 - 0.12);
+          ctx.fillStyle = 'rgba(255,170,0,0.38)';
+          ctx.beginPath();
+          ctx.arc(x, y, 0.95, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#ffb000';
+          ctx.beginPath();
+          ctx.arc(x, y, 0.3, 0, TAU);
+          ctx.fill();
+        }
+      }
     }
     ctx.restore();
   }
 
+  // ------------------------------------------------------------- map pins
+  function pinColor(type) {
+    return { station: '#12b5a6', camera: '#e5484d', hazard: '#ff9f1c', pickup: '#ff5fa2', home: '#8f5bff', crosswalk: '#3b82f6' }[type] || '#3b82f6';
+  }
+  function drawPins(R) {
+    for (const p of world.pins) {
+      if (p.type === 'crosswalk') continue;
+      if (Math.hypot(p.x - cam.x, p.y - cam.y) > R + 10) continue;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(-cam.angle);
+      ctx.fillStyle = COL.shadow;
+      ctx.beginPath();
+      ctx.ellipse(0.5, 0.6, 1.6, 1.0, 0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = pinColor(p.type);
+      ctx.beginPath();
+      ctx.arc(0, -2.3, 1.7, 0, TAU);
+      ctx.moveTo(-1.2, -1.1);
+      ctx.lineTo(0, 0);
+      ctx.lineTo(1.2, -1.1);
+      ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(0, -2.3, 1.0, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = pinColor(p.type);
+      if (p.type === 'station') {
+        ctx.beginPath();
+        ctx.arc(0, -2.1, 0.45, 0, TAU);
+        ctx.moveTo(0, -3.2);
+        ctx.lineTo(0.5, -2.2);
+        ctx.lineTo(-0.5, -2.2);
+        ctx.fill();
+      } else if (p.type === 'hazard') {
+        ctx.beginPath();
+        ctx.moveTo(0, -3.1);
+        ctx.lineTo(0.8, -1.7);
+        ctx.lineTo(-0.8, -1.7);
+        ctx.fill();
+      } else if (p.type === 'home') {
+        ctx.beginPath();
+        ctx.moveTo(-0.8, -2.1);
+        ctx.lineTo(0, -3.0);
+        ctx.lineTo(0.8, -2.1);
+        ctx.lineTo(0.6, -1.6);
+        ctx.lineTo(-0.6, -1.6);
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, -2.3, 0.5, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
+
   function drawSigns(state, R, time) {
-    const rot = -cam.angle; // keep signs upright on screen
+    const rot = -cam.angle;
     const r0 = C.world.signRadius;
     for (const sg of world.signs) {
       if (Math.hypot(sg.x - cam.x, sg.y - cam.y) > R + 6) continue;
@@ -327,13 +561,10 @@ export function createRenderer(canvas, world) {
       ctx.save();
       ctx.translate(sg.x, sg.y);
       ctx.rotate(rot);
-
-      // pole base + shadow
       ctx.fillStyle = COL.shadow;
       ctx.beginPath();
       ctx.ellipse(r * 0.28, r * 0.5, r * 0.95, r * 0.95, 0, 0, TAU);
       ctx.fill();
-
       if (active) {
         ctx.strokeStyle = 'rgba(255,201,40,0.35)';
         ctx.lineWidth = 0.9;
@@ -352,6 +583,196 @@ export function createRenderer(canvas, world) {
     }
   }
 
+  // ------------------------------------------------------------- weather
+  function drawFog(state) {
+    const car = state.car;
+    const rad = 40 + car.lights * 6;
+    const g = ctx.createRadialGradient(car.x, car.y, 5, car.x, car.y, rad);
+    g.addColorStop(0, 'rgba(200,207,214,0)');
+    g.addColorStop(0.55, 'rgba(200,207,214,0.55)');
+    g.addColorStop(1, 'rgba(200,207,214,0.96)');
+    ctx.fillStyle = g;
+    ctx.fillRect(cam.x - 400, cam.y - 400, 800, 800);
+    drawRoute(0.5);
+  }
+
+  function drawNight(state, sx, sy) {
+    const car = state.car;
+    octx.setTransform(1, 0, 0, 1, 0, 0);
+    octx.globalCompositeOperation = 'source-over';
+    octx.clearRect(0, 0, off.width, off.height);
+    octx.fillStyle = 'rgba(6,10,30,0.84)';
+    octx.fillRect(0, 0, off.width, off.height);
+    applyView(octx, sx, sy);
+    octx.globalCompositeOperation = 'destination-out';
+    // soft glow around the car (parking lights / dashboard)
+    let g = octx.createRadialGradient(car.x, car.y, 1, car.x, car.y, 7 + car.lights * 1.5);
+    g.addColorStop(0, 'rgba(0,0,0,0.9)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    octx.fillStyle = g;
+    octx.beginPath();
+    octx.arc(car.x, car.y, 12, 0, TAU);
+    octx.fill();
+    if (car.lights >= 1) {
+      const front = state.spec.length / 2;
+      const len = car.lights === 3 ? 44 : car.lights === 2 ? 24 : 7;
+      const hw = car.lights === 3 ? 8 : car.lights === 2 ? 10 : 3.5;
+      octx.save();
+      octx.translate(car.x, car.y);
+      octx.rotate(car.heading);
+      g = octx.createRadialGradient(front, 0, 1, front, 0, len);
+      g.addColorStop(0, 'rgba(0,0,0,1)');
+      g.addColorStop(0.6, 'rgba(0,0,0,0.75)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      octx.fillStyle = g;
+      octx.beginPath();
+      octx.moveTo(front, -0.9);
+      octx.lineTo(front + len, -hw);
+      octx.lineTo(front + len, hw);
+      octx.lineTo(front, 0.9);
+      octx.closePath();
+      octx.fill();
+      octx.restore();
+    }
+    // other cars show their own lights
+    for (const ai of [...state.traffic, ...state.npcs]) {
+      octx.save();
+      octx.translate(ai.x, ai.y);
+      octx.rotate(ai.heading);
+      g = octx.createRadialGradient(2, 0, 1, 2, 0, 16);
+      g.addColorStop(0, 'rgba(0,0,0,0.95)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      octx.fillStyle = g;
+      octx.beginPath();
+      octx.moveTo(2, -1);
+      octx.lineTo(16, -5);
+      octx.lineTo(16, 5);
+      octx.lineTo(2, 1);
+      octx.fill();
+      octx.restore();
+    }
+    // the sign you are approaching stays readable
+    if (state.activeSign) {
+      g = octx.createRadialGradient(state.activeSign.x, state.activeSign.y, 1, state.activeSign.x, state.activeSign.y, 7);
+      g.addColorStop(0, 'rgba(0,0,0,0.9)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      octx.fillStyle = g;
+      octx.beginPath();
+      octx.arc(state.activeSign.x, state.activeSign.y, 7, 0, TAU);
+      octx.fill();
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(off, 0, 0);
+    // route line stays visible
+    applyView(ctx, sx, sy);
+    drawRoute(0.65);
+  }
+
+  function drawRain(time) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = 'rgba(28,42,66,0.2)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = 'rgba(210,225,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (const d of rain) {
+      const y = ((d.y + time * d.v * 0.9) % 1) * H;
+      const x = d.x * W - (y * 0.12);
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 2, y + 11);
+    }
+    ctx.stroke();
+  }
+
+  // ------------------------------------------------------------- minimap
+  /** The round Waze-style map: roads, purple route, pins, other cars. Heading up. */
+  function drawMinimap(mc, size, state) {
+    const k = 0.78; // pixels per metre
+    const car = state.car;
+    const c = mc.getContext('2d');
+    const d = Math.min(window.devicePixelRatio || 1, 2);
+    if (mc.width !== Math.round(size * d)) {
+      mc.width = Math.round(size * d);
+      mc.height = Math.round(size * d);
+    }
+    c.setTransform(d, 0, 0, d, 0, 0);
+    c.clearRect(0, 0, size, size);
+    c.save();
+    c.beginPath();
+    c.arc(size / 2, size / 2, size / 2, 0, TAU);
+    c.clip();
+    c.fillStyle = state.weather === 'night' ? '#141b26' : '#1d2733';
+    c.fillRect(0, 0, size, size);
+    c.translate(size / 2, size * 0.62);
+    c.rotate(-Math.PI / 2 - car.heading);
+    c.scale(k, k);
+    c.translate(-car.x, -car.y);
+    c.lineJoin = 'round';
+    c.lineCap = 'round';
+    c.strokeStyle = '#0e141c';
+    c.lineWidth = world.roadWidth + 2.6;
+    for (const p of paths) c.stroke(p.path);
+    c.strokeStyle = '#46576d';
+    c.lineWidth = world.roadWidth;
+    for (const p of paths) c.stroke(p.path);
+    // purple route
+    if (paths.length) {
+      c.strokeStyle = 'rgba(143,91,255,0.35)';
+      c.lineWidth = 8 / k;
+      c.stroke(paths[0].path);
+      c.strokeStyle = '#a98bff';
+      c.lineWidth = 4 / k;
+      c.stroke(paths[0].path);
+    }
+    for (const r of world.rings) {
+      c.fillStyle = '#1d2733';
+      c.beginPath();
+      c.arc(r.cx, r.cy, r.island, 0, TAU);
+      c.fill();
+    }
+    // pins
+    for (const p of world.pins) {
+      c.fillStyle = pinColor(p.type);
+      c.beginPath();
+      c.arc(p.x, p.y, 4.2 / k, 0, TAU);
+      c.fill();
+      c.strokeStyle = '#fff';
+      c.lineWidth = 1.4 / k;
+      c.stroke();
+    }
+    // other road users
+    c.fillStyle = '#c4a6ff';
+    for (const n of [...state.npcs, ...state.traffic]) {
+      c.beginPath();
+      c.arc(n.x, n.y, 3 / k, 0, TAU);
+      c.fill();
+    }
+    c.fillStyle = '#ffb347';
+    for (const p of state.peds) {
+      if (p.phase === 'wait' || p.phase === 'cross') {
+        c.beginPath();
+        c.arc(p.px, p.py, 3 / k, 0, TAU);
+        c.fill();
+      }
+    }
+    c.restore();
+    // my car (always the same spot, pointing up)
+    c.save();
+    c.translate(size / 2, size * 0.62);
+    c.fillStyle = '#2f9bff';
+    c.strokeStyle = '#fff';
+    c.lineWidth = 1.6;
+    c.beginPath();
+    c.moveTo(0, -8);
+    c.lineTo(6, 6);
+    c.lineTo(0, 3);
+    c.lineTo(-6, 6);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.restore();
+  }
+
   resize();
-  return { resize, updateCamera, draw, cam, get portrait() { return portrait; } };
+  return { resize, setWorld, updateCamera, draw, drawMinimap, loadPassenger, cam, get portrait() { return portrait; } };
 }

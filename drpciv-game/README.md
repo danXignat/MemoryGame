@@ -1,31 +1,37 @@
 # DRPCIV Road Signs
 
-A phone-first 2D driving game for learning Romanian road signs. Drive a training track, read what each sign means (Learn mode), then take a scored lap (Test mode).
+A landscape-first 2D driving school for learning Romanian road signs. Five cars with different engines, 15 driving school levels (1-5 playable now, 6-15 scaffolded), Learn mode, exam-style Test mode with penalty points, fuel, headlights, weather and a Final Boss drive.
 
 ## Run it with live reload (3 steps)
 
 1. Install Node.js (nodejs.org), open a terminal in this folder and run `npm install` once.
 2. Run `npm run dev`. It prints a **Network** address such as `http://192.168.1.20:5173`.
-3. Put your phone on the same Wi-Fi and open that address in the phone browser. Every time a file is saved, the phone updates by itself.
+3. Put your phone on the same Wi-Fi, turn it sideways and open that address. Every saved edit updates the phone by itself.
 
-Other commands: `npm test` (drives a simulated car around the track and checks the rules) and `npm run artifact` (builds one single page, `dist/artifact.html`).
+Other commands: `npm test` (simulated drivers play every level and compare the five cars) and `npm run artifact` (builds one single page, `dist/artifact.html`).
 
 ## Which file to ask for what
 
 | You want to... | File |
 | --- | --- |
+| Change a car (power, weight, grip, fuel use) or add one | `src/cars.js` |
 | Add or edit a road sign (name, rule, look, Test-mode check) | `src/signs.js` |
-| Change the road, move signs, add junctions or traffic | `src/map.js` |
-| Change car speed, braking, steering, camera, test strictness | `src/config.js` |
-| Change driving physics or the Test-mode rules themselves | `src/game.js` |
-| Change how the world and cars are drawn | `src/render.js` |
-| Change buttons, cards, menus, wording on screen | `src/ui.js`, `src/style.css`, `index.html` |
-| Add a new picture on a sign (a new symbol) | `src/signart.js` |
+| Build or change a level (roads, signs, pedestrians, traffic, weather) | `src/levels.js` |
+| Change the free-roam training town | `src/map.js` |
+| Tune game feel, fuel, exam penalty points | `src/config.js` |
+| Driving physics, fuel, gearbox, exam rules | `src/game.js` |
+| How the world, cars, night/rain/fog and minimap are drawn | `src/render.js` |
+| Buttons, cards, menus, wording | `src/ui.js`, `src/style.css`, `index.html` |
+| Steering wheel and pedal behaviour | `src/controls.js` |
 
-`src/mapbuild.js`, `src/controls.js`, `src/audio.js`, `src/main.js` are plumbing and rarely need changes.
+Plumbing that rarely needs changes: `mapbuild.js`, `signart.js` (draws sign pictures), `audio.js`, `storage.js`, `main.js`.
+
+## Passenger photo
+
+Put a square-ish portrait at `public/assets/passenger.png` (create the folder) and it appears in the right seat. Without it a drawn figure is used. Her name for the ending screen is `story.passenger` in `src/config.js`.
 
 ## Notes
 
-- Sign names and rules were written from memory of the Romanian code (OUG 195/2002). Check them against the official manual before the exam.
+- The city is stylised. Level names are real Brasov districts, but the maps are not real street layouts.
+- Sign texts, the penalty scale (21 points = failed) and car figures were written from general knowledge and driving-school guides. Check them against the official sources before relying on them for the exam.
 - Signs are drawn larger than real so they can be read on a phone.
-- Some Test-mode checks are game rules (for example, at a pedestrian crossing you must be under 25 km/h) to make "slow down" measurable.

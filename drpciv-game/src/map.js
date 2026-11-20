@@ -34,7 +34,7 @@ export const MAP = {
       { id: 'br', type: 'arc', center: [404, 224], radius: 36, from: 0, to: 90 },
       { id: 'bottom1', type: 'line', to: [240, 260] },
       // Half way round the roundabout (counter-clockwise = angle goes DOWN)
-      { id: 'ring', type: 'arc', center: [220, 260], radius: 20, from: 0, to: -180 },
+      { id: 'ring', type: 'arc', center: [220, 260], radius: 20, from: 0, to: -180, roundabout: true },
       { id: 'bottom2', type: 'line', to: [36, 260] },
       { id: 'bl', type: 'arc', center: [36, 224], radius: 36, from: 90, to: 180 },
       { id: 'left', type: 'line', to: [0, 36] },
@@ -53,6 +53,12 @@ export const MAP = {
   ],
 
   rings: [{ cx: 220, cy: 260, r: 20 }], // roundabout (grass island inside)
+
+  // ---- gas station: pull into the bay, stop, switch the engine off, refuel -------------
+  stations: [{ name: 'Fuel station', x: 342, y: 130, bay: { x: 342, y: 130, r: 4 }, zone: { x: 385, y: 130, r: 50 } }],
+
+  // ---- Waze-style map pins ---------------------------------------------------------------
+  pins: [{ type: 'camera', at: ['top1', 120], label: 'Speed camera' }],
 
   // ---- the signs ---------------------------------------------------------------
   //  sign:  key from signs.js
