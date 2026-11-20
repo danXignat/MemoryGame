@@ -1,0 +1,17 @@
+{
+  "name": "drpciv-road-signs-game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mobile-first 2D driving game for learning Romanian road signs (DRPCIV).",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host",
+    "artifact": "node scripts/build-artifact.mjs",
+    "test": "node tests/sim.test.mjs"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

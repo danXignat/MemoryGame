@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#16302a" />
+    <title>DRPCIV Road Signs</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;600;700&display=swap" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="game" aria-label="Driving view"></canvas>
+
+      <!-- HUD: everything that floats above the road -->
+      <div id="hud">
+        <div id="topbar">
+          <div class="seg" id="modeSeg" role="group" aria-label="Game mode">
+            <button type="button" data-mode="learn" class="on">Learn</button>
+            <button type="button" data-mode="test">Test</button>
+          </div>
+          <button type="button" class="chip" id="btnSigns" aria-label="Open the road sign library">
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 9h5M9 13h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            <span>Signs</span>
+          </button>
+          <button type="button" class="chip icon" id="btnMenu" aria-label="Menu">
+            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><circle cx="5" cy="12" r="2" fill="currentColor"/><circle cx="12" cy="12" r="2" fill="currentColor"/><circle cx="19" cy="12" r="2" fill="currentColor"/></svg>
+          </button>
+        </div>
+
+        <div id="readouts">
+          <div id="speedo" aria-live="off"><span id="spdNum">0</span><span class="u">km/h</span></div>
+          <div id="limit" hidden aria-label="Speed limit"><span id="limNum">50</span></div>
+          <div id="scoreBox" hidden><span class="lbl">Score</span><b id="scoreNum">0</b><span id="scoreOf">/ 0</span></div>
+        </div>
+
+        <div id="wrongWay" hidden>Wrong way. Turn around.</div>
+
+        <div id="stage">
+          <article id="card" hidden></article>
+          <div id="toast" hidden></div>
+        </div>
+      </div>
+
+      <!-- On-screen controls -->
+      <div id="controls">
+        <div class="pad steer">
+          <button type="button" class="ctl" data-btn="left" aria-label="Steer left">
+            <svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button type="button" class="ctl" data-btn="right" aria-label="Steer right">
+            <svg viewBox="0 0 24 24" width="38" height="38" aria-hidden="true"><path d="M9 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+
+        <button type="button" class="ctl round" id="btnReset" data-action="reset" aria-label="Reset car onto the road">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M3.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Reset</span>
+        </button>
+
+        <div class="pad pedals">
+          <button type="button" class="ctl pedal brake" data-btn="brake" aria-label="Brake and reverse"><span>Brake</span><small>reverse</small></button>
+          <button type="button" class="ctl pedal gas" data-btn="gas" aria-label="Accelerate"><span>Gas</span></button>
+        </div>
+      </div>
+
+      <div id="overlays"></div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
