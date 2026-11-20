@@ -26,9 +26,18 @@ Other commands: `npm test` (simulated drivers play every level and compare the f
 
 Plumbing that rarely needs changes: `mapbuild.js`, `signart.js` (draws sign pictures), `audio.js`, `storage.js`, `main.js`.
 
-## Passenger photo
+## Photos of the people
 
-Put a square-ish portrait at `public/assets/passenger.png` (create the folder) and it appears in the right seat. Without it a drawn figure is used. Her name for the ending screen is `story.passenger` in `src/config.js`.
+Put the photos in `public/assets/` with these names (jpeg, jpg, png or webp), then run `npm run artifact`:
+
+| File | Who |
+| --- | --- |
+| `naty.jpeg` | Naty, the player and developer (driver avatar) |
+| `alisia.jpeg` | Alisia, Naty's girlfriend (right-seat passenger, Final Boss) |
+| `dan.jpeg` | Dan, Naty's friend (tips) |
+| `petra.jpeg` | Petra, Dan's girlfriend (tips) |
+
+Until a photo is found, a coloured circle with the initial is shown.
 
 ## Notes
 

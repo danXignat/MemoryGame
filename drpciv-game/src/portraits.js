@@ -3,17 +3,17 @@
 //
 //  Put the photos in  public/assets/  with these file names (jpeg, jpg, png or webp):
 //      naty.jpeg      Naty      the player / developer (driver avatar)
-//      alisia.jpeg    Alisia    the right-seat passenger
+//      alisia.jpeg    Alisia    Naty's girlfriend, the right-seat passenger
 //      dan.jpeg       Dan       the friend who gives tips
-//      dangf.jpeg     Dan's girlfriend
+//      petra.jpeg     Petra     Dan's girlfriend
 //  Until a photo is found, a drawn placeholder (coloured circle + initial) is used.
 // ============================================================================
 
 export const PEOPLE = {
   naty: { id: 'naty', name: 'Naty', role: { en: 'Driver and developer', ro: 'Șofer și dezvoltator' }, color: '#2f7bf6', initial: 'N' },
-  alisia: { id: 'alisia', name: 'Alisia', role: { en: 'Passenger', ro: 'Pasagera' }, color: '#e8548c', initial: 'A' },
+  alisia: { id: 'alisia', name: 'Alisia', role: { en: "Naty's girlfriend", ro: 'Prietena lui Naty' }, color: '#e8548c', initial: 'A' },
   dan: { id: 'dan', name: 'Dan', role: { en: 'Friend', ro: 'Prietenul' }, color: '#25a86f', initial: 'D' },
-  dangf: { id: 'dangf', name: "Dan's girlfriend", role: { en: 'Friend', ro: 'Prietena' }, color: '#e8a02a', initial: 'G' },
+  petra: { id: 'petra', name: 'Petra', role: { en: "Dan's girlfriend", ro: 'Prietena lui Dan' }, color: '#e8a02a', initial: 'P' },
 };
 
 const EXT = ['jpeg', 'jpg', 'png', 'webp'];

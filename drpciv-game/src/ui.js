@@ -162,7 +162,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
 
   function showDanTip(level, mode) {
     if (!level || !level.tip) return;
-    const who = level.n % 2 ? 'dan' : 'dangf';
+    const who = level.n % 2 ? 'dan' : 'petra';
     hideCard();
     toast.className = 'info';
     toast.innerHTML = `<div class="toastrow">${pimg(who)}<div><div class="verdict" style="color:var(--accent)">${esc(PEOPLE[who].name)} ${lang() === 'en' ? 'says' : 'zice'}</div><div class="msg" style="font-weight:500">${esc(tr(level.tip, lang()))}</div>${mode === 'test' ? '<p class="rule">Test: follow the purple route. 21 penalty points means failed.</p>' : ''}</div></div>`;

@@ -26,7 +26,7 @@ const assets = {};
 const dir = root + 'public/assets/';
 if (existsSync(dir)) {
   for (const f of readdirSync(dir)) {
-    const m = f.match(/^(naty|alisia|dan|dangf|logo)\.(jpe?g|png|webp)$/i);
+    const m = f.match(/^(naty|alisia|dan|petra|logo)\.(jpe?g|png|webp)$/i);
     if (!m) continue;
     const mime = m[2].toLowerCase() === 'png' ? 'image/png' : m[2].toLowerCase() === 'webp' ? 'image/webp' : 'image/jpeg';
     assets[m[1].toLowerCase()] = `data:${mime};base64,${readFileSync(dir + f).toString('base64')}`;
