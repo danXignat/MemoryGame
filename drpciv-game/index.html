@@ -44,7 +44,7 @@
           <button type="button" class="tb txt" id="bLevel" aria-label="Choose a level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 21V4M6 5h12l-2.5 4L18 13H6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Level</span></button>
           <div class="seg mini" id="modeSeg" role="group" aria-label="Game mode"><button type="button" data-mode="learn" class="on">Learn</button><button type="button" data-mode="test">Test</button></div>
           <button type="button" class="tb" id="bRestart" aria-label="Restart level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M3.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button type="button" class="tb" id="bMenu" aria-label="Menu and pause"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 7h14M5 12h14M5 17h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+          <button type="button" class="tb" id="bMenu" aria-label="Settings and pause"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M19.4 13.5l1.6 1.2-1.8 3.1-1.9-.6a7 7 0 0 1-1.7 1l-.4 2h-3.6l-.4-2a7 7 0 0 1-1.7-1l-1.9.6-1.8-3.1 1.6-1.2a7 7 0 0 1 0-2l-1.6-1.2 1.8-3.1 1.9.6a7 7 0 0 1 1.7-1l.4-2h3.6l.4 2a7 7 0 0 1 1.7 1l1.9-.6 1.8 3.1-1.6 1.2a7 7 0 0 1 0 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
         </div>
 
         <!-- top-right: progress + sign alert -->
@@ -76,6 +76,10 @@
             <circle cx="50" cy="52" r="11" fill="#252b31" stroke="#505a64" stroke-width="2"/>
             <path d="M50 6v10" stroke="#ff4d4d" stroke-width="5" stroke-linecap="round"/>
           </svg>
+        </div>
+        <div id="arrows">
+          <button type="button" class="ctl arw" data-btn="left" aria-label="Steer left"><svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="ctl arw" data-btn="right" aria-label="Steer right"><svg viewBox="0 0 24 24" width="40" height="40" aria-hidden="true"><path d="M9 4l8 8-8 8" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
         <div id="minimap"><canvas id="minimapCv"></canvas><span class="north">N</span></div>
       </div>

@@ -2038,3 +2038,36 @@ p {
   bottom: calc(8px + env(safe-area-inset-bottom, 0px) + 118px);
   z-index: 7;
 }
+
+/* ---- steering choice: arrow buttons (default) or the wheel ---- */
+:root {
+  --arw: clamp(56px, 17vh, 78px);
+}
+#arrows {
+  display: none;
+  gap: 8px;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.arw {
+  width: var(--arw);
+  height: var(--arw);
+  border-radius: 22px;
+}
+.steer-arrows {
+  --wheel: calc(var(--arw) * 2 + 8px); /* keeps the dock maths right */
+}
+.steer-arrows #wheel {
+  display: none;
+}
+.steer-arrows #arrows {
+  display: flex;
+}
+.steer-arrows {
+  --dock-l: calc(var(--edge) + var(--wheel) + var(--mini) + 20px);
+}
+@media (max-width: 780px) {
+  .steer-arrows {
+    --dock-l: calc(var(--edge) + var(--wheel) + 14px);
+  }
+}

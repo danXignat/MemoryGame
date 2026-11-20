@@ -821,8 +821,9 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const s = st();
     const m = openModal(`
       <div class="sheet" role="dialog" aria-label="Menu">
-        ${head('Paused')}
+        ${head('Settings')}
         <div class="sheet-body">
+          <div class="row"><span>Steering<small>Arrows are easier; the wheel is more realistic</small></span><div class="seg2" data-set="steering"><button type="button" data-v="arrows">Arrows</button><button type="button" data-v="wheel">Wheel</button></div></div>
           <div class="row"><span>Rule language<small>Sign names show in Romanian and English</small></span><div class="seg2" data-set="lang"><button type="button" data-v="en">EN</button><button type="button" data-v="ro">RO</button></div></div>
           <div class="row"><span>Conditions<small>Night, rain and fog need low beams (L key)</small></span><div class="seg2" data-set="weather">${Object.keys(WEATHER).map((w) => `<button type="button" data-v="${w}">${WEATHER[w]}</button>`).join('')}</div></div>
           <div class="row"><span>Test indications<small>Show what each sign asks, with live status</small></span><div class="seg2" data-set="hints"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
@@ -839,7 +840,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         </div>
       </div>`);
     const sync = () => {
-      const vals = { lang: settings.lang, weather: st().weather, hints: settings.hints ? '1' : '0', rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
+      const vals = { steering: settings.steering, lang: settings.lang, weather: st().weather, hints: settings.hints ? '1' : '0', rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
       for (const g of m.el.querySelectorAll('[data-set]')) for (const b of g.querySelectorAll('button')) b.classList.toggle('on', b.dataset.v === vals[g.dataset.set]);
     };
     sync();
@@ -849,6 +850,10 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       const key = b.parentElement.dataset.set;
       if (key === 'lang') setLang(b.dataset.v);
       if (key === 'weather') G.game.setWeather(b.dataset.v);
+      if (key === 'steering') {
+        settings.steering = b.dataset.v;
+        applySteering();
+      }
       if (key === 'hints') settings.hints = b.dataset.v === '1';
       if (key === 'rotate') settings.rotate = b.dataset.v === '1';
       if (key === 'sound') {
@@ -891,6 +896,13 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     G.game.restart();
     if (st().mode === 'test') showInfo('Test restarted', 'Follow the purple route and obey every sign. 21 penalty points means failed.');
   }
+
+  function applySteering() {
+    const arrows = settings.steering !== 'wheel';
+    document.body.classList.toggle('steer-arrows', arrows);
+    controls.clear();
+  }
+  applySteering();
 
   // ---------------------------------------------------------------- welcome
   function openWelcome(onStart) {

@@ -11,6 +11,7 @@ export const DEFAULTS = {
   rotate: true,
   sound: true,
   mode: 'learn',
+  steering: 'arrows', // 'arrows' (easier) or 'wheel'
   hints: true, // show sign indications with live status in Test mode
   level: 'L1',
   car: 'golf5',
