@@ -15,6 +15,13 @@ import { addMistake, forgiveMistake, topMistakes } from './storage.js';
 import { PEOPLE, pimg, logoURL } from './portraits.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
+const svg = (d) => `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const ICON = {
+  car: svg('M3 15v-3l2-4.5A2 2 0 0 1 6.8 6h10.4a2 2 0 0 1 1.8 1.5L21 12v3M3 15h18M3 15v2.5h3V15M18 15v2.5h3V15'),
+  flag: svg('M6 21V4M6 5h12l-2.5 4L18 13H6'),
+  book: svg('M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4zM9 9h5M9 13h5'),
+  restart: svg('M4 12a8 8 0 1 0 2.6-5.9M3.5 3.5v5h5'),
+};
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const CAT_ORDER = ['warning', 'priority', 'prohibition', 'mandatory', 'information'];
@@ -891,8 +898,15 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const s = st();
     const m = openModal(`
       <div class="sheet" role="dialog" aria-label="Menu">
-        ${head('Settings')}
+        ${head('Meniu')}
         <div class="sheet-body">
+          <div class="mtiles">
+            <button type="button" class="mtile" id="mCar">${ICON.car}<span>Mașina</span></button>
+            <button type="button" class="mtile" id="mLevel">${ICON.flag}<span>Nivel</span></button>
+            <button type="button" class="mtile" id="mSigns">${ICON.book}<span>Semne</span></button>
+            <button type="button" class="mtile" id="mRestart">${ICON.restart}<span>Restart</span></button>
+          </div>
+          <div class="row"><span>Mod<small>Learn: explică semnele · Test: examen cu puncte de penalizare</small></span><div class="seg2" data-set="mode"><button type="button" data-v="learn">Learn</button><button type="button" data-v="test">Test</button></div></div>
           <div class="row"><span>Steering<small>Arrows are easier; the wheel is more realistic</small></span><div class="seg2" data-set="steering"><button type="button" data-v="arrows">Arrows</button><button type="button" data-v="wheel">Wheel</button></div></div>
           <div class="row"><span>Rule language<small>Sign names show in Romanian and English</small></span><div class="seg2" data-set="lang"><button type="button" data-v="en">EN</button><button type="button" data-v="ro">RO</button></div></div>
           <div class="row"><span>Conditions<small>Night, rain and fog need low beams (L key)</small></span><div class="seg2" data-set="weather">${Object.keys(WEATHER).map((w) => `<button type="button" data-v="${w}">${WEATHER[w]}</button>`).join('')}</div></div>
@@ -900,9 +914,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
           <div class="row"><span>Camera</span><div class="seg2" data-set="rotate"><button type="button" data-v="1">Turning</button><button type="button" data-v="0">Fixed</button></div></div>
           <div class="row"><span>Sound &amp; vibration</span><div class="seg2" data-set="sound"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
           <div class="stack two" style="margin-top:12px">
-            <button type="button" class="btn ghost" id="mLib">Sign library</button>
             <button type="button" class="btn ghost" id="mDrill">My Mistakes drill</button>
-            <button type="button" class="btn ghost" id="mRestart">Restart level</button>
             <button type="button" class="btn ghost" id="mHelp">How to play</button>
             <button type="button" class="btn warn" id="mFinish" ${s.mode === 'test' ? '' : 'hidden'}>Finish test now</button>
             <button type="button" class="btn" data-close>Resume</button>
@@ -910,7 +922,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         </div>
       </div>`);
     const sync = () => {
-      const vals = { steering: settings.steering, lang: settings.lang, weather: st().weather, hints: settings.hints ? '1' : '0', rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
+      const vals = { mode: st().mode, steering: settings.steering, lang: settings.lang, weather: st().weather, hints: settings.hints ? '1' : '0', rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
       for (const g of m.el.querySelectorAll('[data-set]')) for (const b of g.querySelectorAll('button')) b.classList.toggle('on', b.dataset.v === vals[g.dataset.set]);
     };
     sync();
@@ -918,6 +930,13 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       const b = e.target.closest('.seg2 button');
       if (!b) return;
       const key = b.parentElement.dataset.set;
+      if (key === 'mode') {
+        if (b.dataset.v !== st().mode) {
+          m.close();
+          switchMode(b.dataset.v);
+        }
+        return;
+      }
       if (key === 'lang') setLang(b.dataset.v);
       if (key === 'weather') G.game.setWeather(b.dataset.v);
       if (key === 'steering') {
@@ -935,7 +954,9 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       sfx.tap();
     });
     const go = (id, fn) => $(id, m.el).addEventListener('click', () => (m.close(), fn()));
-    go('#mLib', () => openLibrary());
+    go('#mCar', openCars);
+    go('#mLevel', openLevels);
+    go('#mSigns', () => openLibrary());
     go('#mDrill', openDrill);
     go('#mHelp', openHelp);
     go('#mRestart', () => restartLevel());
@@ -1005,10 +1026,8 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   }
 
   // ------------------------------------------------------------- mode switch
-  const modeButtons = [...document.querySelectorAll('#modeSeg [data-mode]')];
   function syncMode() {
     document.body.classList.toggle('mode-test', st().mode === 'test');
-    for (const b of modeButtons) b.classList.toggle('on', b.dataset.mode === st().mode);
     updateScore();
   }
   function switchMode(mode) {
@@ -1020,11 +1039,6 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     syncMode();
     if (mode === 'test') showInfo('Test started', 'Follow the purple route and obey every sign. 21 penalty points means failed.');
   }
-  for (const b of modeButtons)
-    b.addEventListener('click', () => {
-      unlock();
-      if (b.dataset.mode !== st().mode) switchMode(b.dataset.mode);
-    });
 
   // ---------------------------------------------------- top buttons + keys
   function act(name) {
@@ -1042,10 +1056,6 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   E.haz.addEventListener('click', () => act('hazard'));
   E.lights.addEventListener('click', () => act('lights'));
   E.eng.addEventListener('click', () => act('engine'));
-  $('#bCar').addEventListener('click', () => (unlock(), openCars()));
-  $('#bLevel').addEventListener('click', () => (unlock(), openLevels()));
-  $('#bSigns').addEventListener('click', () => (unlock(), openLibrary()));
-  $('#bRestart').addEventListener('click', () => (unlock(), restartLevel()));
   $('#bMenu').addEventListener('click', () => (unlock(), openMenu()));
   E.alert.addEventListener('click', () => {
     if (st().activeSign) openLibrary(st().activeSign.key);

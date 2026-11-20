@@ -2089,3 +2089,124 @@ p {
   -webkit-line-clamp: 3;
   overflow: hidden;
 }
+
+/* ====================== AIRY HUD (kept last) ======================
+   Fewer, lighter elements: driving buttons in one slim capsule, everything
+   else behind the menu button. */
+:root {
+  --tb: clamp(28px, 3.8vw, 36px);
+  --glass: rgba(14, 20, 26, 0.5);
+  --glass-line: rgba(255, 255, 255, 0.12);
+}
+#tc {
+  gap: 2px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--glass);
+  border: 1px solid var(--glass-line);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  pointer-events: auto;
+}
+#tc .tb {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  min-width: calc(var(--tb) + 4px);
+}
+#tc .tb.on {
+  background: rgba(255, 255, 255, 0.14);
+}
+#tc .tb.sig.on.blink,
+#tc .tb.haz.on.blink {
+  background: #ffb000;
+}
+.pill,
+.tb {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+#tl {
+  gap: 6px;
+}
+#tl .pill {
+  height: calc(var(--tb) - 4px);
+  padding: 0 9px;
+  border-radius: 10px;
+}
+#pillZone .prog {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  margin-left: 4px;
+  padding-left: 7px;
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+}
+#pillZone .prog b {
+  font: 700 clamp(13px, 2vw, 16px) / 1 var(--font-num);
+}
+#tr {
+  gap: 6px;
+}
+#bMenu {
+  min-width: var(--tb);
+}
+#nav {
+  max-width: 34vw;
+  padding: 5px 12px 5px 8px;
+  gap: 6px;
+  border-radius: 12px;
+  font-size: clamp(11px, 1.6vw, 13px);
+  background: rgba(54, 30, 120, 0.78);
+  box-shadow: 0 3px 10px rgba(60, 20, 140, 0.35);
+}
+#nav svg {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 780px) {
+  .avatar {
+    width: 30px;
+    height: 30px;
+  }
+  #minimap {
+    width: 72px;
+    height: 72px;
+  }
+}
+
+/* menu tiles: car, level, signs, restart */
+.mtiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.mtile {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border-radius: 14px;
+  background: var(--surface-2, rgba(127, 127, 127, 0.12));
+  border: 1px solid var(--line, rgba(127, 127, 127, 0.25));
+  color: inherit;
+  font-weight: 700;
+  font-size: 12.5px;
+}
+.mtile:active {
+  transform: scale(0.97);
+}
+#tr > * {
+  pointer-events: auto;
+}
+#pillZone {
+  max-width: 36vw;
+}
+#pillZone #progK {
+  display: none;
+}
+#pillZone .prog b::before {
+  content: '✓ ';
+  font-size: 0.8em;
+  opacity: 0.7;
+}

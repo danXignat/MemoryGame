@@ -27,29 +27,22 @@
             <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M5 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 20h12M15 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V8l-3-3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             <span class="fbar"><i id="fuelFill"></i></span><span id="fuelTxt">60%</span>
           </div>
-          <div class="pill zone" id="pillZone"><span id="lvName">Bartolomeu</span></div>
+          <div class="pill zone" id="pillZone"><span id="lvName">Bartolomeu</span><span class="prog"><b id="progTxt">0/0</b><span class="k" id="progK">checks</span></span></div>
           <div class="pill pax" id="pax" hidden><img class="pf" data-portrait="alisia" alt="Alisia" src="" /><span id="paxTxt"></span></div>
         </div>
 
-        <!-- top-centre: signals, lights, engine, car / level / mode / restart -->
+        <!-- top-centre: signals, hazards, lights, engine -->
         <div id="tc">
           <button type="button" class="tb sig" id="bSigL" aria-label="Left turn signal"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M13 5L4 12l9 7v-4.5h7v-5h-7z" fill="currentColor"/></svg></button>
           <button type="button" class="tb haz" id="bHaz" aria-label="Hazard lights"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3L2 20h20z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9.5L7.2 17.5h9.6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg></button>
           <button type="button" class="tb sig" id="bSigR" aria-label="Right turn signal"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M11 5l9 7-9 7v-4.5H4v-5h7z" fill="currentColor"/></svg></button>
           <button type="button" class="tb" id="bLights" aria-label="Headlights"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M13 5a7 7 0 0 0 0 14c1 0 1-1 1-2V7c0-1 0-2-1-2z" fill="currentColor"/><path d="M3 8l5 1.2M3 12h5M3 16l5-1.2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span class="lv" id="lightLv">OFF</span></button>
           <button type="button" class="tb" id="bEng" aria-label="Engine start or stop"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v9M6.6 6.6a8 8 0 1 0 10.8 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
-          <span class="sep"></span>
-          <button type="button" class="tb txt" id="bCar" aria-label="Choose a car"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 15v-3l2-4.5A2 2 0 0 1 6.8 6h10.4a2 2 0 0 1 1.8 1.5L21 12v3M3 15h18M3 15v2.5h3V15M18 15v2.5h3V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7.5" cy="12.3" r="1.1" fill="currentColor"/><circle cx="16.5" cy="12.3" r="1.1" fill="currentColor"/></svg><span>Car</span></button>
-          <button type="button" class="tb txt" id="bSigns" aria-label="Road sign library"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 9h5M9 13h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Signs</span></button>
-          <button type="button" class="tb txt" id="bLevel" aria-label="Choose a level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 21V4M6 5h12l-2.5 4L18 13H6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Level</span></button>
-          <div class="seg mini" id="modeSeg" role="group" aria-label="Game mode"><button type="button" data-mode="learn" class="on">Learn</button><button type="button" data-mode="test">Test</button></div>
-          <button type="button" class="tb" id="bRestart" aria-label="Restart level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M3.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button type="button" class="tb" id="bMenu" aria-label="Settings and pause"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z" fill="none" stroke="currentColor" stroke-width="2.2"/><path d="M19.4 13.5l1.6 1.2-1.8 3.1-1.9-.6a7 7 0 0 1-1.7 1l-.4 2h-3.6l-.4-2a7 7 0 0 1-1.7-1l-1.9.6-1.8-3.1 1.6-1.2a7 7 0 0 1 0-2l-1.6-1.2 1.8-3.1 1.9.6a7 7 0 0 1 1.7-1l.4-2h3.6l.4 2a7 7 0 0 1 1.7 1l1.9-.6 1.8 3.1-1.6 1.2a7 7 0 0 1 0 2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
         </div>
 
-        <!-- top-right: progress + sign alert -->
+        <!-- top-right: menu (car, level, signs, mode, settings) -->
         <div id="tr">
-          <div class="pill" id="pillProg"><span id="progTxt">0/0</span><span class="k" id="progK">checks</span></div>
+          <button type="button" class="tb" id="bMenu" aria-label="Menu"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
           <button type="button" class="pill alert" id="alertPill" hidden><img id="alertImg" alt="" /><span class="at"><b id="alertTxt"></b><small id="alertDist"></small></span><i class="dot" id="alertDot"></i></button>
         </div>
 
