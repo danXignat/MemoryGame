@@ -1,0 +1,13 @@
+{
+  "appId": "ro.cardat.drpciv",
+  "appName": "Car.dat",
+  "webDir": "app-www",
+  "backgroundColor": "#0d1418",
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "never",
+    "backgroundColor": "#0d1418"
+  }
+}

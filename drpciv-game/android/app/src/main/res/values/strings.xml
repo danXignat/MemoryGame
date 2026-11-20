@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Car.dat</string>
+    <string name="title_activity_main">Car.dat</string>
+    <string name="package_name">ro.cardat.drpciv</string>
+    <string name="custom_url_scheme">ro.cardat.drpciv</string>
+</resources>

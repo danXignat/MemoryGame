@@ -10,6 +10,14 @@ Car.dat: a landscape-first 2D driving school for learning Romanian road signs. F
 
 Other commands: `npm test` (simulated drivers play every level and compare the five cars) and `npm run artifact` (builds one single page, `dist/artifact.html`).
 
+## Phone apps (Android and iOS)
+
+The game is also packed as a real app with Capacitor (`android/` and `ios/`).
+
+- `npm run app` rebuilds the game page (`app-www/index.html`) and copies it into both projects.
+- **Android**: `npm run apk` builds `android/app/build/outputs/apk/debug/app-debug.apk` (needs the Android SDK; set `sdk.dir` in `android/local.properties`). Copy the APK to the phone and open it (allow installing from this source).
+- **iOS**: needs a Mac with Xcode. Open `ios/App/App.xcodeproj`, choose your Apple ID under Signing & Capabilities, plug in the iPhone and press Run.
+
 ## Which file to ask for what
 
 | You want to... | File |
