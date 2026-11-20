@@ -180,6 +180,14 @@ export function createRenderer(canvas, initialWorld) {
     ctx.fillRect(0, 0, W, H);
     applyView(ctx, sx, sy);
     const R = Math.hypot(W, H) / cam.scale + 6;
+    {
+      // the world point under the middle of the screen (the "camera" for the 3D look)
+      const dy = H / 2 - H * anchorY;
+      const c = Math.cos(-cam.angle);
+      const sn = Math.sin(-cam.angle);
+      C3 = { x: cam.x + (-dy * sn) / cam.scale, y: cam.y + (dy * c) / cam.scale };
+      K3 = 0.45 / (H / cam.scale);
+    }
     const blinkOn = state.blink === 1;
 
     drawGrass(R);
@@ -200,6 +208,7 @@ export function createRenderer(canvas, initialWorld) {
     drawMission(state, settings, time);
     drawBeams(state.car, state.spec);
     drawCar(state.car, state.spec, state.spec.color, { braking: state.car.braking, reversing: state.car.reversing, signal: state.car.signal, hazard: state.car.hazard, blinkOn, lights: state.car.lights, player: true, passenger: state.passenger, mood: state.mood, engineOn: state.car.engineOn });
+    drawBuildings3D(R, weather === 'night');
     drawTrees(R);
     drawLamps(R);
     drawPins(R);
@@ -386,104 +395,47 @@ export function createRenderer(canvas, initialWorld) {
       ctx.save();
       ctx.translate(h.x, h.y);
       ctx.rotate(h.angle || 0);
-      if (h.kind === 'block') {
-        const sh = 1.2 + (h.floors || 6) * 0.32; // taller blocks cast longer shadows
-        ctx.fillStyle = 'rgba(0,0,0,0.22)';
-        ctx.fillRect(-h.w / 2 + sh * 0.55, -h.h / 2 + sh, h.w, h.h);
-        ctx.fillStyle = 'rgba(0,0,0,0.12)';
-        ctx.fillRect(-h.w / 2 + sh * 0.3, -h.h / 2 + sh * 0.5, h.w, h.h);
-        // flat roof with a raised parapet
-        ctx.fillStyle = shadeColor(h.roof, -0.25);
-        ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
-        const g = ctx.createLinearGradient(0, -h.h / 2, 0, h.h / 2);
-        g.addColorStop(0, shadeColor(h.roof, 0.18));
-        g.addColorStop(1, shadeColor(h.roof, -0.08));
-        ctx.fillStyle = g;
-        ctx.fillRect(-h.w / 2 + 0.45, -h.h / 2 + 0.45, h.w - 0.9, h.h - 0.9);
-        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
-        ctx.lineWidth = 0.14;
-        ctx.strokeRect(-h.w / 2 + 0.1, -h.h / 2 + 0.1, h.w - 0.2, h.h - 0.2);
-        // stairwell / lift rooms with their own little shadows
-        const n = Math.max(2, Math.round(h.w / 12));
-        for (let i = 0; i < n; i++) {
-          const x = -h.w / 2 + ((i + 0.5) * h.w) / n;
-          ctx.fillStyle = 'rgba(0,0,0,0.22)';
-          ctx.fillRect(x - 1.2 + 0.5, -1.4 + 0.6, 2.4, 2.8);
-          ctx.fillStyle = shadeColor(h.roof, 0.28);
-          ctx.fillRect(x - 1.2, -1.4, 2.4, 2.8);
-          ctx.fillStyle = shadeColor(h.roof, -0.1);
-          ctx.fillRect(x - 1.2, 0.9, 2.4, 0.5);
-        }
-        // air units and vents
-        ctx.fillStyle = '#d9dcdf';
-        ctx.fillRect(-h.w / 2 + 2, h.h / 2 - 2.6, 1.4, 1.1);
-        ctx.fillRect(h.w / 2 - 4, -h.h / 2 + 1.2, 1.4, 1.1);
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.beginPath();
-        ctx.arc(h.w / 2 - 6.5, h.h / 2 - 2, 0.45, 0, TAU);
-        ctx.arc(-h.w / 2 + 5.5, -h.h / 2 + 2, 0.45, 0, TAU);
-        ctx.fill();
-      } else {
-        if (h.garden) {
-          ctx.fillStyle = 'rgba(140,200,100,0.35)';
-          ctx.fillRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
-          ctx.strokeStyle = '#3f7d3a'; // hedge
-          ctx.lineWidth = 0.55;
-          ctx.strokeRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
-          ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-          ctx.lineWidth = 0.15;
-          ctx.strokeRect(-h.w / 2 - 3.15, -h.h / 2 - 3.15, h.w + 6.3, h.h + 6.3);
-          // a little path to the door
-          ctx.fillStyle = '#d8cfbd';
-          ctx.fillRect(-0.6, h.h / 2, 1.2, 3);
-        }
-        ctx.fillStyle = 'rgba(0,0,0,0.28)';
-        ctx.fillRect(-h.w / 2 + 1.0, -h.h / 2 + 1.25, h.w, h.h);
-        // hip roof: four slopes, lit from the top left
-        const hw = h.w / 2;
-        const hh = h.h / 2;
-        const ridge = Math.max(0, hw - hh);
-        const face = (pts, f) => {
-          ctx.fillStyle = shadeColor(h.roof, f);
-          ctx.beginPath();
-          ctx.moveTo(pts[0], pts[1]);
-          for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
-          ctx.closePath();
-          ctx.fill();
-        };
-        face([-hw, -hh, hw, -hh, ridge, 0, -ridge, 0], 0.16);
-        face([-hw, hh, hw, hh, ridge, 0, -ridge, 0], -0.22);
-        face([-hw, -hh, -ridge, 0, -hw, hh], 0.04);
-        face([hw, -hh, ridge, 0, hw, hh], -0.32);
-        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-        ctx.lineWidth = 0.08;
-        ctx.beginPath();
-        ctx.moveTo(-ridge, 0);
-        ctx.lineTo(ridge, 0);
-        ctx.moveTo(-hw, -hh);
-        ctx.lineTo(-ridge, 0);
-        ctx.lineTo(-hw, hh);
-        ctx.moveTo(hw, -hh);
-        ctx.lineTo(ridge, 0);
-        ctx.lineTo(hw, hh);
-        ctx.stroke();
-        // tile rows
-        ctx.strokeStyle = 'rgba(0,0,0,0.08)';
-        ctx.lineWidth = 0.06;
-        ctx.beginPath();
-        for (let y = -hh + 0.6; y < hh; y += 0.6) {
-          if (Math.abs(y) < 0.2) continue;
-          const x = hw - (hh - Math.abs(y));
-          ctx.moveTo(-x, y);
-          ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-        // chimney
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.fillRect(ridge * 0.4 + 0.25, -hh * 0.45 + 0.3, 0.8, 0.8);
-        ctx.fillStyle = shadeColor(h.roof, -0.45);
-        ctx.fillRect(ridge * 0.4, -hh * 0.45, 0.8, 0.8);
+      // ground under every building: soft contact shade (the walls and roofs come later, in 3D)
+      const hgt = h.kind === 'block' ? (h.floors || 6) * 3 : 5;
+      if (h.kind !== 'block' && h.garden) {
+        ctx.fillStyle = 'rgba(140,200,100,0.35)';
+        ctx.fillRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
+        ctx.strokeStyle = '#3f7d3a'; // hedge
+        ctx.lineWidth = 0.55;
+        ctx.strokeRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
+        ctx.fillStyle = '#d8cfbd'; // path to the door
+        ctx.fillRect(-0.6, h.h / 2, 1.2, 3);
       }
+      ctx.rotate(-(h.angle || 0));
+      // cast shadow (sun from the top left): the footprint stretched down-right by the height
+      const shx = hgt * 0.32;
+      const shy = hgt * 0.42;
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      const cs = Math.cos(h.angle || 0);
+      const sn = Math.sin(h.angle || 0);
+      const pts = [[-h.w / 2, -h.h / 2], [h.w / 2, -h.h / 2], [h.w / 2, h.h / 2], [-h.w / 2, h.h / 2]].map(([u, v]) => [u * cs - v * sn, u * sn + v * cs]);
+      // convex hull of footprint + shifted footprint, drawn as two quads per edge (cheap)
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (const q of pts) ctx.lineTo(q[0], q[1]);
+      ctx.closePath();
+      for (let i = 0; i < 4; i++) {
+        const q0 = pts[i];
+        const q1 = pts[(i + 1) % 4];
+        ctx.moveTo(q0[0], q0[1]);
+        ctx.lineTo(q1[0], q1[1]);
+        ctx.lineTo(q1[0] + shx, q1[1] + shy);
+        ctx.lineTo(q0[0] + shx, q0[1] + shy);
+        ctx.closePath();
+      }
+      ctx.fill('nonzero');
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0] - 0.6, pts[0][1] - 0.6);
+      ctx.lineTo(pts[1][0] + 0.6, pts[1][1] - 0.6);
+      ctx.lineTo(pts[2][0] + 0.6, pts[2][1] + 0.6);
+      ctx.lineTo(pts[3][0] - 0.6, pts[3][1] + 0.6);
+      ctx.fill();
       ctx.restore();
     }
     // parked cars (police ones flash)
@@ -494,22 +446,204 @@ export function createRenderer(canvas, initialWorld) {
     }
   }
 
+  // ------------------------------------------------- 2.5D: things with height
+  //  A point at height z is pushed away from the screen centre by (p - centre) * z * K,
+  //  like a camera looking straight down. Walls facing the centre are drawn as quads.
+  let K3 = 0.015;
+  let C3 = { x: 0, y: 0 };
+  const up = (x, y, z) => [x + (x - C3.x) * z * K3, y + (y - C3.y) * z * K3];
+  const LIGHT = [-0.6, -0.8]; // sun from the top left
+  const litWindows = []; // collected for the night pass
+  function wallShade(nx, ny) {
+    return -(nx * LIGHT[0] + ny * LIGHT[1]); // -1 dark ... 1 bright
+  }
+  function quad(p0, p1, p2, p3) {
+    ctx.beginPath();
+    ctx.moveTo(p0[0], p0[1]);
+    ctx.lineTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]);
+    ctx.lineTo(p3[0], p3[1]);
+    ctx.closePath();
+  }
+  const lerp2 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  function drawBuildings3D(R, night) {
+    litWindows.length = 0;
+    const list = world.houses.filter((h) => Math.abs(h.x - cam.x) < R + 40 && Math.abs(h.y - cam.y) < R + 40);
+    list.sort((a, b) => Math.hypot(b.x - C3.x, b.y - C3.y) - Math.hypot(a.x - C3.x, a.y - C3.y));
+    for (const h of list) {
+      const block = h.kind === 'block';
+      const floors = h.floors || 6;
+      const wallH = block ? floors * 3 : 3.2;
+      const cs = Math.cos(h.angle || 0);
+      const sn = Math.sin(h.angle || 0);
+      const base = [[-h.w / 2, -h.h / 2], [h.w / 2, -h.h / 2], [h.w / 2, h.h / 2], [-h.w / 2, h.h / 2]].map(([u, v]) => [h.x + u * cs - v * sn, h.y + u * sn + v * cs]);
+      const top = base.map((p) => up(p[0], p[1], wallH));
+      const wallCol = block ? '#d9d4c8' : '#efe6d2';
+      // walls that face the viewer
+      for (let i = 0; i < 4; i++) {
+        const a = base[i];
+        const b = base[(i + 1) % 4];
+        const ex = b[0] - a[0];
+        const ey = b[1] - a[1];
+        const len = Math.hypot(ex, ey) || 1;
+        const nx = ey / len; // outward normal (corners go clockwise on screen)
+        const ny = -ex / len;
+        const mx = (a[0] + b[0]) / 2;
+        const my = (a[1] + b[1]) / 2;
+        if (nx * (C3.x - mx) + ny * (C3.y - my) <= 0) continue;
+        const sh = wallShade(nx, ny);
+        ctx.fillStyle = shadeColor(wallCol, sh > 0 ? sh * 0.15 : sh * 0.38);
+        quad(a, b, top[(i + 1) % 4], top[i]);
+        ctx.fill();
+        // windows
+        const cols = Math.max(1, Math.floor(len / (block ? 3 : 2.6)));
+        const rows = block ? floors : 1;
+        ctx.fillStyle = block ? 'rgba(40,60,80,0.75)' : 'rgba(50,70,90,0.7)';
+        ctx.beginPath();
+        for (let r = 0; r < rows; r++) {
+          const t0 = (r + 0.3) / rows;
+          const t1 = (r + 0.75) / rows;
+          for (let c = 0; c < cols; c++) {
+            const u0 = (c + 0.25) / cols;
+            const u1 = (c + 0.75) / cols;
+            const bl = lerp2(lerp2(a, top[i], t0), lerp2(b, top[(i + 1) % 4], t0), u0);
+            const br = lerp2(lerp2(a, top[i], t0), lerp2(b, top[(i + 1) % 4], t0), u1);
+            const tr = lerp2(lerp2(a, top[i], t1), lerp2(b, top[(i + 1) % 4], t1), u1);
+            const tl = lerp2(lerp2(a, top[i], t1), lerp2(b, top[(i + 1) % 4], t1), u0);
+            ctx.moveTo(bl[0], bl[1]);
+            ctx.lineTo(br[0], br[1]);
+            ctx.lineTo(tr[0], tr[1]);
+            ctx.lineTo(tl[0], tl[1]);
+            ctx.closePath();
+            if (night && ((r * 7 + c * 13 + Math.round(h.x)) % 5 < 2)) litWindows.push([bl, br, tr, tl]);
+          }
+        }
+        ctx.fill();
+        // floor lines on blocks
+        if (block) {
+          ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+          ctx.lineWidth = 0.08;
+          ctx.beginPath();
+          for (let r = 1; r < rows; r++) {
+            const p0 = lerp2(a, top[i], r / rows);
+            const p1 = lerp2(b, top[(i + 1) % 4], r / rows);
+            ctx.moveTo(p0[0], p0[1]);
+            ctx.lineTo(p1[0], p1[1]);
+          }
+          ctx.stroke();
+        }
+      }
+      // roof
+      if (block) {
+        ctx.fillStyle = shadeColor(h.roof, -0.22);
+        quad(top[0], top[1], top[2], top[3]);
+        ctx.fill();
+        const inner = base.map((p) => {
+          const q = [h.x + (p[0] - h.x) * 0.94, h.y + (p[1] - h.y) * 0.9];
+          return up(q[0], q[1], wallH + 0.4);
+        });
+        ctx.fillStyle = shadeColor(h.roof, 0.12);
+        quad(inner[0], inner[1], inner[2], inner[3]);
+        ctx.fill();
+        // lift rooms
+        const n = Math.max(2, Math.round(h.w / 12));
+        for (let k = 0; k < n; k++) {
+          const u = -h.w / 2 + ((k + 0.5) * h.w) / n;
+          const corners = [[u - 1.2, -1.4], [u + 1.2, -1.4], [u + 1.2, 1.4], [u - 1.2, 1.4]].map(([x, y]) => [h.x + x * cs - y * sn, h.y + x * sn + y * cs]);
+          const lo = corners.map((p) => up(p[0], p[1], wallH + 0.4));
+          const hi = corners.map((p) => up(p[0], p[1], wallH + 2.6));
+          ctx.fillStyle = shadeColor(h.roof, -0.15);
+          for (let i = 0; i < 4; i++) {
+            quad(lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]);
+            ctx.fill();
+          }
+          ctx.fillStyle = shadeColor(h.roof, 0.25);
+          quad(hi[0], hi[1], hi[2], hi[3]);
+          ctx.fill();
+        }
+      } else {
+        // hip roof rising above the walls
+        const hw = h.w / 2;
+        const hh = h.h / 2;
+        const ridge = Math.max(0, hw - hh);
+        const loc = (u, v, z) => up(h.x + u * cs - v * sn, h.y + u * sn + v * cs, z);
+        const eave = 0.35;
+        const c0 = loc(-hw - eave, -hh - eave, wallH);
+        const c1 = loc(hw + eave, -hh - eave, wallH);
+        const c2 = loc(hw + eave, hh + eave, wallH);
+        const c3 = loc(-hw - eave, hh + eave, wallH);
+        const r0 = loc(-ridge, 0, wallH + 2.6);
+        const r1 = loc(ridge, 0, wallH + 2.6);
+        const face = (pts, f) => {
+          ctx.fillStyle = shadeColor(h.roof, f);
+          ctx.beginPath();
+          ctx.moveTo(pts[0][0], pts[0][1]);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+          ctx.closePath();
+          ctx.fill();
+        };
+        // light from the top left, in world terms (rotated with the house)
+        const lf = (nx, ny) => {
+          const wx = nx * cs - ny * sn;
+          const wy = nx * sn + ny * cs;
+          return wallShade(wx, wy) * 0.28;
+        };
+        face([c0, c1, r1, r0], lf(0, -1));
+        face([c3, c2, r1, r0], lf(0, 1));
+        face([c0, r0, c3], lf(-1, 0));
+        face([c1, r1, c2], lf(1, 0));
+        ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+        ctx.lineWidth = 0.07;
+        ctx.beginPath();
+        ctx.moveTo(r0[0], r0[1]);
+        ctx.lineTo(r1[0], r1[1]);
+        ctx.moveTo(c0[0], c0[1]);
+        ctx.lineTo(r0[0], r0[1]);
+        ctx.lineTo(c3[0], c3[1]);
+        ctx.moveTo(c1[0], c1[1]);
+        ctx.lineTo(r1[0], r1[1]);
+        ctx.lineTo(c2[0], c2[1]);
+        ctx.stroke();
+        // chimney
+        const ch0 = loc(ridge * 0.4, -hh * 0.45, wallH + 1.8);
+        const ch1 = loc(ridge * 0.4, -hh * 0.45, wallH + 3.4);
+        ctx.strokeStyle = shadeColor(h.roof, -0.45);
+        ctx.lineWidth = 0.75;
+        ctx.beginPath();
+        ctx.moveTo(ch0[0], ch0[1]);
+        ctx.lineTo(ch1[0], ch1[1]);
+        ctx.stroke();
+      }
+    }
+  }
+
   function drawLamps(R) {
     for (const l of world.lamps || []) {
       if (Math.abs(l.x - cam.x) > R + 4 || Math.abs(l.y - cam.y) > R + 4) continue;
-      ctx.strokeStyle = '#3d434b';
-      ctx.lineWidth = 0.22;
+      const top = up(l.x, l.y, 7);
+      const hx = l.x + Math.cos(l.ang) * 1.8;
+      const hy = l.y + Math.sin(l.ang) * 1.8;
+      const head = up(hx, hy, 7);
+      ctx.strokeStyle = 'rgba(0,0,0,0.1)'; // short shadow of the pole
+      ctx.lineWidth = 0.25;
       ctx.beginPath();
       ctx.moveTo(l.x, l.y);
-      ctx.lineTo(l.x + Math.cos(l.ang) * 1.6, l.y + Math.sin(l.ang) * 1.6);
+      ctx.lineTo(l.x + 1.0, l.y + 1.3);
+      ctx.stroke();
+      ctx.strokeStyle = '#4a5058';
+      ctx.lineWidth = 0.2;
+      ctx.beginPath();
+      ctx.moveTo(l.x, l.y);
+      ctx.lineTo(top[0], top[1]);
+      ctx.lineTo(head[0], head[1]);
       ctx.stroke();
       ctx.fillStyle = '#2b3036';
       ctx.beginPath();
-      ctx.arc(l.x, l.y, 0.35, 0, TAU);
+      ctx.ellipse(head[0], head[1], 0.45, 0.28, l.ang, 0, TAU);
       ctx.fill();
       ctx.fillStyle = '#fff3c4';
       ctx.beginPath();
-      ctx.arc(l.x + Math.cos(l.ang) * 1.6, l.y + Math.sin(l.ang) * 1.6, 0.3, 0, TAU);
+      ctx.arc(head[0], head[1], 0.2, 0, TAU);
       ctx.fill();
     }
   }
@@ -548,7 +682,16 @@ export function createRenderer(canvas, initialWorld) {
       ctx.arc(t.x + t.r * 0.45, t.y + t.r * 0.55, t.r * 0.95, 0, TAU);
       ctx.fill();
       const sp = treeSprite(Math.floor(t.shade * 5.99));
-      ctx.drawImage(sp.img, t.x - t.r * 1.25, t.y - t.r * 1.25, t.r * 2.5, t.r * 2.5);
+      const th = 3 + t.r * 1.2; // crown height
+      const c = up(t.x, t.y, th);
+      ctx.strokeStyle = '#5a4130';
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      ctx.moveTo(t.x, t.y);
+      ctx.lineTo(c[0], c[1]);
+      ctx.stroke();
+      const s3 = 1 + th * K3 * 0.6; // nearer the camera looks a bit bigger
+      ctx.drawImage(sp.img, c[0] - t.r * 1.25 * s3, c[1] - t.r * 1.25 * s3, t.r * 2.5 * s3, t.r * 2.5 * s3);
     }
   }
 
@@ -1114,6 +1257,19 @@ export function createRenderer(canvas, initialWorld) {
     // route line stays visible
     applyView(ctx, sx, sy);
     drawRoute(0.65);
+    // lit windows glow through the dark
+    if (litWindows.length) {
+      ctx.fillStyle = 'rgba(255,214,120,0.85)';
+      ctx.beginPath();
+      for (const [a, b, c, d] of litWindows) {
+        ctx.moveTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.lineTo(c[0], c[1]);
+        ctx.lineTo(d[0], d[1]);
+        ctx.closePath();
+      }
+      ctx.fill();
+    }
   }
 
   function drawRain(time) {
