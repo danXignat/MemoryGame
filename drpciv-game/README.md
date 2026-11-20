@@ -35,7 +35,7 @@ Put the photos in `public/assets/` with these names (jpeg, jpg, png or webp), th
 | `naty.jpeg` | Naty, the player and developer (driver avatar) |
 | `alisia.jpeg` | Alisia, Naty's girlfriend (right-seat passenger, Final Boss) |
 | `dan.jpeg` | Dan, Naty's friend (tips) |
-| `petra.jpeg` | Petra, Dan's girlfriend (tips) |
+| `petra.jpeg` | Petra, Dan's wife (tips) |
 
 Until a photo is found, a coloured circle with the initial is shown.
 

@@ -5,7 +5,7 @@
 //      naty.jpeg      Naty      the player / developer (driver avatar)
 //      alisia.jpeg    Alisia    Naty's girlfriend, the right-seat passenger
 //      dan.jpeg       Dan       the friend who gives tips
-//      petra.jpeg     Petra     Dan's girlfriend
+//      petra.jpeg     Petra     Dan's wife
 //  Until a photo is found, a drawn placeholder (coloured circle + initial) is used.
 // ============================================================================
 
@@ -13,7 +13,7 @@ export const PEOPLE = {
   naty: { id: 'naty', name: 'Naty', role: { en: 'Driver and developer', ro: 'Șofer și dezvoltator' }, color: '#2f7bf6', initial: 'N' },
   alisia: { id: 'alisia', name: 'Alisia', role: { en: "Naty's girlfriend", ro: 'Prietena lui Naty' }, color: '#e8548c', initial: 'A' },
   dan: { id: 'dan', name: 'Dan', role: { en: 'Friend', ro: 'Prietenul' }, color: '#25a86f', initial: 'D' },
-  petra: { id: 'petra', name: 'Petra', role: { en: "Dan's girlfriend", ro: 'Prietena lui Dan' }, color: '#e8a02a', initial: 'P' },
+  petra: { id: 'petra', name: 'Petra', role: { en: "Dan's wife", ro: 'Soția lui Dan' }, color: '#e8a02a', initial: 'P' },
 };
 
 const EXT = ['jpeg', 'jpg', 'png', 'webp'];
