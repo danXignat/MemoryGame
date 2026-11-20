@@ -28,7 +28,7 @@ jobs:
           cache-dependency-path: drpciv-game/package-lock.json
       - run: npm ci
       - run: node scripts/build-app.mjs
-      - name: Publish to the gh-pages branch (turn on Pages once: Settings > Pages > Deploy from branch > gh-pages)
+      - name: "Publish to the gh-pages branch (turn on Pages once in Settings > Pages > Deploy from branch > gh-pages)"
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
