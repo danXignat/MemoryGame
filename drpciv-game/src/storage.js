@@ -7,7 +7,7 @@ const SETTINGS_KEY = 'drpciv.settings.v2';
 const MISTAKES_KEY = 'drpciv.mistakes.v1';
 
 export const DEFAULTS = {
-  lang: 'en',
+  lang: typeof navigator !== 'undefined' && /^ro\b/i.test(navigator.language || '') ? 'ro' : 'en',
   rotate: true,
   sound: true,
   mode: 'learn',

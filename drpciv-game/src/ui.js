@@ -14,6 +14,7 @@ import { sfx, vibrate, unlock, setEnabled as setSoundEnabled } from './audio.js'
 import { addMistake, forgiveMistake, topMistakes } from './storage.js';
 import { PEOPLE, pimg, logoURL } from './portraits.js';
 import { createTheory } from './theory.js';
+import { installAutoTranslate, HELP_RO } from './i18n.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const PIN_INFO = {
@@ -69,6 +70,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     }
   })();
   const lang = () => settings.lang;
+  const retranslate = installAutoTranslate(document.getElementById('app'), () => settings.lang === 'ro');
   const img = (key, px = 192) => getSignDataURL(key, SIGNS[key].art, px);
   const name = (o) => tr(o, lang());
   const st = () => G.game.state;
@@ -541,8 +543,18 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
 
   function checkOrientation() {
     const portrait = window.innerHeight > window.innerWidth * 1.02;
-    // never cover a menu, the book or an exam: only the bare game asks to turn the phone
-    E.rotate.hidden = !(portrait && !rotateSkipped && !modals.length);
+    // The game works upright too, so it never blocks: just one friendly hint, once.
+    E.rotate.hidden = true;
+    if (portrait && !rotateSkipped && !modals.length && G.game) {
+      rotateSkipped = true;
+      try {
+        localStorage.setItem('drpciv.rotateSkip', '1');
+      } catch {
+        /* ignore */
+      }
+      const en = lang() === 'en';
+      showInfo(en ? 'Tip' : 'Sfat', en ? 'You can play upright, but sideways you see more of the road.' : 'Poți juca și cu telefonul vertical, dar ținut orizontal vezi mai mult din drum.');
+    }
   }
   window.addEventListener('resize', checkOrientation);
   window.addEventListener('orientationchange', () => setTimeout(checkOrientation, 150));
@@ -641,6 +653,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   function setLang(l) {
     settings.lang = l;
     saveSettings();
+    retranslate();
     modals.forEach((mm) => mm.rerender && mm.rerender());
     if (cardSign && !card.hidden) renderCard(cardSign);
     lastNav = '';
@@ -1086,7 +1099,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     openModal(`
       <div class="sheet" role="dialog" aria-label="How to play">
         ${head('How to play')}
-        <div class="sheet-body">
+        <div class="sheet-body">${lang() === 'ro' ? HELP_RO : `
           <ol class="howto">
             <li><b>Wheel</b> (bottom left): drag it round with a finger. It springs back to centre when you let go.</li>
             <li><b>Gas</b> and <b>Brake / Reverse</b> are the pedals (bottom right). <b>Reset</b> puts the car back on the road.</li>
@@ -1095,7 +1108,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
             <li><b>Learn</b>: drive anywhere, signs explain themselves. <b>Test</b>: exam rules with penalty points, 21 = failed.</li>
             <li>At night or in fog use <b>low beams</b>. Gas stations: stop in the bay, switch the engine off, refuel.</li>
           </ol>
-          <p class="empty" style="text-align:left;padding-bottom:0">Keyboard: WASD or arrows, Space brake, Q / E blinkers, H hazards, L lights, I ignition, R reset.</p>
+          <p class="empty" style="text-align:left;padding-bottom:0">Keyboard: WASD or arrows, Space brake, Q / E blinkers, H hazards, L lights, I ignition, R reset.</p>`}
         </div>
       </div>`);
   }

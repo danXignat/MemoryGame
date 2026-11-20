@@ -621,7 +621,22 @@ export function buildWorld(MAP) {
       if (wr() > busy) continue;
       if (ringS.some(([a, b]) => sv > a - 20 && sv < b + 20)) continue;
       const side = wr() < 0.5 ? 1 : -1;
-      walkers.push({ s: sv, s0: sv - 12 - wr() * 18, s1: sv + 12 + wr() * 18, dir: wr() < 0.5 ? 1 : -1, off: side * (half + 1.7 + wr() * 0.8), speed: 0.9 + wr() * 0.6, shirt: ['#2b4c8c', '#c0392b', '#2e8b57', '#8e44ad', '#e67e22', '#34495e', '#d35400', '#16a085'][Math.floor(wr() * 8)], hair: ['#4a2f23', '#1d1d1d', '#c9a227', '#7b3f00'][Math.floor(wr() * 4)] });
+      const off = side * (half + 1.7 + wr() * 0.8);
+      // keep the whole walk on the pavement: stop where it would step onto any road
+      const clearAt = (t) => {
+        if (t < 0 || t > length) return false;
+        const q = routeAt(t, {});
+        return queryRoad(q.x - q.dy * off, q.y + q.dx * off).dist > half + 0.8;
+      };
+      if (!clearAt(sv)) continue;
+      let w0 = sv;
+      let w1 = sv;
+      const want0 = sv - 12 - wr() * 18;
+      const want1 = sv + 12 + wr() * 18;
+      while (w0 - 1 > want0 && clearAt(w0 - 1)) w0 -= 1;
+      while (w1 + 1 < want1 && clearAt(w1 + 1)) w1 += 1;
+      if (w1 - w0 < 6) continue;
+      walkers.push({ s: sv, s0: w0, s1: w1, dir: wr() < 0.5 ? 1 : -1, off, speed: 0.9 + wr() * 0.6, shirt: ['#2b4c8c', '#c0392b', '#2e8b57', '#8e44ad', '#e67e22', '#34495e', '#d35400', '#16a085'][Math.floor(wr() * 8)], hair: ['#4a2f23', '#1d1d1d', '#c9a227', '#7b3f00'][Math.floor(wr() * 4)] });
     }
   }
 
