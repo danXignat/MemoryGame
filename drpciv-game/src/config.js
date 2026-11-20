@@ -93,7 +93,7 @@ export const CONFIG = {
   //  Figures follow what driving-school guides describe; check the official scale.
   exam: {
     failAt: 21,
-    penalty: { stop: 21, slow: 5, speed: 5, noOvertake: 21, noStop: 5, zones: 8, roundabout: 8, quiz: 2, signal: 3, crosswalk: 21, yield: 21, lights: 3, hazard: 2, curb: 1, fuel: 5, pedHit: 21, pickup: 8, stationSpeed: 3, refuel: 5, lane: 3, hazardStop: 5 },
+    penalty: { stop: 21, slow: 5, speed: 5, noOvertake: 21, noStop: 5, zones: 8, roundabout: 8, quiz: 2, signal: 3, crosswalk: 21, yield: 21, lights: 3, hazard: 2, curb: 1, fuel: 5, pedHit: 21, pickup: 8, stationSpeed: 3, refuel: 5, lane: 3, hazardStop: 5, camera: 5 },
   },
 
   car2: { capKmh: 140, driveEff: 0.6 }, // game speed limit and how much engine power reaches the road

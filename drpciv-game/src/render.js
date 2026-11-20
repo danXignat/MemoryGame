@@ -800,6 +800,13 @@ export function createRenderer(canvas, initialWorld) {
         ctx.lineTo(0.6, -1.6);
         ctx.lineTo(-0.6, -1.6);
         ctx.fill();
+      } else if (p.type === 'camera') {
+        ctx.fillRect(-0.62, -2.68, 1.24, 0.8);
+        ctx.fillRect(-0.3, -2.86, 0.4, 0.2);
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.arc(0, -2.28, 0.27, 0, TAU);
+        ctx.fill();
       } else {
         ctx.beginPath();
         ctx.arc(0, -2.3, 0.5, 0, TAU);
@@ -1070,6 +1077,23 @@ export function createRenderer(canvas, initialWorld) {
     return best;
   }
 
+  /** A map pin (speed camera, police, hazard, station) under a screen point, or null. */
+  function pinAt(px, py) {
+    const p = screenToWorld(px, py);
+    const reach = 3.5 + 14 / cam.scale;
+    let best = null;
+    let bd = reach;
+    for (const pin of world.pins) {
+      if (pin.type === 'crosswalk' || pin.type === 'pickup' || pin.type === 'home') continue;
+      const d = Math.hypot(pin.x - p.x, pin.y - 2.3 - p.y);
+      if (d < bd) {
+        bd = d;
+        best = pin;
+      }
+    }
+    return best;
+  }
+
   resize();
-  return { resize, setWorld, screenToWorld, signAt, updateCamera, draw, drawMinimap, cam, get portrait() { return portrait; } };
+  return { resize, setWorld, screenToWorld, signAt, pinAt, updateCamera, draw, drawMinimap, cam, get portrait() { return portrait; } };
 }

@@ -885,6 +885,33 @@ export function createGame(world, opts = {}) {
     return test.summary;
   }
 
+  // Speed cameras (red pins): a photo as you drive past, over the limit costs points in Test mode
+  const cameras = (world.pins || [])
+    .filter((p) => p.type === 'camera' && p.s != null)
+    .map((p) => {
+      // the limit at the camera = the last speed sign before it (50 km/h in town otherwise)
+      let lim = 50;
+      let at = -1;
+      for (const sg of world.signs)
+        if (sg.test.type === 'speed' && sg.s <= p.s && sg.s > at) {
+          at = sg.s;
+          lim = sg.test.kmh;
+        }
+      return { s: p.s, lim };
+    });
+  function checkCameras() {
+    const pr = state.prog;
+    if (!pr.onRoute || pr.jumped) return;
+    for (const cam of cameras) {
+      if (!(pr.prevS < cam.s && pr.s >= cam.s)) continue;
+      const kmh = Math.round(Math.abs(state.car.v) * 3.6);
+      const lim = cam.lim;
+      const ok = kmh <= lim + C.test.speedTolerance;
+      emit('camera', { kmh, lim, ok });
+      if (!ok) issue('camera', C.exam.penalty.camera, { ro: `Radar: ${kmh} km/h într-o zonă de ${lim} km/h.`, en: `Speed camera: ${kmh} km/h in a ${lim} km/h zone.` }, { title: { ro: 'Radar', en: 'Speed camera' } });
+    }
+  }
+
   const ctx = { s: 0, prevS: 0, kmh: 0, dt: 0, onRoute: false, jumped: false, car: null, crossed: null };
   ctx.crossed = (line) => ctx.onRoute && !ctx.jumped && ctx.prevS < line && ctx.s >= line;
 
@@ -1126,6 +1153,7 @@ export function createGame(world, opts = {}) {
     updateActiveSign();
     updateBlinkersAndStation(dt);
     updatePassenger(dt);
+    checkCameras();
     if (state.mode === 'test' && state.test && !state.test.finished) runRules(dt);
     state.shake = Math.max(0, state.shake - dt * 2.5);
   }

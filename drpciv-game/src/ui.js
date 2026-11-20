@@ -15,6 +15,14 @@ import { addMistake, forgiveMistake, topMistakes } from './storage.js';
 import { PEOPLE, pimg, logoURL } from './portraits.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
+const PIN_INFO = {
+  camera: { t: { ro: 'Radar de viteză', en: 'Speed camera' }, d: { ro: 'Te fotografiază când treci pe lângă el. Dacă depășești limita, în modul Test primești puncte de penalizare.', en: 'It takes a photo as you pass. Over the limit costs penalty points in Test mode.' } },
+  police: { t: { ro: 'Poliție', en: 'Police' }, d: { ro: 'Echipaj de poliție în zonă. Respectă limita și semnalizează.', en: 'Police patrol in the area. Keep to the limit and signal.' } },
+  hazard: { t: { ro: 'Mașină oprită', en: 'Stopped car' }, d: { ro: 'Mașină oprită pe bandă. Încetinește, semnalizează și ocolește-o.', en: 'A car is stopped in the lane. Slow down, signal and go round it.' } },
+  breakdown: { t: { ro: 'Mașină în pană', en: 'Breakdown' }, d: { ro: 'Încetinește și ocolește cu atenție.', en: 'Slow down and pass with care.' } },
+  roadwork: { t: { ro: 'Lucrări', en: 'Roadworks' }, d: { ro: 'Drum îngustat. Încetinește.', en: 'The road narrows. Slow down.' } },
+  station: { t: { ro: 'Benzinărie', en: 'Fuel station' }, d: { ro: 'Intră în stație, oprește, oprește motorul și alimentează.', en: 'Pull in, stop, switch the engine off and refuel.' } },
+};
 const svg = (d) => `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 const ICON = {
   car: svg('M3 15v-3l2-4.5A2 2 0 0 1 6.8 6h10.4a2 2 0 0 1 1.8 1.5L21 12v3M3 15h18M3 15v2.5h3V15M18 15v2.5h3V15'),
@@ -125,7 +133,16 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   $('#game').addEventListener('pointerdown', (e) => {
     if (!G.game || modals.length) return;
     const sg = renderer.signAt(e.clientX, e.clientY);
-    if (!sg) return;
+    if (!sg) {
+      const pin = renderer.pinAt(e.clientX, e.clientY);
+      if (pin && PIN_INFO[pin.type]) {
+        unlock();
+        sfx.tap();
+        const i = PIN_INFO[pin.type];
+        showInfo(tr(i.t, lang()), tr(i.d, lang()));
+      }
+      return;
+    }
     unlock();
     sfx.tap();
     openLibrary(sg.key);
@@ -1087,6 +1104,16 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     game.on('paxLeave', () => showPersonToast('alisia', 'Alisia', lang() === 'en' ? 'Thanks for the safe drive! See you soon.' : 'Mersi pentru drumul liniștit! Ne vedem curând.'));
     game.on('home', () => {
       if (st().mode !== 'test') showPersonToast('alisia', 'Alisia', lang() === 'en' ? 'I am home. Try it in Test mode for the licence ending!' : 'Am ajuns acasă. Încearcă și în modul Test pentru finalul cu permisul!');
+    });
+    game.on('camera', (c) => {
+      const app = document.getElementById('app');
+      app.classList.remove('camflash');
+      void app.offsetWidth;
+      app.classList.add('camflash');
+      if (st().mode === 'test' && !c.ok) return; // the penalty toast explains it
+      const en = lang() === 'en';
+      if (c.ok) showInfo(en ? 'Speed camera: OK' : 'Radar: OK', en ? `You passed at ${c.kmh} km/h (limit ${c.lim}).` : `Ai trecut cu ${c.kmh} km/h (limita ${c.lim}).`);
+      else showInfo(en ? 'Speed camera: too fast!' : 'Radar: prea repede!', en ? `${c.kmh} km/h in a ${c.lim} km/h zone. In Test mode this costs penalty points.` : `${c.kmh} km/h unde limita e ${c.lim}. În modul Test primești puncte de penalizare.`);
     });
     game.on('lowfuel', () => {
       sfx.lowfuel();

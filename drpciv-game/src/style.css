@@ -2210,3 +2210,90 @@ p {
   font-size: 0.8em;
   opacity: 0.7;
 }
+
+/* speed camera photo flash */
+#app.camflash::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: #fff;
+  animation: camflash 0.45s ease-out forwards;
+}
+@keyframes camflash {
+  from {
+    opacity: 0.75;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ====================== PORTRAIT (phone held upright) ======================
+   Row 1: avatar · driving capsule · menu.  Left column: score, fuel, level.
+   Right: minimap, speed limit.  Bottom: arrows left, speedometer over pedals right. */
+@media (orientation: portrait) {
+  :root {
+    --arw: clamp(56px, 17vw, 72px);
+    --pedw: clamp(52px, 14vw, 64px);
+    --gauge: clamp(90px, 25vw, 112px);
+  }
+  #tc {
+    top: var(--top);
+    width: auto;
+    flex-wrap: nowrap;
+  }
+  #tc .tb {
+    min-width: calc(var(--tb) + 2px);
+  }
+  #tl .trow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .avatar {
+    width: 32px;
+    height: 32px;
+  }
+  #pillZone {
+    max-width: 62vw;
+  }
+  #minimap {
+    position: fixed;
+    top: calc(var(--top) + var(--tb) + 8px);
+    right: max(8px, env(safe-area-inset-right, 0px));
+    width: 84px;
+    height: 84px;
+  }
+  #limit {
+    top: calc(var(--top) + var(--tb) + 100px);
+    bottom: auto;
+    left: auto;
+    right: calc(max(8px, env(safe-area-inset-right, 0px)) + 22px);
+  }
+  #nav {
+    top: calc(var(--top) + var(--tb) + 150px);
+    max-width: 92vw;
+  }
+  #station {
+    top: calc(var(--top) + var(--tb) + 210px);
+    max-width: 92vw;
+  }
+  #br {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+  }
+  #br #btnReset {
+    align-self: flex-start;
+  }
+  #stage,
+  .mode-test #stage {
+    top: auto;
+    left: 2vw;
+    right: calc(var(--pedw) * 2 + 26px);
+    bottom: calc(var(--arw) + 22px);
+    max-width: none;
+  }
+}
