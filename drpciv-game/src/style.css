@@ -2297,3 +2297,308 @@ p {
     max-width: none;
   }
 }
+
+/* ====================== THEORY EXAM (Chestionare) ====================== */
+.mtiles {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.mtile span {
+  font-size: 11.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.btn[data-theory] {
+  display: grid;
+  margin-top: 8px;
+  height: auto;
+  padding: 8px 12px;
+}
+.btn[data-theory] small {
+  display: block;
+  font-weight: 500;
+  opacity: 0.75;
+  font-size: 11.5px;
+}
+.thintro,
+.thstats,
+.thnote {
+  font-size: 13.5px;
+  line-height: 1.45;
+  margin: 0 0 10px;
+}
+.thnote {
+  font-size: 11.5px;
+  opacity: 0.7;
+  margin: 10px 0 0;
+}
+.thstats {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.overlay.center .sheet.theory.exam {
+  width: min(calc(100% - 16px), 860px);
+  max-height: calc(100% - 16px);
+}
+.thbody {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  min-height: 0;
+}
+.thbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.thbar > span {
+  flex: 1;
+  display: grid;
+  justify-items: center;
+  padding: 4px 2px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  line-height: 1.1;
+}
+.thbar small {
+  font-size: 10px;
+  opacity: 0.7;
+}
+.thbar b {
+  font: 700 18px / 1 var(--font-num);
+}
+.thbar .okc b {
+  color: #1f9d55;
+}
+.thbar .badc b {
+  color: #d64545;
+}
+.thbar .x {
+  flex: none;
+  width: 40px;
+  height: 40px;
+}
+.thq {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.thimg {
+  flex: none;
+  width: clamp(80px, 18vw, 140px);
+  height: auto;
+}
+.thmain {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 8px;
+}
+.thmain h3 {
+  font-size: clamp(15px, 2.2vw, 18px);
+  line-height: 1.3;
+  margin: 0;
+}
+.thopts {
+  display: grid;
+  gap: 6px;
+}
+.thopt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: var(--surface);
+  color: inherit;
+  font-size: 14px;
+  line-height: 1.3;
+}
+.thopt i {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  font-weight: 800;
+  background: var(--surface-2);
+}
+.thopt.on {
+  border-color: #2f6fe4;
+  background: rgba(47, 111, 228, 0.1);
+}
+.thopt.on i {
+  background: #2f6fe4;
+  color: #fff;
+}
+.thopt.right {
+  border-color: #1f9d55;
+  background: rgba(31, 157, 85, 0.12);
+}
+.thopt.wrong {
+  border-color: #d64545;
+  background: rgba(214, 69, 69, 0.12);
+}
+.thwhy {
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.thwhy .g,
+.thmi .g {
+  color: #1f9d55;
+}
+.thwhy .r,
+.thmi .r {
+  color: #d64545;
+}
+.thactions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.thactions .btn {
+  flex: 1 1 140px;
+}
+.thactions .btn:disabled {
+  opacity: 0.45;
+}
+.thres {
+  text-align: center;
+  padding: 14px;
+  border-radius: 16px;
+  color: #fff;
+}
+.thres.pass {
+  background: #1f9d55;
+}
+.thres.fail {
+  background: #d64545;
+}
+.thres h2 {
+  font-size: 30px;
+  letter-spacing: 0.08em;
+  margin: 0 0 4px;
+}
+.thres p {
+  margin: 0;
+}
+.thmh {
+  margin: 4px 0 0;
+}
+.thmist {
+  display: grid;
+  gap: 8px;
+}
+.thmi {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.thmi img {
+  width: 48px;
+  height: 48px;
+  flex: none;
+}
+.thmi ul {
+  margin: 4px 0;
+  padding-left: 16px;
+}
+.thmi li.g {
+  font-weight: 700;
+}
+.thmi li.r {
+  text-decoration: line-through;
+}
+@media (orientation: portrait) {
+  .thq {
+    flex-direction: column;
+    align-items: center;
+  }
+  .thbar small {
+    font-size: 9px;
+  }
+}
+/* the exam fills the screen so nothing is cut off on short landscape phones */
+.overlay.center .sheet.theory.exam {
+  position: fixed;
+  top: max(8px, env(safe-area-inset-top, 0px));
+  bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(calc(100% - 16px), 900px);
+  max-height: none;
+  animation: none;
+}
+.sheet.theory.exam .thbody {
+  flex: 1;
+}
+@media (max-height: 500px) {
+  .thbody {
+    gap: 6px;
+    padding: 6px 10px 8px;
+  }
+  .thbar > span {
+    padding: 2px;
+  }
+  .thbar b {
+    font-size: 15px;
+  }
+  .thbar .x {
+    width: 34px;
+    height: 34px;
+  }
+  .thimg {
+    width: 84px;
+  }
+  .thmain {
+    gap: 5px;
+  }
+  .thmain h3 {
+    font-size: 14.5px;
+  }
+  .thopt {
+    padding: 5px 8px;
+    font-size: 13px;
+  }
+  .thopt i {
+    width: 24px;
+    height: 24px;
+  }
+  .thactions .btn {
+    height: 38px;
+    font-size: 13.5px;
+  }
+  .thwhy {
+    padding: 5px 8px;
+    font-size: 12px;
+  }
+}
+.stack.three {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.btn[data-theory] {
+  margin-top: 0;
+}
+@media (orientation: portrait) {
+  .stack.three {
+    grid-template-columns: 1fr;
+  }
+}

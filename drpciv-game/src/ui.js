@@ -13,6 +13,7 @@ import { LEVELS } from './levels.js';
 import { sfx, vibrate, unlock, setEnabled as setSoundEnabled } from './audio.js';
 import { addMistake, forgiveMistake, topMistakes } from './storage.js';
 import { PEOPLE, pimg, logoURL } from './portraits.js';
+import { createTheory } from './theory.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const PIN_INFO = {
@@ -29,6 +30,7 @@ const ICON = {
   flag: svg('M6 21V4M6 5h12l-2.5 4L18 13H6'),
   book: svg('M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4zM9 9h5M9 13h5'),
   restart: svg('M4 12a8 8 0 1 0 2.6-5.9M3.5 3.5v5h5'),
+  quiz: svg('M9 4h6M8 4H6a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2M8.5 11l1.5 1.5 3-3M8.5 17h7'),
 };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -93,6 +95,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     if (e.code === 'Escape' && modals.length) modals[modals.length - 1].close();
   });
   const head = (title, extra = '') => `<div class="sheet-head"><h2>${title}</h2>${extra}<button type="button" class="x" data-close aria-label="Close">&times;</button></div>`;
+  const theory = createTheory({ openModal, head, signImg: (key, px) => img(key, px), sfx, esc });
 
   // ------------------------------------------------------------ sign card
   const card = $('#card');
@@ -921,6 +924,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
             <button type="button" class="mtile" id="mCar">${ICON.car}<span>Mașina</span></button>
             <button type="button" class="mtile" id="mLevel">${ICON.flag}<span>Nivel</span></button>
             <button type="button" class="mtile" id="mSigns">${ICON.book}<span>Semne</span></button>
+            <button type="button" class="mtile" id="mTheory">${ICON.quiz}<span>Chestionare</span></button>
             <button type="button" class="mtile" id="mRestart">${ICON.restart}<span>Restart</span></button>
           </div>
           <div class="row"><span>Mod<small>Learn: explică semnele · Test: examen cu puncte de penalizare</small></span><div class="seg2" data-set="mode"><button type="button" data-v="learn">Learn</button><button type="button" data-v="test">Test</button></div></div>
@@ -974,6 +978,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     go('#mCar', openCars);
     go('#mLevel', openLevels);
     go('#mSigns', () => openLibrary());
+    go('#mTheory', theory.open);
     go('#mDrill', openDrill);
     go('#mHelp', openHelp);
     go('#mRestart', () => restartLevel());
@@ -1021,13 +1026,20 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         <div class="logobox"><img class="logo" src="${logoURL()}" alt="Car.dat" /></div>
         <p>A driving school with 15 levels to learn the Romanian road signs.</p>
         <div class="credit">${pimg('naty', 'sm')}<span>Developed by Naty</span></div>
-        <div class="stack two">
+        <div class="stack three">
           <button type="button" class="btn big" data-go="learn">Learn mode<small>Signs explain themselves</small></button>
           <button type="button" class="btn big ghost" data-go="test">Test mode<small>Penalty points like the exam</small></button>
+          <button type="button" class="btn big ghost" data-theory>Chestionare<small>Examenul teoretic DRPCIV</small></button>
         </div></div></div>`,
       { dismiss: false }
     );
     m.el.addEventListener('click', (e) => {
+      if (e.target.closest('[data-theory]')) {
+        unlock();
+        sfx.tap();
+        theory.open();
+        return;
+      }
       const b = e.target.closest('[data-go]');
       if (!b) return;
       unlock();

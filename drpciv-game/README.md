@@ -18,6 +18,7 @@ Other commands: `npm test` (simulated drivers play every level and compare the f
 | Add or edit a road sign (name, rule, look, Test-mode check) | `src/signs.js` |
 | Build or change a level (roads, signs, pedestrians, traffic, weather) | `src/levels.js` |
 | Change the free-roam training town | `src/map.js` |
+| Add or edit theory exam questions (Chestionare) | `src/questions.js` |
 | Tune game feel, fuel, exam penalty points | `src/config.js` |
 | Driving physics, fuel, gearbox, exam rules | `src/game.js` |
 | How the world, cars, night/rain/fog and minimap are drawn | `src/render.js` |
@@ -43,4 +44,5 @@ Until a photo is found, a coloured circle with the initial is shown.
 
 - The city is stylised. Level names are real Brasov districts, but the maps are not real street layouts.
 - Sign texts, the penalty scale (21 points = failed) and car figures were written from general knowledge and driving-school guides. Check them against the official sources before relying on them for the exam.
+- The Chestionare questions follow the DRPCIV exam format (26 questions, 22 correct to pass, 30 minutes) but are written for the game, not copied from the official question bank.
 - Signs are drawn larger than real so they can be read on a phone.
