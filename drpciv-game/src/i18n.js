@@ -9,9 +9,9 @@
 // whole pieces of text (exact match, after trimming)
 const EXACT = {
   // welcome
-  'Learn mode': 'Mod Învățare',
+  'Learn mode': 'Învățare',
   'Signs explain themselves': 'Semnele se explică singure',
-  'Test mode': 'Mod Test',
+  'Test mode': 'Test',
   'Penalty points like the exam': 'Puncte de penalizare, ca la examen',
   'A driving school with 15 levels to learn the Romanian road signs.': 'O școală de șoferi cu 15 niveluri, ca să înveți indicatoarele din România.',
   'Developed by Naty': 'Realizat de Naty',

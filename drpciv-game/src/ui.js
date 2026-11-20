@@ -1132,6 +1132,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const keys = ['stop', 'giveWay', 'priorityRoad', 'speed50', 'roundabout'];
     const m = openModal(
       `<div class="sheet" role="dialog" aria-label="Welcome"><div class="welcome">
+        <div class="wlang seg2" role="group" aria-label="Language"><button type="button" data-wl="ro">RO</button><button type="button" data-wl="en">EN</button></div>
         <div class="signrow">${keys.map((k) => `<img src="${img(k, 128)}" alt="" />`).join('')}</div>
         <div class="logobox"><img class="logo" src="${logoURL()}" alt="Car.dat" /></div>
         <p>A driving school with 15 levels to learn the Romanian road signs.</p>
@@ -1143,7 +1144,18 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         </div></div></div>`,
       { dismiss: false }
     );
+    const syncWl = () => {
+      for (const b of m.el.querySelectorAll('[data-wl]')) b.classList.toggle('on', b.dataset.wl === lang());
+    };
+    syncWl();
     m.el.addEventListener('click', (e) => {
+      const wl = e.target.closest('[data-wl]');
+      if (wl) {
+        setLang(wl.dataset.wl);
+        syncWl();
+        sfx.tap();
+        return;
+      }
       if (e.target.closest('[data-theory]')) {
         unlock();
         sfx.tap();

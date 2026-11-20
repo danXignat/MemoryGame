@@ -3090,3 +3090,66 @@ p {
     font-size: 18px;
   }
 }
+
+/* ===== full-screen exam and book without position:fixed (iPhone Safari squashed them) ===== */
+.overlay.center .sheet.theory.exam,
+.overlay.center .book {
+  position: relative;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  transform: none;
+  align-self: stretch;
+  justify-self: center;
+  height: auto;
+  max-height: none;
+  min-height: 0;
+  margin: max(8px, env(safe-area-inset-top, 0px)) 0 max(8px, env(safe-area-inset-bottom, 0px));
+}
+.overlay.center .sheet.theory.exam {
+  width: min(calc(100% - 16px), 900px);
+  display: flex;
+  flex-direction: column;
+}
+.overlay.center .book {
+  width: min(calc(100% - 16px), 760px);
+}
+.sheet.theory.exam .thbody {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.welcome {
+  position: relative;
+}
+.wlang {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+}
+.wlang button {
+  min-width: 44px;
+  height: 34px;
+  font-size: 13px;
+}
+.wlang {
+  position: static;
+  justify-self: end;
+  align-self: end;
+  margin: -4px -4px -6px auto;
+}
+@media (orientation: landscape) {
+  .wlang {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 0;
+  }
+  .logo {
+    width: min(30vh, 200px);
+  }
+}
+.overlay.center .sheet:has(.welcome) {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
