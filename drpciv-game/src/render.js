@@ -191,6 +191,7 @@ export function createRenderer(canvas, initialWorld) {
     const blinkOn = state.blink === 1;
 
     drawGrass(R);
+    drawRegions(R, time);
     drawRoads();
     drawIslands();
     drawStations(state);
@@ -213,6 +214,8 @@ export function createRenderer(canvas, initialWorld) {
     drawLamps(R);
     drawPins(R);
     drawSigns(state, R, time);
+    lastCar = state.car;
+    drawGeoLabels(R);
 
     if (weather === 'fog') drawFog(state);
     if (weather === 'night') drawNight(state, sx, sy);
@@ -226,6 +229,231 @@ export function createRenderer(canvas, initialWorld) {
       ctx.beginPath();
       ctx.ellipse(p.x, p.y, p.rx, p.ry, p.a, 0, TAU);
       ctx.fill();
+    }
+  }
+
+  // --------------------------------------------- Brașov: mountains, lake, fields, rail
+  const polyPath = (pts) => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+  };
+  function regionVisible(r, R) {
+    for (const [x, y] of r.pts) if (Math.abs(x - cam.x) < R + 60 && Math.abs(y - cam.y) < R + 60) return true;
+    return Math.abs(r.cx - cam.x) < R + 200 && Math.abs(r.cy - cam.y) < R + 200;
+  }
+  function drawRegions(R, time) {
+    for (const r of world.regions || []) {
+      if (!regionVisible(r, R)) continue;
+      if (r.type === 'mountain' || r.type === 'forest') {
+        polyPath(r.pts);
+        ctx.fillStyle = r.type === 'mountain' ? '#3f6f3a' : '#477a3d';
+        ctx.fill();
+        if (r.type === 'mountain') {
+          // contour lines climbing away from the road
+          ctx.save();
+          polyPath(r.pts);
+          ctx.clip();
+          ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+          ctx.lineWidth = 0.6;
+          const half = Math.floor(r.pts.length / 2);
+          const inner = r.pts.slice(0, half);
+          const outer = r.pts.slice(half).reverse();
+          for (let k = 1; k < 7; k++) {
+            const t = k / 7;
+            ctx.beginPath();
+            inner.forEach((p, i) => {
+              const q = outer[Math.min(i, outer.length - 1)];
+              const x = p[0] + (q[0] - p[0]) * t;
+              const y = p[1] + (q[1] - p[1]) * t;
+              if (i) ctx.lineTo(x, y);
+              else ctx.moveTo(x, y);
+            });
+            ctx.stroke();
+          }
+          ctx.restore();
+          if (r.letters) {
+            // the famous white letters on the slope of Tâmpa
+            ctx.save();
+            ctx.translate(r.lx, r.ly);
+            const horiz = r.side === 'n' || r.side === 's';
+            if (!horiz) ctx.rotate(r.side === 'e' ? -Math.PI / 2 : Math.PI / 2);
+            ctx.font = 'bold 9px Barlow Condensed, Arial Narrow, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.fillText(r.letters, 0.6, 0.8);
+            ctx.fillStyle = '#f4f4ef';
+            ctx.fillText(r.letters, 0, 0);
+            ctx.restore();
+          }
+        }
+        // soft edge of the woods
+        ctx.strokeStyle = 'rgba(30,60,30,0.35)';
+        ctx.lineWidth = 2.5;
+        polyPath(r.pts);
+        ctx.stroke();
+      } else if (r.type === 'lake') {
+        polyPath(r.pts);
+        ctx.fillStyle = '#d8cfa8'; // sandy shore
+        ctx.fill();
+        ctx.save();
+        ctx.translate(r.cx, r.cy);
+        ctx.scale(0.93, 0.9);
+        ctx.translate(-r.cx, -r.cy);
+        polyPath(r.pts);
+        const g = ctx.createRadialGradient(r.cx, r.cy, 5, r.cx, r.cy, 90);
+        g.addColorStop(0, '#2f6fa3');
+        g.addColorStop(1, '#4f95c4');
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.clip();
+        ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+        ctx.lineWidth = 0.3;
+        for (let i = -6; i <= 6; i++) {
+          const y = r.cy + i * 6 + Math.sin(time * 0.8 + i) * 0.8;
+          ctx.beginPath();
+          for (let x = r.cx - 90; x <= r.cx + 90; x += 6) ctx.lineTo(x, y + Math.sin(x * 0.3 + time + i) * 0.5);
+          ctx.stroke();
+        }
+        ctx.restore();
+        // a little pier with boats
+        ctx.fillStyle = '#8a6a4a';
+        ctx.fillRect(r.cx - 1, r.cy - 26, 2, 14);
+        ctx.fillStyle = '#e8e2d6';
+        ctx.beginPath();
+        ctx.ellipse(r.cx + 3.5, r.cy - 16, 2.2, 0.9, 0.2, 0, TAU);
+        ctx.ellipse(r.cx - 3.5, r.cy - 19, 2.2, 0.9, -0.2, 0, TAU);
+        ctx.fill();
+      } else if (r.type === 'field') {
+        polyPath(r.pts);
+        ctx.fillStyle = r.crop != null && r.crop < 0.5 ? '#c7b25c' : '#8fae4f';
+        ctx.fill();
+        ctx.save();
+        polyPath(r.pts);
+        ctx.clip();
+        ctx.strokeStyle = 'rgba(80,60,20,0.18)';
+        ctx.lineWidth = 0.35;
+        const ang = r.ang ?? 0.3;
+        const cs = Math.cos(ang);
+        const sn = Math.sin(ang);
+        ctx.beginPath();
+        for (let k = -60; k <= 60; k += 1.6) {
+          ctx.moveTo(r.cx - cs * 120 - sn * k, r.cy - sn * 120 + cs * k);
+          ctx.lineTo(r.cx + cs * 120 - sn * k, r.cy + sn * 120 + cs * k);
+        }
+        ctx.stroke();
+        ctx.restore();
+      } else if (r.type === 'park') {
+        polyPath(r.pts);
+        ctx.fillStyle = '#6fb15c';
+        ctx.fill();
+        ctx.strokeStyle = '#d9cfb3'; // gravel paths
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.ellipse(r.cx, r.cy, 18, 11, 0.3, 0, TAU);
+        ctx.moveTo(r.cx - 30, r.cy);
+        ctx.lineTo(r.cx + 30, r.cy);
+        ctx.stroke();
+      } else if (r.type === 'rail') {
+        polyPath(r.pts);
+        ctx.fillStyle = '#8b8378'; // ballast
+        ctx.fill();
+      }
+    }
+    // tracks: sleepers and two steel rails each, plus a few wagons
+    for (const l of world.railLines || []) {
+      const dx = l.b[0] - l.a[0];
+      const dy = l.b[1] - l.a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ux = dx / len;
+      const uy = dy / len;
+      const nx = -uy;
+      const ny = ux;
+      ctx.strokeStyle = '#5a4634';
+      ctx.lineWidth = 0.35;
+      ctx.beginPath();
+      for (let d = 0; d < len; d += 0.9) {
+        const x = l.a[0] + ux * d;
+        const y = l.a[1] + uy * d;
+        if (Math.abs(x - cam.x) > R + 5 || Math.abs(y - cam.y) > R + 5) continue;
+        ctx.moveTo(x + nx * 1.3, y + ny * 1.3);
+        ctx.lineTo(x - nx * 1.3, y - ny * 1.3);
+      }
+      ctx.stroke();
+      ctx.strokeStyle = '#c9ccd1';
+      ctx.lineWidth = 0.14;
+      ctx.beginPath();
+      for (const o of [-0.72, 0.72]) {
+        ctx.moveTo(l.a[0] + nx * o, l.a[1] + ny * o);
+        ctx.lineTo(l.b[0] + nx * o, l.b[1] + ny * o);
+      }
+      ctx.stroke();
+    }
+    const rl = world.railLines || [];
+    for (let i = 1; i < rl.length; i += 2) {
+      const l = rl[i];
+      const dx = l.b[0] - l.a[0];
+      const dy = l.b[1] - l.a[1];
+      const len = Math.hypot(dx, dy) || 1;
+      const ang = Math.atan2(dy, dx);
+      for (let k = 0; k < 9; k++) {
+        const d = len * 0.25 + k * 14.5;
+        const x = l.a[0] + (dx / len) * d;
+        const y = l.a[1] + (dy / len) * d;
+        if (Math.abs(x - cam.x) > R + 10 || Math.abs(y - cam.y) > R + 10) continue;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(ang);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(-6.5 + 0.4, -1.5 + 0.5, 13, 3);
+        ctx.fillStyle = ['#7a3b2e', '#3f5a73', '#6b6f44'][(i + k) % 3];
+        ctx.fillRect(-6.5, -1.5, 13, 3);
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(-6.3, -1.3, 12.6, 0.6);
+        ctx.restore();
+      }
+    }
+  }
+
+  let lastCar = null;
+  // names of places, readable whichever way the camera turns
+  function drawGeoLabels(R) {
+    const L = world.geoLabels || [];
+    const car = lastCar;
+    for (const g of L) {
+      let x = g.x;
+      let y = g.y;
+      if (car && g.line) {
+        // follow the car along the edge of the mountain / forest / field
+        const v = Math.max(g.line.min, Math.min(g.line.max, g.line.horiz ? car.x : car.y));
+        x = g.line.horiz ? v : g.line.at;
+        y = g.line.horiz ? g.line.at : v;
+      } else if (car && g.rect) {
+        const cs = Math.cos(g.rect.angle);
+        const sn = Math.sin(g.rect.angle);
+        const u = Math.max(-g.rect.w / 2 + 5, Math.min(g.rect.w / 2 - 5, (car.x - g.rect.x) * cs + (car.y - g.rect.y) * sn));
+        x = g.rect.x + cs * u;
+        y = g.rect.y + sn * u;
+      }
+      if (Math.abs(x - cam.x) > R + 10 || Math.abs(y - cam.y) > R + 10) continue;
+      const big = g.kind !== 'landmark';
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(-cam.angle);
+      ctx.scale(1 / cam.scale, 1 / cam.scale);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `${big ? 800 : 700} ${big ? 15 : 12}px Inter, system-ui, sans-serif`;
+      const text = big ? g.text.toUpperCase() : g.text;
+      ctx.lineWidth = 4;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(10,20,15,0.6)';
+      ctx.strokeText(text, 0, big ? 0 : -18);
+      ctx.fillStyle = big ? 'rgba(255,255,255,0.88)' : '#fff6d6';
+      ctx.fillText(text, 0, big ? 0 : -18);
+      ctx.restore();
     }
   }
 
@@ -396,7 +624,7 @@ export function createRenderer(canvas, initialWorld) {
       ctx.translate(h.x, h.y);
       ctx.rotate(h.angle || 0);
       // ground under every building: soft contact shade (the walls and roofs come later, in 3D)
-      const hgt = h.kind === 'block' ? (h.floors || 6) * 3 : 5;
+      const hgt = h.height ?? (h.kind === 'block' ? (h.floors || 6) * 3 : 5);
       if (h.kind !== 'block' && h.garden) {
         ctx.fillStyle = 'rgba(140,200,100,0.35)';
         ctx.fillRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
@@ -473,12 +701,12 @@ export function createRenderer(canvas, initialWorld) {
     for (const h of list) {
       const block = h.kind === 'block';
       const floors = h.floors || 6;
-      const wallH = block ? floors * 3 : 3.2;
+      const wallH = h.height ?? (block ? floors * 3 : 3.2);
       const cs = Math.cos(h.angle || 0);
       const sn = Math.sin(h.angle || 0);
       const base = [[-h.w / 2, -h.h / 2], [h.w / 2, -h.h / 2], [h.w / 2, h.h / 2], [-h.w / 2, h.h / 2]].map(([u, v]) => [h.x + u * cs - v * sn, h.y + u * sn + v * cs]);
       const top = base.map((p) => up(p[0], p[1], wallH));
-      const wallCol = block ? '#d9d4c8' : '#efe6d2';
+      const wallCol = h.wall || (block ? '#d9d4c8' : '#efe6d2');
       // walls that face the viewer
       for (let i = 0; i < 4; i++) {
         const a = base[i];
@@ -496,8 +724,9 @@ export function createRenderer(canvas, initialWorld) {
         quad(a, b, top[(i + 1) % 4], top[i]);
         ctx.fill();
         // windows
-        const cols = Math.max(1, Math.floor(len / (block ? 3 : 2.6)));
-        const rows = block ? floors : 1;
+        const tall = h.kind === 'tower';
+        const cols = tall ? 1 : Math.max(1, Math.floor(len / (block ? 3 : h.kind === 'factory' ? 4 : 2.6)));
+        const rows = block ? floors : tall ? Math.max(2, Math.round(wallH / 7)) : Math.max(1, Math.round(wallH / 3));
         ctx.fillStyle = block ? 'rgba(40,60,80,0.75)' : 'rgba(50,70,90,0.7)';
         ctx.beginPath();
         for (let r = 0; r < rows; r++) {
@@ -534,7 +763,52 @@ export function createRenderer(canvas, initialWorld) {
         }
       }
       // roof
-      if (block) {
+      if (h.kind === 'factory') {
+        ctx.fillStyle = shadeColor(h.roof, -0.1);
+        quad(top[0], top[1], top[2], top[3]);
+        ctx.fill();
+        // saw-tooth north lights across the hall
+        const n = Math.max(3, Math.round(h.w / 5));
+        for (let k = 0; k < n; k++) {
+          const t0 = k / n;
+          const t1 = (k + 0.45) / n;
+          const a0 = lerp2(top[0], top[1], t0);
+          const a1 = lerp2(top[0], top[1], t1);
+          const b0 = lerp2(top[3], top[2], t0);
+          const b1 = lerp2(top[3], top[2], t1);
+          ctx.fillStyle = 'rgba(180,205,220,0.75)';
+          quad(a0, a1, b1, b0);
+          ctx.fill();
+          ctx.fillStyle = 'rgba(0,0,0,0.12)';
+          const c1 = lerp2(top[0], top[1], (k + 0.95) / n);
+          const d1 = lerp2(top[3], top[2], (k + 0.95) / n);
+          quad(a1, c1, d1, b1);
+          ctx.fill();
+        }
+      } else if (h.kind === 'tower') {
+        const apex = up(h.x, h.y, wallH + Math.max(h.w, h.h) * 2.2);
+        for (let i = 0; i < 4; i++) {
+          const a = top[i];
+          const b = top[(i + 1) % 4];
+          const nx = (b[1] - a[1]);
+          const ny = -(b[0] - a[0]);
+          const ln = Math.hypot(nx, ny) || 1;
+          ctx.fillStyle = shadeColor(h.roof, wallShade(nx / ln, ny / ln) * 0.3);
+          ctx.beginPath();
+          ctx.moveTo(a[0], a[1]);
+          ctx.lineTo(b[0], b[1]);
+          ctx.lineTo(apex[0], apex[1]);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.strokeStyle = '#d4af37'; // a gilded cross / weathervane
+        ctx.lineWidth = 0.15;
+        const tip = up(h.x, h.y, wallH + Math.max(h.w, h.h) * 2.2 + 2);
+        ctx.beginPath();
+        ctx.moveTo(apex[0], apex[1]);
+        ctx.lineTo(tip[0], tip[1]);
+        ctx.stroke();
+      } else if (block) {
         ctx.fillStyle = shadeColor(h.roof, -0.22);
         quad(top[0], top[1], top[2], top[3]);
         ctx.fill();
@@ -572,8 +846,9 @@ export function createRenderer(canvas, initialWorld) {
         const c1 = loc(hw + eave, -hh - eave, wallH);
         const c2 = loc(hw + eave, hh + eave, wallH);
         const c3 = loc(-hw - eave, hh + eave, wallH);
-        const r0 = loc(-ridge, 0, wallH + 2.6);
-        const r1 = loc(ridge, 0, wallH + 2.6);
+        const roofH = h.kind === 'church' ? h.h * 0.65 : 2.6;
+        const r0 = loc(-ridge, 0, wallH + roofH);
+        const r1 = loc(ridge, 0, wallH + roofH);
         const face = (pts, f) => {
           ctx.fillStyle = shadeColor(h.roof, f);
           ctx.beginPath();
@@ -614,7 +889,25 @@ export function createRenderer(canvas, initialWorld) {
         ctx.lineTo(ch1[0], ch1[1]);
         ctx.stroke();
       }
+      roofSign(h, wallH);
     }
+  }
+
+  function roofSign(h, wallH) {
+    if (!h.sign) return;
+    const c = up(h.x, h.y, wallH + 0.6);
+    ctx.save();
+    ctx.translate(c[0], c[1]);
+    ctx.rotate(h.angle || 0);
+    const size = Math.min(h.h * 0.32, 4.5);
+    ctx.font = `800 ${size}px Inter, Arial, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillText(h.sign, 0.25, 0.3);
+    ctx.fillStyle = h.sign === 'DRPCIV' ? '#1d4ed8' : h.sign === 'CORESI' ? '#c2185b' : '#7a2e1d';
+    ctx.fillText(h.sign, 0, 0);
+    ctx.restore();
   }
 
   function drawLamps(R) {

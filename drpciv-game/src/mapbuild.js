@@ -685,16 +685,231 @@ export function buildWorld(MAP) {
     return out;
   };
   const fits = (x, y, w, h, ang, roadPad) => {
-    if (rectPoints(x, y, w, h, ang).some(([px, py]) => queryRoad(px, py).dist < half + roadPad || nearRing(px, py, 5) || blocked(px, py, 3))) return false;
+    if (rectPoints(x, y, w, h, ang).some(([px, py]) => queryRoad(px, py).dist < half + roadPad || nearRing(px, py, 5) || blocked(px, py, 3) || (typeof solidRegion === 'function' && solidRegion(px, py)))) return false;
     const rr = Math.hypot(w, h) / 2;
     if (houses.some((o) => Math.hypot(o.x - x, o.y - y) < (rr + Math.hypot(o.w, o.h) / 2) * 0.82)) return false;
     return true;
   };
 
+  // ------------------------------------------------- Brașov geography of the district
+  //  MAP.geo = { regions: [{ type, side, depth, name, letters }], rail: { side, name },
+  //              landmarks: [{ kind, name, at (0..1 along the route), side (1 right / -1 left) }] }
+  //  Regions sit just outside the area the route covers, on one side (n / s / e / w),
+  //  so the road never runs through a lake or a mountain.
+  const geo = MAP.geo || {};
+  const regions = [];
+  const geoLabels = [];
+  const railLines = [];
+  const pointInPoly = (x, y, pts) => {
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const [xi, yi] = pts[i];
+      const [xj, yj] = pts[j];
+      if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi || 1e-9) + xi) inside = !inside;
+    }
+    return inside;
+  };
+  const sideBand = (side, gap, depth, wobble, span = 1) => {
+    // a band along one side of the route area with a wavy inner edge
+    const pts = [];
+    const n = 28;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const hw = ((maxX - minX) / 2 + 60) * span;
+    const hh = ((maxY - minY) / 2 + 60) * span;
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const wv = Math.sin(t * 9.1 + gap) * wobble + Math.sin(t * 23.7) * wobble * 0.4;
+      if (side === 's') pts.push([cx - hw + 2 * hw * t, maxY + gap + wv]);
+      if (side === 'n') pts.push([cx - hw + 2 * hw * t, minY - gap - wv]);
+      if (side === 'e') pts.push([maxX + gap + wv, cy - hh + 2 * hh * t]);
+      if (side === 'w') pts.push([minX - gap - wv, cy - hh + 2 * hh * t]);
+    }
+    const outer = pts.slice().reverse().map(([x, y]) => (side === 's' ? [x, y + depth] : side === 'n' ? [x, y - depth] : side === 'e' ? [x + depth, y] : [x - depth, y]));
+    return [...pts, ...outer];
+  };
+  // a blob region (lake, park) beside the route
+  const blob = (x, y, rx, ry, seed) => {
+    const pts = [];
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2;
+      const k = 1 + Math.sin(a * 3 + seed) * 0.12 + Math.sin(a * 5 + seed * 2) * 0.07;
+      pts.push([x + Math.cos(a) * rx * k, y + Math.sin(a) * ry * k]);
+    }
+    return pts;
+  };
+  const sideCenter = (side, gap) => {
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    return side === 's' ? [cx, maxY + gap] : side === 'n' ? [cx, minY - gap] : side === 'e' ? [maxX + gap, cy] : [minX - gap, cy];
+  };
+  for (const r of geo.regions || []) {
+    const gap = r.gap ?? 16;
+    const depth = r.depth ?? 70;
+    let pts;
+    if (r.type === 'lake' || r.type === 'park') {
+      // right beside the route, where it comes closest to that side, without touching any road
+      const dir = { s: [0, 1], n: [0, -1], e: [1, 0], w: [-1, 0] }[r.side] || [0, 1];
+      let bestK = 0;
+      let bestV = -Infinity;
+      for (let k = 0; k <= N; k += 4) {
+        const v = X[k] * dir[0] + Y[k] * dir[1];
+        if (v > bestV) (bestV = v), (bestK = k);
+      }
+      let rx = r.rx ?? 70;
+      let ry = r.ry ?? 35;
+      for (let tries = 0; tries < 8; tries++) {
+        const cx = X[bestK] + dir[0] * (half + 12 + (dir[1] ? ry : rx));
+        const cy = Y[bestK] + dir[1] * (half + 12 + (dir[1] ? ry : rx));
+        pts = blob(cx, cy, rx, ry, regions.length + 1);
+        if (pts.every(([x, y]) => queryRoad(x, y).dist > half + 5)) break;
+        rx *= 0.85;
+        ry *= 0.85;
+      }
+    } else pts = sideBand(r.side, gap, depth, r.type === 'mountain' ? 6 : 3, r.span ?? 1);
+    const reg = { type: r.type, pts, name: r.name || null, letters: r.letters || null, side: r.side };
+    let sx = 0;
+    let sy = 0;
+    for (const [x, y] of pts) (sx += x), (sy += y);
+    reg.cx = sx / pts.length;
+    reg.cy = sy / pts.length;
+    // the label sits on the part closest to the road, where you can see it
+    const [lx, ly] = r.type === 'lake' || r.type === 'park' ? [reg.cx, reg.cy] : sideCenter(r.side, gap + 22);
+    reg.lx = lx;
+    reg.ly = ly;
+    regions.push(reg);
+    if (reg.name) {
+      const lab = { x: lx, y: ly, text: reg.name, kind: r.type };
+      if (r.type !== 'lake' && r.type !== 'park') {
+        const horiz = r.side === 'n' || r.side === 's';
+        const inner = r.side === 's' ? maxY + gap + 16 : r.side === 'n' ? minY - gap - 16 : r.side === 'e' ? maxX + gap + 16 : minX - gap - 16;
+        lab.line = { horiz, at: inner, min: horiz ? minX - 40 : minY - 40, max: horiz ? maxX + 40 : maxY + 40 };
+      }
+      geoLabels.push(lab);
+    }
+  }
+  if (geo.rail) {
+    const side = geo.rail.side;
+    const gap = geo.rail.gap ?? 22;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    const horiz = side === 'n' || side === 's';
+    const len = horiz ? maxX - minX + 160 : maxY - minY + 160;
+    for (let k = 0; k < (geo.rail.tracks ?? 3); k++) {
+      const off = gap + k * 4.5;
+      const a = horiz ? [cx - len / 2, side === 's' ? maxY + off : minY - off] : [side === 'e' ? maxX + off : minX - off, cy - len / 2];
+      const b = horiz ? [cx + len / 2, a[1]] : [a[0], cy + len / 2];
+      railLines.push({ a, b });
+    }
+    const first = railLines[0];
+    const last = railLines[railLines.length - 1];
+    const pad = 3;
+    const ballast = horiz
+      ? [[first.a[0], first.a[1] - pad * Math.sign(last.a[1] - first.a[1] || 1)], [first.b[0], first.b[1] - pad * Math.sign(last.a[1] - first.a[1] || 1)], [last.b[0], last.b[1] + pad * Math.sign(last.a[1] - first.a[1] || 1)], [last.a[0], last.a[1] + pad * Math.sign(last.a[1] - first.a[1] || 1)]]
+      : [[first.a[0] - pad * Math.sign(last.a[0] - first.a[0] || 1), first.a[1]], [first.b[0] - pad * Math.sign(last.a[0] - first.a[0] || 1), first.b[1]], [last.b[0] + pad * Math.sign(last.a[0] - first.a[0] || 1), last.b[1]], [last.a[0] + pad * Math.sign(last.a[0] - first.a[0] || 1), last.a[1]]];
+    regions.push({ type: 'rail', pts: ballast, cx: (first.a[0] + last.b[0]) / 2, cy: (first.a[1] + last.b[1]) / 2 });
+    if (geo.rail.name) {
+      const [lx, ly] = sideCenter(side, gap - 6);
+      geoLabels.push({ x: lx, y: ly, text: geo.rail.name, kind: 'rail' });
+    }
+  }
+  const inRegion = (x, y, types) => regions.some((r) => (!types || types.includes(r.type)) && pointInPoly(x, y, r.pts));
+  const solidRegion = (x, y) => inRegion(x, y, ['lake', 'rail', 'mountain', 'forest', 'field', 'plaza', 'park']);
+
+  // landmarks: special buildings placed beside the route
+  const LANDMARK = {
+    blackchurch: { w: 44, h: 20, kind: 'church', wall: '#6b625a', roof: '#3d3a37', height: 16, tower: { w: 9, h: 9, height: 42, at: -0.5 }, label: 'Biserica Neagră' },
+    church: { w: 20, h: 10, kind: 'church', wall: '#f1ebe0', roof: '#5a5f66', height: 8, tower: { w: 5, h: 5, height: 24, at: -0.5 } },
+    townhall: { w: 22, h: 14, kind: 'house', wall: '#efc76a', roof: '#a8483a', height: 9, tower: { w: 5, h: 5, height: 26, at: 0 } },
+    mall: { w: 70, h: 34, kind: 'block', wall: '#dfe4ea', roof: '#b7bec7', floors: 3, sign: 'CORESI' },
+    factory: { w: 56, h: 30, kind: 'factory', wall: '#c9c2b4', roof: '#9aa0a6', height: 10 },
+    station: { w: 60, h: 14, kind: 'block', wall: '#e9dfc9', roof: '#8c5a4a', floors: 2, sign: 'GARA BRAȘOV' },
+    drpciv: { w: 34, h: 18, kind: 'block', wall: '#e3e7ec', roof: '#7f8790', floors: 3, sign: 'DRPCIV' },
+    school: { w: 26, h: 12, kind: 'house', wall: '#e7dcc3', roof: '#7a4a3a', height: 8, tower: { w: 4, h: 4, height: 18, at: 0.4 } },
+  };
+  const landmarkAt = (lm) => {
+    const spec = { ...LANDMARK[lm.kind] };
+    if (!spec.w) return;
+    // try spots near the wished place, both sides if needed
+    for (let tries = 0; tries < 40; tries++) {
+      const f = Math.min(0.95, Math.max(0.05, (lm.at ?? 0.5) + (tries % 2 ? 1 : -1) * Math.ceil(tries / 2) * 0.025));
+      const side = tries > 20 ? -(lm.side ?? 1) : lm.side ?? 1;
+      const p = routeAt(length * f, {});
+      const ang = Math.atan2(p.dy, p.dx);
+      const nx = -p.dy * side;
+      const ny = p.dx * side;
+      const off = half + 9 + spec.h / 2;
+      const x = p.x + nx * off;
+      const y = p.y + ny * off;
+      if (!fits(x, y, spec.w + 2, spec.h + 2, ang, 5)) continue;
+      const h = { x, y, w: spec.w, h: spec.h, angle: ang, kind: spec.kind, roof: spec.roof, wall: spec.wall, height: spec.height, floors: spec.floors, sign: spec.sign || null, landmark: true };
+      houses.push(h);
+      if (spec.tower) {
+        const t = spec.tower;
+        const u = (t.at * spec.w) / 2;
+        houses.push({ x: x + Math.cos(ang) * u, y: y + Math.sin(ang) * u, w: t.w, h: t.h, angle: ang, kind: 'tower', roof: spec.roof, wall: spec.wall, height: t.height, landmark: true });
+      }
+      // the label slides along the side of the building that faces the road
+      geoLabels.push({ x, y, text: lm.name || spec.label || '', kind: 'landmark', rect: { x: x - nx * (spec.h / 2 - 1), y: y - ny * (spec.h / 2 - 1), w: spec.w, angle: ang } });
+      return;
+    }
+  };
+  for (const lm of geo.landmarks || []) landmarkAt(lm);
+
   // buildings along both sides of the route
   const tmpP = {};
+  const facades = ['#e8c27a', '#d98e73', '#9fc5a8', '#e6d3a3', '#c9a0c9', '#f0e2c0', '#b8d0e0', '#e5a96b'];
   const placeAlong = (sv, side) => {
     const st = styleAt(sv);
+    if (st === 'forest') return 0;
+    if (st === 'oldtown') {
+      // old centre: two- and three-storey houses wall to wall, right on the pavement
+      const p = routeAt(sv, tmpP);
+      const ang = Math.atan2(p.dy, p.dx);
+      const nx = -p.dy * side;
+      const ny = p.dx * side;
+      const w = 7 + rnd() * 4;
+      const h = 9 + rnd() * 3;
+      const off = half + 2.8 + h / 2;
+      const x = p.x + nx * off;
+      const y = p.y + ny * off;
+      if (!fits(x, y, w, h, ang, 2.3)) return 0;
+      houses.push({ x, y, w, h, angle: ang, kind: 'house', roof: ['#b5543c', '#a8483a', '#c26a4a', '#9c4434'][Math.floor(rnd() * 4)], wall: facades[Math.floor(rnd() * facades.length)], height: 6 + Math.floor(rnd() * 3) * 2.6 });
+      return w - 0.2;
+    }
+    if (st === 'industrial') {
+      const p = routeAt(sv, tmpP);
+      const ang = Math.atan2(p.dy, p.dx);
+      const nx = -p.dy * side;
+      const ny = p.dx * side;
+      const w = 34 + rnd() * 18;
+      const h = 20 + rnd() * 8;
+      const off = half + 12 + h / 2;
+      const x = p.x + nx * off;
+      const y = p.y + ny * off;
+      if (!fits(x, y, w, h, ang, 6)) return 0;
+      houses.push({ x, y, w, h, angle: ang, kind: 'factory', roof: '#9aa0a6', wall: '#c9c2b4', height: 8 + rnd() * 3 });
+      return w + 4;
+    }
+    if (st === 'village') {
+      // village houses close to the street, long gardens and a strip of field behind
+      const p = routeAt(sv, tmpP);
+      const ang = Math.atan2(p.dy, p.dx);
+      const nx = -p.dy * side;
+      const ny = p.dx * side;
+      const w = 9 + rnd() * 3;
+      const h = 7 + rnd() * 2;
+      const off = half + 6 + h / 2;
+      const x = p.x + nx * off;
+      const y = p.y + ny * off;
+      if (!fits(x, y, w + 4, h + 4, ang, 3)) return 0;
+      houses.push({ x, y, w, h, angle: ang, kind: 'house', roof: roofs[Math.floor(rnd() * roofs.length)], wall: ['#f3ead6', '#e9dcc0', '#dbe6d0', '#f1e1c6'][Math.floor(rnd() * 4)], garden: true });
+      const fx = x + nx * (h / 2 + 16);
+      const fy = y + ny * (h / 2 + 16);
+      const fpts = rectPoints(fx, fy, w + 4, 24, ang).slice(1, 5);
+      if (fpts.every(([px, py]) => queryRoad(px, py).dist > half + 4)) regions.push({ type: 'field', pts: [fpts[0], fpts[1], fpts[3], fpts[2]], cx: fx, cy: fy, ang, crop: rnd() });
+      return w + 6;
+    }
     const city = st === 'city' || (st === 'mixed' && rnd() < 0.45);
     const p = routeAt(sv, tmpP);
     const ang = Math.atan2(p.dy, p.dx);
@@ -768,7 +983,26 @@ export function buildWorld(MAP) {
 
   // trees and bushes fill the rest (more where there is room)
   const free = (x, y, r) =>
-    !(queryRoad(x, y).dist < half + r + 2.2 || blocked(x, y, r) || houses.some((o) => inRect(o, x, y, r + (o.garden ? 2.5 : 1.2))) || lots.some((o) => inRect(o, x, y, r + 0.5)));
+    !(queryRoad(x, y).dist < half + r + 2.2 || blocked(x, y, r) || solidRegion(x, y) || houses.some((o) => inRect(o, x, y, r + (o.garden ? 2.5 : 1.2))) || lots.some((o) => inRect(o, x, y, r + 0.5)));
+  // forests and mountains are full of trees; lakes, rails, squares and fields have none
+  for (const r of regions) {
+    if (r.type !== 'forest' && r.type !== 'mountain' && r.type !== 'park') continue;
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    for (const [x, y] of r.pts) (x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y));
+    const step = r.type === 'park' ? 11 : 6.5;
+    for (let y = y0; y < y1; y += step)
+      for (let x = x0; x < x1; x += step) {
+        const tx = x + rnd() * step * 0.8;
+        const ty = y + rnd() * step * 0.8;
+        if (!pointInPoly(tx, ty, r.pts)) continue;
+        if (queryRoad(tx, ty).dist < half + 5) continue;
+        if (r.letters && Math.hypot(tx - r.lx, ty - r.ly) < 26) continue; // keep the BRAȘOV letters visible
+        trees.push({ x: tx, y: ty, r: 2.2 + rnd() * 1.6, shade: r.type === 'mountain' ? 0.5 + rnd() * 0.5 : rnd() });
+      }
+  }
   const area = (bx1 - bx0) * (by1 - by0);
   const treeMax = Math.min(900, Math.round(area / 260));
   for (let attempt = 0; attempt < treeMax * 6 && trees.length < treeMax; attempt++) {
@@ -791,6 +1025,9 @@ export function buildWorld(MAP) {
   }
 
   return {
+    regions,
+    geoLabels,
+    railLines,
     roadWidth: MAP.roadWidth,
     half,
     warnings,

@@ -44,7 +44,7 @@ Until a photo is found, a coloured circle with the initial is shown.
 
 ## Notes
 
-- The city is stylised. Level names are real Brasov districts, but the maps are not real street layouts.
+- The street layouts are stylised. The scenery follows each Brașov district: Tâmpa with the BRAȘOV letters by the old centre, Biserica Neagră and Casa Sfatului, Lacul Noua, the railway at Triaj and Gara Brașov, Coresi and the Tractorul and Rulmentul factories, the forest road to Poiana Brașov, the village and fields of Sânpetru. Edit them in `GEO` at the end of `src/levels.js`.
 - Sign texts, the penalty scale (21 points = failed) and car figures were written from general knowledge and driving-school guides. Check them against the official sources before relying on them for the exam.
 - The Chestionare questions follow the DRPCIV exam format (26 questions, 22 correct to pass, 30 minutes) but are written for the game, not copied from the official question bank.
 - Signs are drawn larger than real so they can be read on a phone.

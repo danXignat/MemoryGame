@@ -487,6 +487,44 @@ export const LEVELS = [
   { id: 'boss', tip: T('Ia-o pe Alisia de la Livada Poștei și condu-o acasă fără griji.', 'Pick up Alisia at Livada Poștei and drive her home, calmly.'), n: 16, district: 'Livada Poștei → Sânpetru', title: T('Final Boss: acasă', 'Final Boss: drive her home'), goal: T('Ia-o pe Alisia de la Livada Poștei și du-o acasă în Sânpetru.', 'Pick up Alisia at Livada Poștei and drive her home to Sânpetru.'), weather: 'day', playable: true, build: boss, fuel: 0.5, boss: true },
 ];
 
+// ------------------------------------------------------------ Brașov geography
+//  What each district really looks like: mountains, forests, the lake, the railway,
+//  famous buildings and the kind of houses. It only changes the scenery, never the
+//  roads or the exam checks. Sides: n / s / e / w of the area the route covers.
+const GEO = {
+  L1: { decor: { style: 'suburb' }, geo: { regions: [{ type: 'forest', side: 'e', depth: 80, name: 'Dealul Cetății' }], landmarks: [{ kind: 'church', name: 'Biserica Sf. Bartolomeu', at: 0.35, side: -1 }] } },
+  L2: { decor: { style: 'city' }, geo: { landmarks: [{ kind: 'mall', name: 'Coresi Shopping Resort', at: 0.45, side: 1 }, { kind: 'factory', name: 'Fosta uzină Tractorul', at: 0.8, side: -1 }] } },
+  L3: { decor: { style: 'city' }, geo: { regions: [{ type: 'park', side: 'w', rx: 45, ry: 30, name: 'Parc' }] } },
+  L4: { decor: { style: 'city' }, geo: { rail: { side: 'n', name: 'Calea ferată · Triaj', tracks: 4 }, landmarks: [{ kind: 'station', name: 'Gara Brașov', at: 0.4, side: 1 }] } },
+  L5: { decor: { style: 'mixed' }, geo: { regions: [{ type: 'mountain', side: 's', depth: 110, name: 'Masivul Postăvarul' }, { type: 'forest', side: 'e', depth: 70, name: 'Pădurea Tâmpa' }] } },
+  L6: { decor: { style: 'city' }, geo: { regions: [{ type: 'mountain', side: 's', gap: 40, depth: 120, name: 'Munții din sud' }] } },
+  L7: { decor: { style: 'industrial' }, geo: { regions: [{ type: 'field', side: 'n', depth: 90, name: 'Câmpurile Stupini' }], landmarks: [{ kind: 'factory', name: 'Rulmentul', at: 0.3, side: 1 }] } },
+  L8: { decor: { style: 'oldtown' }, geo: { regions: [{ type: 'mountain', side: 'e', depth: 130, name: 'Muntele Tâmpa', letters: 'BRAȘOV' }], landmarks: [{ kind: 'blackchurch', name: 'Biserica Neagră', at: 0.3, side: 1 }, { kind: 'townhall', name: 'Casa Sfatului · Piața Sfatului', at: 0.62, side: -1 }] } },
+  L9: { decor: { style: 'city' }, geo: { regions: [{ type: 'mountain', side: 's', gap: 30, depth: 110, name: 'Tâmpa' }] } },
+  L10: { decor: { style: 'city' }, geo: { regions: [{ type: 'lake', side: 's', rx: 80, ry: 38, name: 'Lacul Noua' }, { type: 'forest', side: 'e', depth: 80, name: 'Pădurea Noua' }] } },
+  L11: { decor: { style: 'city' }, geo: { regions: [{ type: 'mountain', side: 's', gap: 45, depth: 120, name: 'Postăvarul' }] } },
+  L12: {
+    decor: { style: 'forest', zones: [['a', 'oldtown']] },
+    geo: { regions: [{ type: 'mountain', side: 'n', depth: 110, name: 'Muntele Postăvarul' }, { type: 'forest', side: 's', depth: 90, name: 'Drumul spre Poiana Brașov' }], landmarks: [{ kind: 'school', name: 'Prima Școală Românească · Schei', at: 0.08, side: 1 }] },
+  },
+  L13: { decor: { style: 'mixed' }, geo: { regions: [{ type: 'mountain', side: 's', gap: 35, depth: 120, name: 'Tâmpa' }] } },
+  L14: { decor: { style: 'city' }, geo: { landmarks: [{ kind: 'drpciv', name: 'DRPCIV Brașov · examen', at: 0.08, side: 1 }] } },
+  L15: { decor: { style: 'city' }, geo: { landmarks: [{ kind: 'drpciv', name: 'DRPCIV Brașov · examen', at: 0.08, side: 1 }], regions: [{ type: 'mountain', side: 's', gap: 40, depth: 120, name: 'Tâmpa' }] } },
+  boss: {
+    decor: { style: 'city', zones: [['e', 'village'], ['f', 'village'], ['g', 'village']] },
+    geo: { regions: [{ type: 'park', side: 'w', rx: 40, ry: 30, name: 'Livada Poștei' }, { type: 'forest', side: 'n', depth: 90, name: 'Dealul Lempeș' }], landmarks: [{ kind: 'church', name: 'Biserica din Sânpetru', at: 0.88, side: -1 }] },
+  },
+};
+for (const l of LEVELS) {
+  const g = GEO[l.id];
+  if (!g || !l.build) continue;
+  const orig = l.build;
+  l.build = () => {
+    const m = orig();
+    return { ...m, decor: { ...(m.decor || {}), ...g.decor }, geo: g.geo };
+  };
+}
+
 const cache = {};
 export function getLevel(id) {
   return LEVELS.find((l) => l.id === id) || LEVELS[1];
