@@ -72,3 +72,6 @@ export const portraitURL = (id) => urls[id] || '';
 export const portraitImage = (id) => images[id] || null;
 /** Markup for a round portrait. */
 export const pimg = (id, cls = '') => `<img class="pf ${cls}" data-portrait="${id}" src="${portraitURL(id)}" alt="${PEOPLE[id].name}" />`;
+
+/** The Car.dat logo (public/assets/logo.jpg, or embedded in the single-page build). */
+export const logoURL = () => (window.__ASSETS && window.__ASSETS.logo) || './assets/logo.jpg';

@@ -1835,3 +1835,25 @@ p {
 #nav {
   max-width: 36vw;
 }
+
+/* ---- Car.dat logo on the welcome screen ---- */
+.logobox {
+  background: #000;
+  border-radius: 16px;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+  justify-self: center;
+}
+.logo {
+  display: block;
+  width: min(34vh, 220px);
+  height: auto;
+  border-radius: 12px;
+}
+.welcome {
+  gap: 10px;
+}
+.welcome .signrow {
+  display: none;
+}

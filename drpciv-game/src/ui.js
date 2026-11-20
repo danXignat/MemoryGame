@@ -12,7 +12,7 @@ import { CARS, CAR_ORDER } from './cars.js';
 import { LEVELS } from './levels.js';
 import { sfx, vibrate, unlock, setEnabled as setSoundEnabled } from './audio.js';
 import { addMistake, forgiveMistake, topMistakes } from './storage.js';
-import { PEOPLE, pimg } from './portraits.js';
+import { PEOPLE, pimg, logoURL } from './portraits.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -913,8 +913,8 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const m = openModal(
       `<div class="sheet" role="dialog" aria-label="Welcome"><div class="welcome">
         <div class="signrow">${keys.map((k) => `<img src="${img(k, 128)}" alt="" />`).join('')}</div>
-        <h1>DRPCIV Road Signs</h1>
-        <p>Learn the Romanian road signs in a driving school with 15 levels.</p>
+        <div class="logobox"><img class="logo" src="${logoURL()}" alt="Car.dat" /></div>
+        <p>A driving school with 15 levels to learn the Romanian road signs.</p>
         <div class="credit">${pimg('naty', 'sm')}<span>Developed by Naty</span></div>
         <div class="stack two">
           <button type="button" class="btn big" data-go="learn">Learn mode<small>Signs explain themselves</small></button>
