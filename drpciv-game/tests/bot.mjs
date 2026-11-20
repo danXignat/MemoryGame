@@ -63,6 +63,8 @@ export function makeBot(game, world, map, kind = 'careful') {
             if (task.type === 'stop') {
               const dist = task.line - s - 2.0;
               if (dist > -3 && dist < 60 && !(task.minV <= C.test.stopMaxKmh)) target = Math.min(target, stopAt(dist));
+              const cf = task.p.conflict;
+              if (cf && dist > -1 && dist < 6 && st.npcs.some((n) => Math.hypot(n.x - cf.x, n.y - cf.y) < cf.r + Math.max(12, cf.r))) target = 0;
             }
             if (task.type === 'pickup' && task.s - s < 30) target = Math.min(target, stopAt(task.s - s - 1));
           }

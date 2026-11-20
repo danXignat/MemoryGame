@@ -78,6 +78,8 @@ const MSG_BY_KEY = {
 };
 
 const PSEUDO = (id, key, s) => ({ id, key, def: SIGNS[key], s, test: {}, zones: null });
+const NPC_COLORS = ['#5f7fbf', '#8c6bd6', '#c0392b', '#2c3e50', '#7f8c8d', '#16a085', '#d35400', '#b8bcc2', '#1f6f8b'];
+const pickColor = () => NPC_COLORS[Math.floor(Math.random() * NPC_COLORS.length)];
 const SIGNAL_SIGN = (id, s) => ({ id, key: 'signalling', def: SIGNS.signalling, s, test: {}, zones: null });
 
 // ============================================================================
@@ -350,12 +352,31 @@ export function createGame(world, opts = {}) {
       if (def.loop) continue;
       def.timer = (def.timer ?? 0) - dt;
       if (def.timer <= 0 && state.npcs.filter((n) => n.def === def).every((n) => n.s > 18)) {
-        def.timer = def.every;
-        state.npcs.push({ def, s: 0, v: def.kmh / 3.6, x: 0, y: 0, heading: 0, color: def.color, width: 1.8, length: 4.3 });
+        def.timer = def.every * (0.8 + Math.random() * 0.5);
+        def.count = (def.count || 0) + 1;
+        const police = !!def.policeEvery && def.count % def.policeEvery === 0;
+        state.npcs.push({ def, s: 0, v: def.kmh / 3.6, x: 0, y: 0, heading: 0, color: police ? '#f4f6f8' : pickColor(), police, width: 1.8, length: police ? 4.6 : 4.3 });
       }
     }
     for (let i = state.npcs.length - 1; i >= 0; i--) {
       const n = state.npcs[i];
+      // drive sensibly: stop for the player in their lane, keep a gap to the car ahead
+      let want = n.def.kmh / 3.6;
+      if (n.init) {
+        const fx = Math.cos(n.heading);
+        const fy = Math.sin(n.heading);
+        const rx = state.car.x - n.x;
+        const ry = state.car.y - n.y;
+        const ahead = rx * fx + ry * fy;
+        const side = Math.abs(-rx * fy + ry * fx);
+        if (ahead > 0 && ahead < 24 && side < 2.8) want = 0;
+        for (const o of state.npcs) {
+          if (o === n || o.def !== n.def) continue;
+          const gap = o.s - n.s;
+          if (gap > 0 && gap < 11) want = Math.min(want, o.v * 0.8);
+        }
+      }
+      n.v = approach(n.v, want, (want < n.v ? 6 : 2) * dt);
       n.s += n.v * dt;
       if (n.def.loop) n.s %= n.def.path.length;
       else if (n.s >= n.def.path.length) {
@@ -366,6 +387,7 @@ export function createGame(world, opts = {}) {
       n.x = pt.x - pt.dy * n.def.lane;
       n.y = pt.y + pt.dx * n.def.lane;
       n.heading = Math.atan2(pt.dy, pt.dx);
+      n.init = true;
       if (pushOutOfTraffic(state.car, n) > 3) issue('pedHit', C.exam.penalty.pedHit, { ro: 'Ai lovit un alt vehicul.', en: 'You hit another vehicle.' }, { title: { ro: 'Accident', en: 'Crash' } });
     }
 
@@ -511,7 +533,9 @@ export function createGame(world, opts = {}) {
         if (c.s >= t.line - win && c.s <= t.line) t.minV = Math.min(t.minV, c.kmh);
         if (c.crossed(t.line)) {
           const low = t.minV === Infinity ? c.kmh : t.minV;
-          finish(t, low <= T.stopMaxKmh, 'stop', { kmh: low.toFixed(1) });
+          const cf = t.p.conflict;
+          if (low <= T.stopMaxKmh && cf && state.npcs.some((n) => Math.hypot(n.x - cf.x, n.y - cf.y) < cf.r)) finish(t, false, 'yield');
+          else finish(t, low <= T.stopMaxKmh, 'stop', { kmh: low.toFixed(1) });
         }
       },
     },

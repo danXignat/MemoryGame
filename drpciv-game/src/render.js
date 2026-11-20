@@ -159,15 +159,18 @@ export function createRenderer(canvas, initialWorld) {
     drawStations(state);
     drawRoute(0.9);
     drawPaint();
-    drawHouses(R);
+    drawHouses(R, time);
+    drawBushes(R);
     for (const ai of state.traffic) drawCar(ai, null, ai.color, {});
-    for (const n of state.npcs) drawCar(n, null, n.color, {});
+    const flash = Math.floor(time * 4) % 2;
+    for (const n of state.npcs) drawCar(n, null, n.color, { police: n.police, flash });
     for (const o of state.obstacles || []) drawCar(o, null, o.color, { hazard: true, blinkOn: Math.floor(time / 0.33) % 2 === 0 });
     drawPeds(state, time);
     drawMission(state, settings, time);
     drawBeams(state.car, state.spec);
     drawCar(state.car, state.spec, state.spec.color, { braking: state.car.braking, reversing: state.car.reversing, signal: state.car.signal, hazard: state.car.hazard, blinkOn, lights: state.car.lights, player: true, passenger: state.passenger, mood: state.mood, engineOn: state.car.engineOn });
     drawTrees(R);
+    drawLamps(R);
     drawPins(R);
     drawSigns(state, R, time);
 
@@ -292,19 +295,111 @@ export function createRenderer(canvas, initialWorld) {
     }
   }
 
-  function drawHouses(R) {
+  function drawHouses(R, time) {
+    const near = (o, pad) => Math.abs(o.x - cam.x) < R + pad && Math.abs(o.y - cam.y) < R + pad;
+    // car parks in front of blocks
+    for (const l of world.lots || []) {
+      if (!near(l, 30)) continue;
+      ctx.save();
+      ctx.translate(l.x, l.y);
+      ctx.rotate(l.angle);
+      ctx.fillStyle = '#4a4f57';
+      ctx.fillRect(-l.w / 2, -l.h / 2, l.w, l.h);
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 0.12;
+      ctx.beginPath();
+      for (let x = -l.w / 2; x <= l.w / 2 + 0.01; x += 3) {
+        ctx.moveTo(x - 1.5, -l.h / 2 + 0.4);
+        ctx.lineTo(x - 1.5, l.h / 2 - 0.4);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
     for (const h of world.houses) {
-      if (Math.hypot(h.x - cam.x, h.y - cam.y) > R + 12) continue;
-      const x = h.x - h.w / 2;
-      const y = h.y - h.h / 2;
-      ctx.fillStyle = COL.shadow;
-      ctx.fillRect(x + 1.1, y + 1.3, h.w, h.h);
-      ctx.fillStyle = h.roof;
-      ctx.fillRect(x, y, h.w, h.h);
-      ctx.fillStyle = 'rgba(0,0,0,0.16)';
-      ctx.fillRect(x, y + h.h / 2 - 0.25, h.w, 0.5);
-      ctx.fillStyle = 'rgba(255,255,255,0.14)';
-      ctx.fillRect(x, y, h.w, h.h / 2 - 0.25);
+      if (!near(h, 40)) continue;
+      ctx.save();
+      ctx.translate(h.x, h.y);
+      ctx.rotate(h.angle || 0);
+      if (h.kind === 'block') {
+        const sh = 1.2 + (h.floors || 6) * 0.25; // taller blocks cast longer shadows
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(-h.w / 2 + sh * 0.6, -h.h / 2 + sh, h.w, h.h);
+        ctx.fillStyle = h.roof;
+        ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
+        ctx.strokeStyle = 'rgba(255,255,255,0.35)'; // parapet
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(-h.w / 2 + 0.3, -h.h / 2 + 0.3, h.w - 0.6, h.h - 0.6);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)'; // stairwells / lift rooms
+        const n = Math.max(2, Math.round(h.w / 12));
+        for (let i = 0; i < n; i++) {
+          const x = -h.w / 2 + ((i + 0.5) * h.w) / n;
+          ctx.fillRect(x - 1.2, -1.4, 2.4, 2.8);
+        }
+        ctx.fillStyle = 'rgba(255,255,255,0.12)';
+        ctx.fillRect(-h.w / 2 + 2, h.h / 2 - 2.6, 3, 1.6);
+        ctx.fillRect(h.w / 2 - 5, -h.h / 2 + 1.2, 3, 1.6);
+      } else {
+        if (h.garden) {
+          ctx.fillStyle = 'rgba(120,190,90,0.55)';
+          ctx.fillRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
+          ctx.strokeStyle = '#d9c9a3'; // fence
+          ctx.lineWidth = 0.18;
+          ctx.strokeRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
+        }
+        ctx.fillStyle = COL.shadow;
+        ctx.fillRect(-h.w / 2 + 0.9, -h.h / 2 + 1.1, h.w, h.h);
+        ctx.fillStyle = h.roof;
+        ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
+        ctx.fillStyle = 'rgba(0,0,0,0.18)';
+        ctx.fillRect(-h.w / 2, -0.25, h.w, 0.5); // ridge
+        ctx.fillStyle = 'rgba(255,255,255,0.14)';
+        ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h / 2 - 0.25);
+      }
+      ctx.restore();
+    }
+    // parked cars (police ones flash)
+    const flash = Math.floor(time * 4) % 2;
+    for (const c of world.parked || []) {
+      if (!near(c, 10)) continue;
+      drawCar(c, null, c.color, { police: c.police, flash });
+    }
+  }
+
+  function drawLamps(R) {
+    for (const l of world.lamps || []) {
+      if (Math.abs(l.x - cam.x) > R + 4 || Math.abs(l.y - cam.y) > R + 4) continue;
+      ctx.strokeStyle = '#3d434b';
+      ctx.lineWidth = 0.22;
+      ctx.beginPath();
+      ctx.moveTo(l.x, l.y);
+      ctx.lineTo(l.x + Math.cos(l.ang) * 1.6, l.y + Math.sin(l.ang) * 1.6);
+      ctx.stroke();
+      ctx.fillStyle = '#2b3036';
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, 0.35, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#fff3c4';
+      ctx.beginPath();
+      ctx.arc(l.x + Math.cos(l.ang) * 1.6, l.y + Math.sin(l.ang) * 1.6, 0.3, 0, TAU);
+      ctx.fill();
+    }
+  }
+
+  function drawBushes(R) {
+    for (const b of world.bushes || []) {
+      if (Math.abs(b.x - cam.x) > R + 3 || Math.abs(b.y - cam.y) > R + 3) continue;
+      ctx.fillStyle = '#3f8f45';
+      ctx.beginPath();
+      ctx.arc(b.x, b.y, b.r, 0, TAU);
+      ctx.fill();
+      if (b.flower) {
+        ctx.fillStyle = b.flower;
+        for (let i = 0; i < 4; i++) {
+          ctx.beginPath();
+          ctx.arc(b.x + Math.cos(i * 1.7) * b.r * 0.5, b.y + Math.sin(i * 1.7) * b.r * 0.5, 0.18, 0, TAU);
+          ctx.fill();
+        }
+      }
     }
   }
 
@@ -606,6 +701,19 @@ export function createRenderer(canvas, initialWorld) {
       }
     }
 
+    if (o.police) {
+      ctx.fillStyle = '#1d4ed8'; // blue stripe
+      ctx.fillRect(-L / 2 + 0.3, -Wd / 2 + 0.08, L - 0.6, 0.28);
+      ctx.fillRect(-L / 2 + 0.3, Wd / 2 - 0.36, L - 0.6, 0.28);
+      ctx.fillStyle = o.flash ? '#2563ff' : '#ff2d2d'; // light bar
+      ctx.fillRect(-0.45, -Wd / 2 + 0.3, 0.5, Wd / 2 - 0.3);
+      ctx.fillStyle = o.flash ? '#ff2d2d' : '#2563ff';
+      ctx.fillRect(-0.45, 0, 0.5, Wd / 2 - 0.3);
+      ctx.fillStyle = o.flash ? 'rgba(60,110,255,0.25)' : 'rgba(255,50,50,0.25)';
+      ctx.beginPath();
+      ctx.arc(-0.2, 0, 2.6, 0, TAU);
+      ctx.fill();
+    }
     // lights
     const lit = o.lights >= 1;
     ctx.fillStyle = lit ? '#fff6c4' : '#d9dbd0';
@@ -801,6 +909,19 @@ export function createRenderer(canvas, initialWorld) {
       octx.lineTo(2, 1);
       octx.fill();
       octx.restore();
+    }
+    // street lamps light pools of road
+    for (const l of world.lamps || []) {
+      const lx = l.x + Math.cos(l.ang) * 1.6;
+      const ly = l.y + Math.sin(l.ang) * 1.6;
+      if (Math.abs(lx - cam.x) > 90 || Math.abs(ly - cam.y) > 90) continue;
+      g = octx.createRadialGradient(lx, ly, 0.5, lx, ly, 9);
+      g.addColorStop(0, 'rgba(0,0,0,0.75)');
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      octx.fillStyle = g;
+      octx.beginPath();
+      octx.arc(lx, ly, 9, 0, TAU);
+      octx.fill();
     }
     // the sign you are approaching stays readable
     if (state.activeSign) {

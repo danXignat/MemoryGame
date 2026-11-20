@@ -2079,3 +2079,13 @@ p {
   z-index: 8;
   max-width: 46vw;
 }
+#card .donow {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+#card .donow .dt {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}

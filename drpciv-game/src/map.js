@@ -19,6 +19,8 @@
 
 export const MAP = {
   roadWidth: 8, // two lanes of 4 m
+  oncoming: { kmh: 34, every: 14 }, // traffic coming the other way
+  decor: { style: 'mixed' },
 
   // ---- the route (open path: START ... FINISH) --------------------------------
   route: {

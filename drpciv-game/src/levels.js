@@ -128,12 +128,13 @@ function track(start, headingDeg, steps) {
   };
 }
 
-const base = (t, start, extra) => ({ roadWidth: 8, route: { start, segments: t.segments }, extraRoads: t.extraRoads, rings: t.rings, stations: t.stations, ...extra });
+const base = (t, start, extra) => ({ roadWidth: 8, route: { start, segments: t.segments }, extraRoads: t.extraRoads, rings: t.rings, stations: t.stations, oncoming: { kmh: 36, every: 13 }, ...extra });
 
 // ------------------------------------------------------------------ level maps
 function level1() {
   const t = track([0, 0], 0, [['line', 'a', 150], ['turn', 'b', 'right', 90, 40], ['line', 'c', 130], ['turn', 'd', 'left', 90, 40], ['line', 'e', 140]]);
   return base(t, [0, 0], {
+    decor: { style: 'suburb' },
     signs: [
       { sign: 'speed50', at: ['a', 20] },
       { sign: 'curveRight', at: ['a', 100] },
@@ -152,6 +153,7 @@ function level2() {
     ['line', 'g', 120],
   ]);
   return base(t, [0, 0], {
+    decor: { style: 'mixed' },
     signs: [
       { sign: 'speed50', at: ['a', 15] },
       { sign: 'turnRight', at: ['a', 100], zones: { pass: t.after('b', 12), fail: t.ahead('b', 28) } },
@@ -169,14 +171,16 @@ function level3() {
     ['line', 'e', 150],
   ]);
   return base(t, [0, 0], {
+    decor: { style: 'city' },
     signs: [
       { sign: 'speed50', at: ['a', 15] },
       { sign: 'turnRight', at: ['a', 128], zones: { pass: t.after('b', 12), fail: t.ahead('b', 24) } },
-      { sign: 'stop', at: ['a', 165] },
+      { sign: 'stop', at: ['a', 165], test: { conflict: { ...t.corner('b'), r: 22 } } },
       { sign: 'turnLeft', at: ['c', 118], zones: { pass: t.after('d', 12), fail: t.ahead('d', 24) } },
       { sign: 'stop', at: ['c', 155] },
     ],
     turns: [{ at: ['b', 0], side: 'right', lead: 12 }, { at: ['d', 0], side: 'left', lead: 12 }],
+    npcs: [{ id: 'cross', points: t.through('b', 200, 220), kmh: 30, every: 15, road: false }],
   });
 }
 
@@ -184,6 +188,7 @@ function level4() {
   const t = track([0, 0], -90, [['line', 'a', 150], ['turn', 'b', 'right', 90, 8], ['arm', 'back', 160], ['line', 'c', 190]]);
   const J = t.corner('b');
   return base(t, [0, 0], {
+    decor: { style: 'city' },
     signs: [
       { sign: 'giveWay', at: ['a', 132], test: { conflict: { x: J.x - 8, y: J.y, r: 26 } } },
       { sign: 'priorityRoad', at: ['c', 40] },
@@ -199,6 +204,7 @@ function level4() {
 function level5() {
   const t = track([0, 0], 0, [['line', 'a', 170], ['turn', 'b', 'right', 90, 40], ['line', 'c', 170], ['turn', 'd', 'left', 70, 50], ['line', 'e', 130]]);
   return base(t, [0, 0], {
+    decor: { style: 'suburb' },
     signs: [
       { sign: 'speed30', at: ['a', 10] },
       { sign: 'pedestrian', at: ['a', 60] },
@@ -219,6 +225,7 @@ function boss() {
     ['line', 'g', 150],
   ]);
   return base(t, [0, 0], {
+    decor: { style: 'city', zones: [['e', 'suburb'], ['f', 'suburb'], ['g', 'suburb']] },
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'turnRight', at: ['a', 96], zones: { pass: t.after('b', 12), fail: t.ahead('b', 28) } },
@@ -241,6 +248,7 @@ function boss() {
 function level6() {
   const t = track([0, 0], 0, [['line', 'a', 200], ['turn', 'b', 'right', 40, 80], ['line', 'c', 180], ['turn', 'd', 'left', 40, 80], ['line', 'e', 200], ['turn', 'f', 'right', 30, 100], ['line', 'g', 160]]);
   return base(t, [0, 0], {
+    decor: { style: 'city' },
     signs: [
       { sign: 'speed50', at: ['a', 15] },
       { sign: 'children', at: ['c', 20] },
@@ -255,6 +263,7 @@ function level6() {
 function level7() {
   const t = track([0, 0], 0, [['line', 'a', 140], ['turn', 'b', 'right', 30, 120], ['line', 'c', 260], ['turn', 'd', 'left', 30, 120], ['line', 'e', 200]]);
   return base(t, [0, 0], {
+    decor: { style: 'mixed' }, oncoming: false,
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'noOvertaking', at: ['a', 60] },
@@ -268,6 +277,7 @@ function level7() {
 function level8() {
   const t = track([0, 0], 0, [['line', 'a', 110], ['station', 'st', 'Fuel station'], ['line', 'c', 160], ['turn', 'd', 'right', 90, 30], ['line', 'e', 200]]);
   return base(t, [0, 0], {
+    decor: { style: 'city' }, oncoming: false,
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'noParking', at: ['c', 20] },
@@ -287,6 +297,7 @@ function level9() {
   const e1 = t.corner('a');
   const e2 = t.corner('c');
   return base(t, [0, 0], {
+    decor: { style: 'mixed' },
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'roundabout', at: ['a', 90], until: ['r1', l1] },
@@ -311,6 +322,7 @@ function level10() {
   ]);
   const J = t.corner('d');
   return base(t, [0, 0], {
+    decor: { style: 'city' },
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'turnRight', at: ['a', 110], zones: { pass: t.after('b', 12), fail: t.ahead('b', 24) } },
@@ -329,6 +341,7 @@ function level10() {
 function level11() {
   const t = track([0, 0], 0, [['line', 'a', 220], ['turn', 'b', 'right', 30, 150], ['line', 'c', 220], ['turn', 'd', 'left', 30, 150], ['line', 'e', 220]]);
   return base(t, [0, 0], {
+    decor: { style: 'city' },
     roadWidth: 15,
     startLane: 5.6,
     laneDividers: [3.75, -3.75],
@@ -343,6 +356,7 @@ function level11() {
 function level12() {
   const t = track([0, 0], 0, [['line', 'a', 120], ['turn', 'b', 'right', 80, 32], ['line', 'c', 70], ['turn', 'd', 'left', 100, 30], ['line', 'e', 80], ['turn', 'f', 'right', 90, 28], ['line', 'g', 120]]);
   return base(t, [0, 0], {
+    decor: { style: 'suburb' },
     roadWidth: 7,
     signs: [
       { sign: 'speed30', at: ['a', 10] },
@@ -364,6 +378,7 @@ function level13() {
   ]);
   const J = t.corner('f');
   return base(t, [0, 0], {
+    decor: { style: 'city' },
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'stop', at: ['a', 135] },
@@ -390,6 +405,7 @@ function level14() {
   const l1 = t.arcLen('r1');
   const e1 = t.corner('c');
   return base(t, [0, 0], {
+    decor: { style: 'city' },
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'turnLeft', at: ['a', 110], zones: { pass: t.after('b', 12), fail: t.ahead('b', 24) } },
@@ -420,6 +436,7 @@ function level15() {
   const e1 = t.corner('c');
   const J = t.corner('f');
   return base(t, [0, 0], {
+    decor: { style: 'mixed' },
     signs: [
       { sign: 'speed50', at: ['a', 10] },
       { sign: 'turnRight', at: ['a', 120], zones: { pass: t.after('b', 12), fail: t.ahead('b', 24) } },

@@ -435,47 +435,157 @@ export function buildWorld(MAP) {
   const refuel = MAP.refuel ? { litres: MAP.refuel.litres ?? 10, ...onRoute(MAP.refuel.at, 'refuel') } : null;
   const laneDividers = MAP.laneDividers || [];
 
+  // --------------------------------------------------- oncoming traffic on the route
+  //  Cars drive the route the other way, in their own lane. Not through roundabouts
+  //  (they would go round the wrong way), so they start after the last one.
+  if (MAP.oncoming) {
+    let sFrom = 0;
+    for (const sg of MAP.route.segments) if (sg.roundabout) sFrom = Math.max(sFrom, segRanges[sg.id][1] + 12);
+    const pts = [];
+    for (let k = N; k >= 0 && k * ds >= sFrom; k -= 3) pts.push([X[k], Y[k]]);
+    if (pts.length > 10) npcDefs.push({ id: 'oncoming', path: makePath(pts), kmh: MAP.oncoming.kmh ?? 36, every: MAP.oncoming.every ?? 13, color: '#5f7fbf', lane: C.traffic.laneOffset, oncoming: true, policeEvery: MAP.oncoming.policeEvery ?? 4 });
+  }
+
   // ------------------------------------------------------ scenery (decoration)
-  const rnd = mulberry32(20240611);
+  //  Built along the route: apartment blocks in the city, houses with gardens in the
+  //  suburbs, street lamps, parked cars, then trees and bushes fill the rest.
+  //  MAP.decor = { style: 'city' | 'suburb' | 'mixed', zones: [[routePieceId, style], ...] }
+  const rnd = mulberry32(MAP.seed ?? 20240611);
   const rings = (MAP.rings || []).map((r) => ({ ...r, island: Math.max(1, r.r - half - 0.7) }));
-  const houses = [];
+  const decor = { style: 'mixed', zones: [], lamps: true, ...(MAP.decor || {}) };
+  const houses = []; // buildings: { x, y, w, h, angle, kind: 'house' | 'block', roof }
+  const lots = []; // parking areas in front of blocks
+  const parked = []; // parked cars (decoration only)
+  const lamps = [];
   const trees = [];
+  const bushes = [];
   const m = 70;
   const bx0 = minX - m;
   const bx1 = maxX + m;
   const by0 = minY - m;
   const by1 = maxY + m;
-  const roofs = ['#b5543c', '#a8483a', '#c26a4a', '#8c5a4a', '#9a7b58', '#7d8793'];
+  const roofs = ['#b5543c', '#a8483a', '#c26a4a', '#8c5a4a', '#9a7b58', '#7d8793', '#6d7f5a'];
+  const blockRoofs = ['#8d949c', '#9aa1a8', '#7f8790', '#a3a29a'];
+  const carColors = ['#c0392b', '#2c3e50', '#ecf0f1', '#7f8c8d', '#2980b9', '#16a085', '#d35400', '#8e44ad', '#f1c40f'];
 
-  // keep the Final Boss spots (pick-up, her house) free of trees and houses
+  // keep the Final Boss spots (pick-up, her house) free
   const keepClear = [mission && mission.house, mission && mission.pickup].filter(Boolean);
   const blocked = (x, y, pad) => keepClear.some((k) => Math.hypot(x - k.x, y - k.y) < 15 + pad);
   const nearRing = (x, y, pad) => rings.some((r) => Math.hypot(x - r.cx, y - r.cy) < r.r + half + pad);
-  for (let attempt = 0; attempt < 900 && houses.length < 34; attempt++) {
-    const w = 10 + rnd() * 8;
-    const h = 8 + rnd() * 6;
-    const x = bx0 + 30 + rnd() * (bx1 - bx0 - 60);
-    const y = by0 + 30 + rnd() * (by1 - by0 - 60);
-    const pts = [
-      [x, y],
-      [x - w / 2, y - h / 2],
-      [x + w / 2, y - h / 2],
-      [x - w / 2, y + h / 2],
-      [x + w / 2, y + h / 2],
-    ];
-    if (pts.some(([px, py]) => queryRoad(px, py).dist < half + 7 || nearRing(px, py, 6) || blocked(px, py, 2))) continue;
-    if (houses.some((o) => Math.abs(o.x - x) < (o.w + w) / 2 + 5 && Math.abs(o.y - y) < (o.h + h) / 2 + 5)) continue;
-    houses.push({ x, y, w, h, roof: roofs[Math.floor(rnd() * roofs.length)] });
+  const styleAt = (sv) => {
+    for (const [id, st] of decor.zones) if (segRanges[id] && sv >= segRanges[id][0] && sv <= segRanges[id][1]) return st;
+    return decor.style;
+  };
+  const inRect = (o, x, y, pad) => {
+    const c = Math.cos(-o.angle);
+    const sn = Math.sin(-o.angle);
+    const lx = (x - o.x) * c - (y - o.y) * sn;
+    const ly = (x - o.x) * sn + (y - o.y) * c;
+    return Math.abs(lx) < o.w / 2 + pad && Math.abs(ly) < o.h / 2 + pad;
+  };
+  const rectPoints = (x, y, w, h, ang) => {
+    const c = Math.cos(ang);
+    const sn = Math.sin(ang);
+    const out = [];
+    for (const [u, v] of [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1], [0, -1], [0, 1], [-1, 0], [1, 0]]) out.push([x + (u * w * c) / 2 - (v * h * sn) / 2, y + (u * w * sn) / 2 + (v * h * c) / 2]);
+    return out;
+  };
+  const fits = (x, y, w, h, ang, roadPad) => {
+    if (rectPoints(x, y, w, h, ang).some(([px, py]) => queryRoad(px, py).dist < half + roadPad || nearRing(px, py, 5) || blocked(px, py, 3))) return false;
+    const rr = Math.hypot(w, h) / 2;
+    if (houses.some((o) => Math.hypot(o.x - x, o.y - y) < (rr + Math.hypot(o.w, o.h) / 2) * 0.82)) return false;
+    return true;
+  };
+
+  // buildings along both sides of the route
+  const tmpP = {};
+  const placeAlong = (sv, side) => {
+    const st = styleAt(sv);
+    const city = st === 'city' || (st === 'mixed' && rnd() < 0.45);
+    const p = routeAt(sv, tmpP);
+    const ang = Math.atan2(p.dy, p.dx);
+    const nx = -p.dy * side;
+    const ny = p.dx * side;
+    if (city) {
+      const w = 28 + rnd() * 14;
+      const h = 11 + rnd() * 2.5;
+      const off = half + 10 + h / 2;
+      const x = p.x + nx * off;
+      const y = p.y + ny * off;
+      if (!fits(x, y, w, h, ang, 4)) return 0;
+      houses.push({ x, y, w, h, angle: ang, kind: 'block', roof: blockRoofs[Math.floor(rnd() * blockRoofs.length)], floors: 4 + Math.floor(rnd() * 7) });
+      // a small car park between the block and the road
+      const lotOff = half + 5;
+      const lot = { x: p.x + nx * lotOff, y: p.y + ny * lotOff, w: w * 0.8, h: 6, angle: ang };
+      if (rectPoints(lot.x, lot.y, lot.w, lot.h, ang).every(([px, py]) => queryRoad(px, py).dist >= half + 1.2)) {
+        lots.push(lot);
+        const n = Math.floor(lot.w / 3);
+        for (let i = 0; i < n; i++) {
+          if (rnd() < 0.35) continue;
+          const t = (i - (n - 1) / 2) * 3;
+          parked.push({ x: lot.x + Math.cos(ang) * t, y: lot.y + Math.sin(ang) * t, heading: ang + Math.PI / 2 * (rnd() < 0.5 ? 1 : -1), length: 4.2, width: 1.8, color: carColors[Math.floor(rnd() * carColors.length)] });
+        }
+      }
+      return w;
+    }
+    const w = 9 + rnd() * 4;
+    const h = 8 + rnd() * 3;
+    const off = half + 7.5 + h / 2;
+    const x = p.x + nx * off;
+    const y = p.y + ny * off;
+    if (!fits(x, y, w + 4, h + 4, ang, 3)) return 0;
+    houses.push({ x, y, w, h, angle: ang, kind: 'house', roof: roofs[Math.floor(rnd() * roofs.length)], garden: true });
+    return w + 6;
+  };
+  for (const side of [1, -1]) {
+    let sv = 14 + rnd() * 10;
+    while (sv < length - 10) {
+      const used = placeAlong(sv, side);
+      sv += (used || 8) + 5 + rnd() * 8;
+    }
   }
-  for (let attempt = 0; attempt < 2600 && trees.length < 420; attempt++) {
+
+  // street lamps just outside the curb, both sides
+  if (decor.lamps) {
+    for (const side of [1, -1]) {
+      for (let sv = 10; sv < length; sv += 32) {
+        const p = routeAt(sv, tmpP);
+        const x = p.x - p.dy * side * (half + 1.6);
+        const y = p.y + p.dx * side * (half + 1.6);
+        if (queryRoad(x, y).dist < half + 1.2 || nearRing(x, y, 1) || houses.some((o) => inRect(o, x, y, 1))) continue;
+        lamps.push({ x, y, ang: Math.atan2(p.dy, p.dx) + (side > 0 ? Math.PI / 2 : -Math.PI / 2) });
+      }
+    }
+  }
+
+  // police car parked at police pins
+  for (const pn of pins) if (pn.type === 'police') {
+    const loc = routeAt(pn.s ?? 0, tmpP);
+    parked.push({ x: pn.x, y: pn.y, heading: Math.atan2(loc.dy, loc.dx), length: 4.6, width: 1.85, color: '#f4f6f8', police: true });
+  }
+
+  // trees and bushes fill the rest (more where there is room)
+  const free = (x, y, r) =>
+    !(queryRoad(x, y).dist < half + r + 2.2 || blocked(x, y, r) || houses.some((o) => inRect(o, x, y, r + (o.garden ? 2.5 : 1.2))) || lots.some((o) => inRect(o, x, y, r + 0.5)));
+  const area = (bx1 - bx0) * (by1 - by0);
+  const treeMax = Math.min(900, Math.round(area / 260));
+  for (let attempt = 0; attempt < treeMax * 6 && trees.length < treeMax; attempt++) {
     const x = bx0 + rnd() * (bx1 - bx0);
     const y = by0 + rnd() * (by1 - by0);
-    const r = 1.6 + rnd() * 1.9;
-    if (queryRoad(x, y).dist < half + r + 2.2 || blocked(x, y, r)) continue;
+    const r = 1.5 + rnd() * 2.1;
+    if (!free(x, y, r)) continue;
     if (nearRing(x, y, r + 1) && !rings.some((rg) => Math.hypot(x - rg.cx, y - rg.cy) < rg.island - r)) continue;
-    if (houses.some((o) => Math.abs(o.x - x) < o.w / 2 + r + 1.5 && Math.abs(o.y - y) < o.h / 2 + r + 1.5)) continue;
-    if (trees.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r + 0.6)) continue;
+    if (trees.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r + 0.4)) continue;
     trees.push({ x, y, r, shade: rnd() });
+  }
+  const bushMax = Math.min(500, Math.round(area / 500));
+  for (let attempt = 0; attempt < bushMax * 5 && bushes.length < bushMax; attempt++) {
+    const x = bx0 + rnd() * (bx1 - bx0);
+    const y = by0 + rnd() * (by1 - by0);
+    const r = 0.6 + rnd() * 0.8;
+    if (!free(x, y, r) || nearRing(x, y, r + 1)) continue;
+    if (trees.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r)) continue;
+    bushes.push({ x, y, r, flower: rnd() < 0.25 ? ['#ff8fab', '#ffd166', '#f4f1de', '#c77dff'][Math.floor(rnd() * 4)] : null });
   }
 
   return {
@@ -502,6 +612,10 @@ export function buildWorld(MAP) {
     startLane,
     weather: MAP.weather || 'day',
     houses,
+    lots,
+    parked,
+    lamps,
+    bushes,
     trees,
     bounds: { minX, minY, maxX, maxY },
     route: { length, ds, N, X, Y, DX, DY, segRanges, at: routeAt, locate },

@@ -97,7 +97,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         <div class="ctext">
           <div class="chd"><b class="nameRo">${esc(d.name.ro)}</b><span class="cmeta"><b id="cardDist"></b><i class="dot" id="cardDot"></i></span></div>
           <div class="nameEn">${esc(tr(CATEGORIES[d.category], lang()))} · ${esc(d.name.en)}</div>
-          ${ind ? `<div class="donow"><b>${lang() === 'en' ? 'Do now' : 'Acum'}</b> ${esc(tr(ind.do, lang()))}</div>` : ''}
+          ${ind ? `<div class="donow"><div class="dt"><b>${lang() === 'en' ? 'Do now' : 'Acum'}</b> ${esc(tr(ind.do, lang()))}</div></div>` : ''}
         </div>
       </div>`;
   }
