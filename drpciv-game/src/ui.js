@@ -80,39 +80,32 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   const toast = $('#toast');
   let cardSign = null;
   let cardLastSeen = 0;
-  let pinned = false;
 
   function renderCard(sg) {
     const d = sg.def;
     const ind = d.ind;
+    card.style.setProperty('--cat', CATEGORIES[d.category].color);
     card.innerHTML = `
       <div class="cardrow">
-        <img src="${img(sg.key, 192)}" alt="" />
-        <div>
-          <div class="pillrow">${catPill(d.category)}<span class="pin"><b id="cardDist"></b> ${pinned ? 'Tap to close' : 'Tap for full rule'}</span></div>
-          <div class="nameRo">${esc(d.name.ro)}</div>
-          <div class="nameEn">${esc(d.name.en)}</div>
+        <img src="${img(sg.key, 128)}" alt="" />
+        <div class="ctext">
+          <div class="chd"><b class="nameRo">${esc(d.name.ro)}</b><span class="cmeta"><b id="cardDist"></b><i class="dot" id="cardDot"></i></span></div>
+          <div class="nameEn">${esc(tr(CATEGORIES[d.category], lang()))} · ${esc(d.name.en)}</div>
           ${ind ? `<div class="donow"><b>${lang() === 'en' ? 'Do now' : 'Acum'}</b> ${esc(tr(ind.do, lang()))}</div>` : ''}
-          <p class="rule">${esc(tr(d.rule, lang()))}</p>
         </div>
       </div>`;
-    card.classList.toggle('pinned', pinned);
   }
   function showCard(sg) {
     cardSign = sg;
     renderCard(sg);
     card.hidden = false;
-    hideToast();
   }
   function hideCard() {
     card.hidden = true;
     cardSign = null;
-    pinned = false;
   }
   card.addEventListener('click', () => {
-    pinned = !pinned;
-    if (!pinned && st().activeSign !== cardSign) hideCard();
-    else if (cardSign) renderCard(cardSign);
+    if (cardSign) openLibrary(cardSign.key);
   });
 
   // -------------------------------------------------------- feedback toast
@@ -414,24 +407,15 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       E.progK.textContent = 'route';
     }
 
-    // sign indication: what the sign asks, how far, and whether you are meeting it (Test)
+    // sign indication dock: what the sign asks, how far, and (Test) whether you are meeting it
     const a = s.activeSign;
     const ind = a ? G.game.indication() : null;
-    const showAlert = !!(ind && s.mode === 'test' && settings.hints && ind.sign.def.ind);
-    E.alert.hidden = !showAlert;
-    if (showAlert) {
-      const k = ind.sign.key + lang();
-      if (E.alert.dataset.k !== k) {
-        E.alert.dataset.k = k;
-        E.alertImg.src = img(ind.sign.key, 96);
-        E.alertTxt.textContent = tr(ind.sign.def.ind.do, lang());
-      }
-      E.alertDist.textContent = `${Math.round(ind.dist)} m · ${{ ok: lang() === 'en' ? 'OK' : 'Corect', violated: lang() === 'en' ? 'Violated' : 'Încălcat', watch: lang() === 'en' ? 'Watch' : 'Atenție', info: '' }[ind.status]}`;
-      E.alertDot.className = 'dot ' + ind.status;
-    }
-    if (!card.hidden && ind) {
-      const el = $('#cardDist', card);
-      if (el) el.textContent = `${Math.round(ind.dist)} m`;
+    E.alert.hidden = true;
+    if (ind && !card.hidden) {
+      const dEl = $('#cardDist', card);
+      if (dEl) dEl.textContent = `${Math.round(ind.dist)} m`;
+      const dot = $('#cardDot', card);
+      if (dot) dot.className = 'dot ' + (s.mode === 'test' ? ind.status : 'hide');
     }
 
     // Alisia (passenger) reacts to how you drive
@@ -447,14 +431,15 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     updateStation(s);
     updateScore();
 
-    // the Learn-mode card follows the sign you are approaching
-    if (s.mode === 'learn' && !modals.length) {
+    // the dock follows the sign you are approaching (Learn, and Test when indications are on)
+    const wantCard = !modals.length && (s.mode === 'learn' || (s.mode === 'test' && settings.hints));
+    if (wantCard) {
       const now = performance.now();
       if (a) {
         cardLastSeen = now;
-        if (cardSign !== a) showCard(a);
-      } else if (cardSign && !pinned && now - cardLastSeen > 4500) hideCard();
-    } else if (s.mode !== 'learn' && !card.hidden) hideCard();
+        if (cardSign !== a && toast.hidden) showCard(a);
+      } else if (cardSign && now - cardLastSeen > 4500) hideCard();
+    } else if (!card.hidden) hideCard();
   }
 
   function checkOrientation() {

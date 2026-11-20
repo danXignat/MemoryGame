@@ -1857,3 +1857,184 @@ p {
 .welcome .signrow {
   display: none;
 }
+
+/* ====================== INDICATION DOCK (bottom centre) ======================
+   Sits between the wheel cluster and the speedometer/pedals, so it never
+   covers the road ahead or the controls. Card, feedback and tips share it. */
+:root {
+  --dock-l: calc(var(--edge) + var(--wheel) + var(--mini) + 20px);
+  --dock-r: calc(max(8px, env(safe-area-inset-right, 0px)) + 46px + var(--gauge) + var(--pedw) * 2 + 38px);
+}
+#stage,
+.mode-test #stage {
+  top: auto;
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  left: var(--dock-l);
+  right: var(--dock-r);
+  width: auto;
+  max-width: 400px;
+  margin: 0 auto;
+  transform: none;
+  z-index: 6;
+}
+#card,
+#toast {
+  border-radius: 14px;
+}
+#card {
+  border-left: 6px solid var(--cat, var(--accent));
+}
+.cardrow {
+  grid-template-columns: 40px 1fr;
+  gap: 8px;
+  padding: 7px 9px 7px 7px;
+}
+.cardrow img {
+  width: 40px;
+  height: 40px;
+}
+.chd {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+}
+.chd .nameRo {
+  margin-top: 0;
+  font-size: clamp(12px, 1.8vw, 14.5px);
+  line-height: 1.12;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.cmeta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.cmeta .dot.hide {
+  display: none;
+}
+.cmeta .dot {
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+}
+#card .nameEn {
+  font-size: 10.5px;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+#card .donow {
+  margin-top: 4px;
+  padding: 4px 7px;
+  font-size: clamp(10.5px, 1.6vw, 12px);
+  -webkit-line-clamp: 3;
+}
+.toastrow {
+  grid-template-columns: 36px 1fr;
+  gap: 8px;
+  padding: 7px 9px 7px 7px;
+}
+.toastrow.noimg {
+  grid-template-columns: 1fr;
+}
+.toastrow img,
+.toastrow .pf {
+  width: 36px;
+  height: 36px;
+}
+.verdict {
+  font-size: clamp(12px, 1.8vw, 14px);
+  gap: 6px;
+}
+.verdict .pts {
+  font-size: 15px;
+}
+.msg {
+  font-size: clamp(10.5px, 1.6vw, 12px);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.toastrow .rule {
+  display: none;
+}
+#alertPill {
+  display: none !important;
+}
+
+/* narrow phones: the minimap moves to the top right so the dock keeps its space */
+@media (max-width: 780px) {
+  :root {
+    --dock-l: calc(var(--edge) + var(--wheel) + 14px);
+  }
+  #minimap {
+    position: fixed;
+    top: calc(var(--top) + var(--tb) + 8px);
+    right: max(8px, env(safe-area-inset-right, 0px));
+    width: 78px;
+    height: 78px;
+  }
+  #nav {
+    max-width: 40vw;
+  }
+}
+@media (orientation: portrait) {
+  #stage,
+  .mode-test #stage {
+    left: 2vw;
+    right: 2vw;
+    bottom: calc(var(--wheel) + 24px);
+    max-width: none;
+  }
+}
+.cardrow,
+.toastrow {
+  grid-template-columns: 40px minmax(0, 1fr);
+}
+.toastrow.noimg {
+  grid-template-columns: minmax(0, 1fr);
+}
+.toastrow {
+  grid-template-columns: 36px minmax(0, 1fr);
+}
+.ctext,
+.toastrow > div {
+  min-width: 0;
+}
+
+/* speed-limit badge floats just above the dock instead of the left column */
+#limit {
+  top: auto;
+  left: var(--dock-l);
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px) + 84px);
+  width: 40px;
+  height: 40px;
+  border-width: 4px;
+  font-size: 15px;
+}
+@media (max-width: 780px) {
+  /* avatar on its own line so the score never runs under the signal buttons */
+  #tl .trow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+  .avatar {
+    width: 34px;
+    height: 34px;
+  }
+  #pillZone {
+    max-width: 24vw;
+  }
+}
+#limit {
+  bottom: calc(8px + env(safe-area-inset-bottom, 0px) + 118px);
+  z-index: 7;
+}
