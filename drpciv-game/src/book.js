@@ -9,7 +9,7 @@
 //    { p: 'text' }              a paragraph (**bold** works)
 //    { li: ['a', 'b'] }         a list
 //    { table: [['a','b'], ...] } a two-column table (first row = header)
-//    { tip: 'text' }            a highlighted "remember" box
+//    { tip: 'text', label }     a highlighted box (label: 'Pont', 'În joc', ...)
 //    { signs: ['stop', ...] }   sign pictures with their name and rule
 //
 //  Written for the game from the Romanian traffic rules (OUG 195/2002, HG 1391/2006).
@@ -24,23 +24,23 @@ const signsOf = (cat) => visibleSignKeys().filter((k) => SIGNS[k].category === c
 export const CHAPTERS = [
   {
     id: 'semne',
-    title: 'Indicatoare rutiere',
+    title: 'Indicatoarele',
     sign: 'stop',
     pages: [
       [
-        { h: 'Cum recunoști un indicator' },
-        { p: 'Forma și culoarea îți spun ce fel de indicator este, chiar înainte să vezi simbolul.' },
+        { h: 'Înainte să le înveți pe de rost' },
+        { p: 'Nu te apuca să tocești indicatoarele unul câte unul. Uită-te întâi la formă și la culoare. De la 50 de metri nu vezi desenul, dar vezi dacă e un triunghi roșu sau un cerc albastru, și deja știi cam ce urmează.' },
         {
           table: [
-            ['Formă și culoare', 'Ce înseamnă'],
-            ['Triunghi cu chenar roșu', '**Avertizare**: urmează un pericol'],
-            ['Octogon roșu, romb galben, triunghi întors', '**Prioritate**: cine trece primul'],
-            ['Cerc cu chenar roșu', '**Interzicere / restricție**'],
-            ['Cerc albastru', '**Obligare**: așa trebuie să mergi'],
-            ['Pătrat sau dreptunghi albastru', '**Informare**'],
+            ['Ce vezi', 'Ce-ți spune'],
+            ['Triunghi cu margine roșie', 'Atenție, urmează ceva: o curbă, copii, o îngustare'],
+            ['Octogon roșu, romb galben, triunghi cu vârful în jos', 'Cine trece primul prin intersecție'],
+            ['Cerc cu margine roșie', 'Ceva ce nu ai voie să faci'],
+            ['Cerc albastru plin', 'Ceva ce trebuie să faci'],
+            ['Pătrat sau dreptunghi albastru', 'Doar te informează'],
           ],
         },
-        { tip: 'Semnalele polițistului și semaforul au întâietate față de indicatoare; indicatoarele, față de regulile generale.' },
+        { tip: 'Când semaforul spune una și indicatorul alta, asculți de semafor. Când polițistul spune altceva decât amândouă, asculți de polițist.', label: 'Ordinea' },
       ],
       ...['priority', 'warning', 'prohibition', 'mandatory', 'information'].map((cat) => [{ h: CATEGORIES[cat].ro }, { signs: signsOf(cat) }]),
     ],
@@ -51,145 +51,162 @@ export const CHAPTERS = [
     sign: 'speed50',
     pages: [
       [
-        { h: 'Limitele de viteză (categoria B)' },
+        { h: 'Cifrele pe care le întreabă la examen' },
+        { p: 'Pentru mașină mică, categoria B, dacă nu scrie altceva pe vreun indicator:' },
         {
           table: [
-            ['Unde', 'Maxim'],
-            ['În localitate', '50 km/h'],
-            ['Alte drumuri din afara localității', '90 km/h'],
-            ['Drum expres, drum național european (E)', '100 km/h'],
-            ['Autostradă', '130 km/h'],
+            ['Unde ești', 'Cât poți să mergi'],
+            ['În oraș, în sat', '50 km/h'],
+            ['Pe drumurile obișnuite din afara localității', '90 km/h'],
+            ['Pe drum expres sau pe un național european (E)', '100 km/h'],
+            ['Pe autostradă', '130 km/h'],
           ],
         },
-        { p: 'Indicatoarele pot coborî sau ridica aceste limite pe anumite porțiuni.' },
-        { tip: 'Ai permis de mai puțin de un an? În afara localităților limita ta este cu **20 km/h mai mică**.' },
+        { p: 'Primul an după ce iei permisul ai o regulă în plus: în afara localităților scazi 20 din cifrele de mai sus. Pe un drum de 90 mergi cu maxim 70.' },
       ],
       [
-        { h: 'Sancțiuni pentru viteză' },
-        { li: ['Peste limită cu mai mult de **50 km/h**: permisul se suspendă **90 de zile**.', 'Punctele de penalizare se adună: la **15 puncte** permisul se suspendă **30 de zile**.', 'Radarele fotografiază viteza în dreptul lor; în joc, pinul roșu cu aparat foto.'] },
-        { h: 'Viteza potrivită' },
-        { p: 'Limita este un maxim, nu o țintă. Pe ploaie, ceață, zăpadă, noaptea sau lângă școli mergi mai încet decât limita.' },
+        { h: 'Ce pățești dacă exagerezi' },
+        { p: 'Dacă te prinde cu peste 50 km/h mai mult decât limita, rămâi fără permis 90 de zile. Nu contează că drumul era liber și că te grăbeai.' },
+        { p: 'Punctele de penalizare se adună de la o amendă la alta. Când ajungi la 15, permisul ți se suspendă pentru 30 de zile.' },
+        { h: 'Limita nu e o țintă' },
+        { p: 'Pe ploaie, pe ceață, noaptea sau lângă o școală, 50 poate fi prea mult. Mergi cu cât te lasă drumul și vremea, nu cu cât scrie pe stâlp.' },
+        { tip: 'În joc, pinul roșu cu aparat foto e un radar. Treci pe lângă el cu viteza legală, altfel în modul Test te costă puncte.', label: 'În joc' },
       ],
     ],
   },
   {
     id: 'prioritate',
-    title: 'Prioritate în intersecții',
+    title: 'Cine trece primul',
     sign: 'giveWay',
     pages: [
       [
-        { h: 'Cine are întâietate' },
-        { li: ['1. Semnalele **polițistului**', '2. **Semaforul**', '3. **Indicatoarele** și marcajele', '4. **Regulile** de circulație'] },
-        { p: 'Dacă polițistul îți face semn să treci pe roșu, treci: semnalul lui are prioritate.' },
+        { h: 'Pe cine asculți' },
+        { p: 'În intersecție pot să-ți spună ce să faci mai multe lucruri deodată. Contează în ordinea asta:' },
+        { li: ['polițistul care dirijează', 'semaforul', 'indicatoarele și marcajele', 'regulile generale, cum e prioritatea de dreapta'] },
+        { p: 'Deci dacă e roșu și polițistul îți face semn să treci, treci. Pare ciudat prima dată, dar așa e legea.' },
       ],
       [
-        { h: 'Intersecții fără semne' },
-        { p: 'Ai de acordat prioritate vehiculului care vine **din dreapta** (prioritatea de dreapta).' },
-        { h: 'Virajul la stânga' },
-        { p: 'Cedezi trecerea vehiculelor din sens opus care merg înainte sau virează la dreapta.' },
-        { tip: 'Pe un **drum cu prioritate** (romb galben), mașinile de pe străzile laterale te așteaptă. În joc le vezi oprite la marginea intersecției.' },
+        { h: 'Intersecția fără nimic' },
+        { p: 'Fără semafor, fără indicatoare, fără polițist? Lași să treacă mașina care vine din dreapta ta. Asta e toată regula.' },
+        { h: 'Când faci stânga' },
+        { p: 'Cei care vin din față și merg drept sau fac dreapta trec înaintea ta. Tu aștepți în mijlocul intersecției, cu roțile drepte, până se face loc.' },
+        { tip: 'Dacă ești pe drumul cu romb galben, mașinile de pe străduțele laterale trebuie să te aștepte. În joc le vezi oprite la margine până treci.', label: 'În joc' },
       ],
       [
         { h: 'Sensul giratoriu' },
-        { li: ['La intrarea marcată cu „Cedează trecerea”, cei care circulă deja în giratoriu au prioritate.', 'Ocolești insula prin dreapta, în sensul săgeților.', 'Semnalizezi **dreapta** înainte de ieșire.'] },
-        { h: 'Cui faci loc întotdeauna' },
-        { li: ['Ambulanță, pompieri, poliție cu girofar și sirenă: tragi dreapta, oprești dacă e nevoie.', 'În localitate, autobuzului care semnalizează plecarea din stație.', 'Pietonului angajat pe trecerea nesemaforizată și celui cu baston alb.', 'La tramvaiul oprit în stație fără refugiu: oprești în spatele lui.'] },
+        { p: 'Când la intrare scrie „Cedează trecerea”, cei care sunt deja în cerc au prioritate. Intri doar când ai loc, ocolești insula prin dreapta și semnalizezi dreapta înainte să ieși.' },
+        { h: 'Cui îi faci loc oricum' },
+        { li: ['Ambulanței, pompierilor și poliției cu girofar și sirenă. Tragi pe dreapta, iar dacă e nevoie, oprești.', 'Autobuzului care pleacă din stație în oraș și a semnalizat.', 'Pietonului care a pus deja piciorul pe zebra fără semafor.', 'Omului cu baston alb, oriunde ar traversa.', 'Când tramvaiul stă în stație și nu are refugiu, oprești în spatele lui. Lumea coboară direct pe carosabil.'] },
       ],
     ],
   },
   {
     id: 'semafoare',
-    title: 'Semafoare și marcaje',
+    title: 'Semafoare și linii pe asfalt',
     sign: 'pedestrian',
     pages: [
       [
-        { h: 'Culorile semaforului' },
+        { h: 'Semaforul, pe scurt' },
         {
           table: [
-            ['Lumina', 'Ce faci'],
-            ['Verde', 'Treci, cu atenție la pietoni și la cei care virează'],
-            ['Galben fix', 'Oprești, dacă mai poți opri în siguranță'],
-            ['Roșu', 'Oprești înainte de linie'],
-            ['Galben intermitent', 'Treci cu atenție, după indicatoare și reguli'],
-            ['Săgeată verde lângă roșu', 'Poți vira în direcția ei, dar cedezi trecerea'],
+            ['Vezi', 'Faci'],
+            ['Verde', 'Treci, dar te uiți după pietoni și după cei care virează'],
+            ['Galben fix', 'Oprești. Treci doar dacă ești atât de aproape că o frână ar fi periculoasă'],
+            ['Roșu', 'Stai înainte de linie'],
+            ['Galben care clipește', 'Semaforul nu dirijează. Te uiți la indicatoare'],
+            ['Săgeată verde lângă roșu', 'Poți vira în direcția ei, dar nu ai prioritate'],
           ],
         },
+        { tip: 'La săgeata verde cei mai mulți greșesc: cred că au liber. Nu au. Pietonii care traversează și mașinile care au verde trec primele.', label: 'Greșeala clasică' },
       ],
       [
-        { h: 'Marcaje pe drum' },
-        { li: ['**Linia continuă** nu se încalcă și nu se trece peste ea.', '**Linia discontinuă** se poate trece pentru depășire sau schimbarea benzii, cu semnalizare.', 'La **linia de oprire** (STOP sau semafor) oprești înaintea ei.'] },
-        { h: 'Trecerea la nivel cu calea ferată' },
-        { p: 'Lumina **roșie intermitentă** sau bariera coborâtă înseamnă: oprești, vine trenul.' },
+        { h: 'Liniile de pe drum' },
+        { p: 'Linia continuă din mijloc nu se calcă. Nici pentru o depășire scurtă, nici ca să întorci.' },
+        { p: 'Peste linia întreruptă poți trece, cu semnalizare, ca să depășești sau să schimbi banda.' },
+        { p: 'La STOP și la semafor, linia de oprire e locul unde se opresc roțile din față, nu un pic după ea.' },
+        { h: 'Calea ferată' },
+        { p: 'Lumina roșie care clipește sau bariera lăsată înseamnă că vine trenul. Oprești și aștepți, chiar dacă încă nu-l vezi.' },
       ],
     ],
   },
   {
     id: 'oprire',
-    title: 'Depășire, oprire, staționare',
+    title: 'Depășit, oprit, parcat',
     sign: 'noOvertaking',
     pages: [
       [
         { h: 'Depășirea' },
-        { p: 'Depășești prin **stânga**, după ce te-ai asigurat și ai semnalizat. Pe dreapta depășești numai un vehicul care a semnalizat și s-a deplasat spre stânga ca să vireze.' },
-        { h: 'Unde nu ai voie să depășești' },
-        { li: ['Pe trecerea pentru pietoni', 'În tunel', 'În curbe și pe vârf de rampă fără vizibilitate', 'Unde e indicatorul „Depășirea interzisă” sau linie continuă'] },
-        { tip: 'În joc: în fața ta apar mașini mai lente. Poți sta în coloană în spatele lor sau le poți depăși acolo unde e permis și nu vine nimeni din față.' },
+        { p: 'Depășești pe stânga. Te uiți în oglindă, semnalizezi, treci, apoi revii pe banda ta fără să tai fața celui depășit.' },
+        { p: 'Pe dreapta ai voie doar într-o situație: cel din față a semnalizat stânga și s-a tras spre mijloc ca să vireze.' },
+        { h: 'Unde nu depășești deloc' },
+        { li: ['pe trecerea de pietoni', 'în tunel', 'în curbă sau în vârf de deal, unde nu vezi ce vine', 'unde e indicatorul cu cele două mașini sau linie continuă'] },
+        { tip: 'În joc vei da de mașini care merg mai încet decât tine. Poți să rămâi în spatele lor sau să le depășești unde ai voie și nu vine nimic din față.', label: 'În joc' },
       ],
       [
-        { h: 'Oprire și staționare' },
-        { table: [['Termen', 'Înseamnă'], ['Oprire', 'Imobilizare de cel mult 5 minute'], ['Staționare', 'Imobilizare de peste 5 minute']] },
-        { h: 'Oprirea este interzisă' },
-        { li: ['Pe trecerea pentru pietoni', 'În tunel', 'La mai puțin de 25 m înainte și după stația de autobuz', 'Unde există indicatorul „Oprirea interzisă”'] },
-        { h: 'Mersul înapoi este interzis' },
-        { li: ['Pe autostradă', 'În intersecții'] },
+        { h: 'Oprire sau staționare?' },
+        { p: 'Diferența e doar de timp. Până în 5 minute e oprire. Peste 5 minute e staționare. Contează, pentru că unele indicatoare interzic una și o lasă pe cealaltă.' },
+        { h: 'Unde nu ai voie nici să oprești' },
+        { li: ['pe zebra', 'în tunel', 'mai aproape de 25 m de indicatorul stației de autobuz, în fața sau în spatele lui', 'unde e indicatorul „Oprirea interzisă”'] },
+        { h: 'Cu spatele, niciodată pe aici' },
+        { p: 'Pe autostradă și în intersecții nu mergi cu spatele. Dacă ai ratat ieșirea, mergi până la următoarea.' },
+        { tip: 'În parcările de lângă blocuri locurile libere se aprind verde când treci încet pe lângă ele. Intră drept, cu fața sau cu spatele, și oprește în mijlocul locului.', label: 'Exersează' },
       ],
     ],
   },
   {
     id: 'sofer',
-    title: 'Șoferul, alcoolul și documentele',
+    title: 'Tu, mașina și actele',
     sign: 'noEntry',
     pages: [
       [
-        { h: 'La volan' },
-        { li: ['**Alcool**: nu conduci după ce ai băut. Peste 0,40 mg/l în aerul expirat este infracțiune.', '**Telefonul** se folosește doar cu sistem „mâini libere”.', '**Centura** e obligatorie pentru toți cei din mașină, față și spate.', '**Copiii** călătoresc în scaune potrivite vârstei și înălțimii.'] },
+        { h: 'Înainte să pornești' },
+        { p: 'Alcoolul nu se negociază. Nici „doar o bere”, nici „am mâncat bine”. Peste 0,40 mg/l în aerul expirat nu mai e amendă, e dosar penal.' },
+        { p: 'Telefonul stă în suport. Vorbești doar prin sistemul „mâini libere”.' },
+        { p: 'Centura o pun toți, și cei din spate. Copiii mici stau în scaunul lor, potrivit cu vârsta și cu înălțimea, nu în brațe.' },
       ],
       [
         { h: 'Permisul' },
-        { li: ['Categoria B se poate obține de la **18 ani**.', 'Permisul se preschimbă la **10 ani**.', '**15 puncte** de penalizare = suspendare **30 de zile**.'] },
-        { h: 'Mașina' },
-        { p: 'Pe drum cu zăpadă, gheață sau polei, **anvelopele de iarnă** sunt obligatorii.' },
+        { p: 'Pentru categoria B trebuie să ai 18 ani. Permisul îl schimbi o dată la 10 ani.' },
+        { p: 'Ți-l pot lua pentru o vreme dacă strângi 15 puncte de penalizare (30 de zile) sau dacă treci cu peste 50 km/h de limită (90 de zile).' },
+        { h: 'Iarna' },
+        { p: 'Când pe drum e zăpadă, gheață sau polei, cauciucurile de iarnă sunt obligatorii. Nu contează în ce lună e.' },
       ],
     ],
   },
   {
     id: 'accidente',
-    title: 'Pană, accident, prim ajutor',
+    title: 'Când ceva merge prost',
     sign: 'narrowRoad',
     pages: [
       [
-        { h: 'Rămâi în pană' },
-        { li: ['Aprinzi **luminile de avarie**.', 'Pui **triunghiurile reflectorizante** ca să fii văzut de departe.', 'Ieși din mașină pe partea dinspre acostament și stai în afara drumului.'] },
-        { h: 'La un accident cu răniți' },
-        { li: ['Suni la **112**.', 'Acorzi primul ajutor dacă știi, fără să te pui în pericol.', 'Nu pleci de la locul accidentului.'] },
-        { tip: 'Victima inconștientă nu se mută din mașină decât dacă e în pericol imediat, de exemplu foc.' },
+        { h: 'Ai rămas în pană' },
+        { p: 'Pui avariile din prima secundă. Ieși din mașină pe partea dinspre șanț, nu pe cea dinspre trafic, și pui triunghiurile, ca să te vadă cei din spate de departe. Apoi stai în afara drumului, nu lângă mașină.' },
+        { h: 'Ajungi la un accident' },
+        { p: 'Suni la 112. Le spui unde ești, câți oameni sunt răniți și dacă iese fum. Ajuți dacă știi ce faci, dar fără să te pui și tu în pericol.' },
+        { p: 'Dacă ai fost implicat și sunt răniți, nu pleci de acolo.' },
+        { tip: 'Pe cineva inconștient nu-l scoți din mașină doar ca să fie scos. Îl miști numai dacă rămânerea acolo e mai periculoasă, de exemplu dacă ia foc mașina.', label: 'Important' },
       ],
     ],
   },
   {
     id: 'preventiv',
-    title: 'Conducere preventivă și economică',
+    title: 'Cum să nu ai nevoie de capitolul de dinainte',
     sign: 'curveLeft',
     pages: [
       [
-        { h: 'Distanța și vremea' },
-        { li: ['Distanța față de cel din față crește cu viteza și pe drum ud sau înghețat.', '**Ceață**: viteză mică, faza scurtă și lumina de ceață, distanță mare. Faza lungă se reflectă și te orbește.', '**Acvaplanare**: ridici piciorul de pe accelerație și ții volanul drept, fără frână bruscă.', '**Noaptea**: la întâlnirea cu alt vehicul treci pe faza scurtă.'] },
+        { h: 'Distanța' },
+        { p: 'Cu cât mergi mai repede, cu atât lași mai mult loc în față. Pe ud lași și mai mult, pe gheață de câteva ori mai mult.' },
+        { h: 'Vremea' },
+        { p: 'Pe ceață încetinești, aprinzi faza scurtă și proiectorul de ceață și stai departe de cel din față. Faza lungă nu ajută: lumina se întoarce din ceață direct în ochii tăi.' },
+        { p: 'Dacă simți că volanul devine moale pe apă, ai intrat în acvaplanare. Ridici piciorul de pe accelerație și ții volanul drept. Nu frânezi brusc și nu tragi de volan.' },
+        { p: 'Noaptea, când vine cineva din față, treci pe faza scurtă. Și tu ai vrea să ți se facă la fel.' },
       ],
       [
         { h: 'Oboseala' },
-        { p: 'Oboseala îți încetinește reacțiile. Singurul remediu sigur este **pauza**: oprești într-un loc sigur și te odihnești.' },
-        { h: 'Condus economic' },
-        { li: ['Schimbi treptele la turații moderate.', 'Anticipezi traficul ca să nu frânezi brusc.', 'Nu lași motorul mult timp la ralanti.'] },
+        { p: 'Geamul deschis și muzica tare nu te trezesc, doar te păcălesc câteva minute. Dacă ți se închid ochii, oprești undeva în siguranță și dormi un sfert de oră.' },
+        { h: 'Un plin care ține mai mult' },
+        { p: 'Schimbi viteza fără să turezi motorul. Te uiți departe în față, ca să nu frânezi în ultima clipă. Nu lași motorul să meargă degeaba minute întregi la ralanti.' },
+        { tip: 'Se vede și în joc: mașina care accelerează brusc și frânează mereu consumă mult mai mult decât una condusă lin.', label: 'În joc' },
       ],
     ],
   },
@@ -202,7 +219,7 @@ export function blockHTML(b, { signImg, esc }) {
   const md = (t) => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   if (b.h) return `<h4>${md(b.h)}</h4>`;
   if (b.p) return `<p>${md(b.p)}</p>`;
-  if (b.tip) return `<div class="bk-tip"><b>Ține minte</b> ${md(b.tip)}</div>`;
+  if (b.tip) return `<div class="bk-tip"><b>${esc(b.label || 'Pont')}</b> ${md(b.tip)}</div>`;
   if (b.li) return `<ul>${b.li.map((x) => `<li>${md(x)}</li>`).join('')}</ul>`;
   if (b.table) return `<table>${b.table.map((r, i) => `<tr>${r.map((c) => (i ? `<td>${md(c)}</td>` : `<th>${md(c)}</th>`)).join('')}</tr>`).join('')}</table>`;
   if (b.signs)
