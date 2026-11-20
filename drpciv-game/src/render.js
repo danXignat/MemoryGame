@@ -164,6 +164,7 @@ export function createRenderer(canvas, initialWorld) {
     for (const n of state.npcs) drawCar(n, null, n.color, {});
     for (const o of state.obstacles || []) drawCar(o, null, o.color, { hazard: true, blinkOn: Math.floor(time / 0.33) % 2 === 0 });
     drawPeds(state, time);
+    drawMission(state, settings, time);
     drawBeams(state.car, state.spec);
     drawCar(state.car, state.spec, state.spec.color, { braking: state.car.braking, reversing: state.car.reversing, signal: state.car.signal, hazard: state.car.hazard, blinkOn, lights: state.car.lights, player: true, passenger: state.passenger, mood: state.mood, engineOn: state.car.engineOn });
     drawTrees(R);
@@ -365,6 +366,125 @@ export function createRenderer(canvas, initialWorld) {
     }
   }
 
+  // ------------------------------------------- the Final Boss: Alisia and her house
+  function label(x, y, text, color = '#ffffff', dy = -34) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-cam.angle);
+    ctx.scale(1 / cam.scale, 1 / cam.scale);
+    ctx.font = '700 12.5px Inter, Arial, sans-serif';
+    const w = ctx.measureText(text).width + 14;
+    ctx.fillStyle = 'rgba(11,19,23,0.85)';
+    rr(ctx, -w / 2, dy - 11, w, 22, 9);
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 0, dy);
+    ctx.restore();
+  }
+  function drawAlisia(x, y, heading, time, waving) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1.6, 1.6); // a bit bigger than life so her face is easy to see
+    ctx.fillStyle = COL.shadow;
+    ctx.beginPath();
+    ctx.ellipse(0.25, 0.3, 0.75, 0.9, 0, 0, TAU);
+    ctx.fill();
+    ctx.save();
+    ctx.rotate(heading);
+    ctx.fillStyle = '#e8548c'; // dress
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 0.42, 0.85, 0, 0, TAU);
+    ctx.fill();
+    if (waving) {
+      ctx.strokeStyle = '#e8b89a';
+      ctx.lineWidth = 0.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(0.1, 0.6);
+      ctx.lineTo(0.75 + 0.25 * Math.sin(time * 8), 1.05);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // face, always upright on screen
+    ctx.rotate(-cam.angle);
+    const img = portraitImage('alisia');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, -0.15, 0.62, 0, TAU);
+    ctx.clip();
+    if (img) ctx.drawImage(img, -0.62, -0.77, 1.24, 1.24);
+    else {
+      ctx.fillStyle = '#3b2418';
+      ctx.fillRect(-0.7, -0.9, 1.4, 1.5);
+      ctx.fillStyle = '#e8b89a';
+      ctx.beginPath();
+      ctx.arc(0, -0.08, 0.4, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.12;
+    ctx.beginPath();
+    ctx.arc(0, -0.15, 0.62, 0, TAU);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawMission(state, settings, time) {
+    const m = world.mission;
+    const p = state.pax;
+    if (!m || !p) return;
+    const ro = settings.lang === 'ro';
+    // her house at the end of the drive
+    if (m.house && Math.hypot(m.house.x - cam.x, m.house.y - cam.y) < 140) {
+      ctx.save();
+      ctx.translate(m.house.x, m.house.y);
+      ctx.rotate(m.house.heading);
+      ctx.fillStyle = COL.shadow;
+      ctx.fillRect(-5.2, -3.7, 11, 8.5);
+      ctx.fillStyle = '#f4ead8';
+      ctx.fillRect(-5.5, -4.2, 11, 8.4);
+      ctx.fillStyle = '#c4476e';
+      ctx.fillRect(-5.5, -4.2, 11, 4.2);
+      ctx.fillStyle = '#a63a5c';
+      ctx.fillRect(-5.5, -0.2, 11, 0.4);
+      ctx.fillStyle = '#7a4a2a';
+      ctx.fillRect(-1, -4.6, 2, 0.8); // door towards the road
+      ctx.restore();
+      label(m.house.x, m.house.y, 'Str. Sfinții Constantin și Elena 41', '#ffd1e3', -44);
+    }
+    // where to stop
+    const pulse = 1 + 0.12 * Math.sin(time * 5);
+    if (p.phase === 'waiting' || p.phase === 'walking') {
+      ctx.strokeStyle = 'rgba(255,95,162,0.9)';
+      ctx.lineWidth = 0.35;
+      ctx.setLineDash([1.2, 0.9]);
+      ctx.beginPath();
+      ctx.arc(m.pickup.x, m.pickup.y, 4.2 * pulse, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (p.phase === 'in' && m.destSpot && Math.hypot(state.car.x - m.destSpot.x, state.car.y - m.destSpot.y) < 80) {
+      ctx.strokeStyle = 'rgba(160,120,255,0.95)';
+      ctx.lineWidth = 0.35;
+      ctx.setLineDash([1.2, 0.9]);
+      ctx.beginPath();
+      ctx.arc(m.destSpot.x, m.destSpot.y, 4.6 * pulse, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      label(m.destSpot.x, m.destSpot.y, ro ? 'Oprește aici' : 'Stop here', '#e5dbff', -26);
+    }
+    // Alisia herself
+    if (p.phase === 'waiting' || p.phase === 'walking' || p.phase === 'leaving' || p.phase === 'home') {
+      if (p.phase === 'home') return;
+      const towards = p.phase === 'walking' ? Math.atan2(state.car.y - p.y, state.car.x - p.x) : p.phase === 'leaving' ? Math.atan2(m.house.y - p.y, m.house.x - p.x) : Math.atan2(state.car.y - p.y, state.car.x - p.x);
+      drawAlisia(p.x, p.y, towards - Math.PI / 2, time, p.phase === 'waiting');
+      const txt = p.phase === 'waiting' ? (ro ? 'Alisia · oprește aici' : 'Alisia · stop here') : 'Alisia';
+      if (p.phase !== 'leaving') label(p.x, p.y, txt, '#ffd1e3', -48);
+    }
+  }
+
   // ----------------------------------------------------------------- cars
   function drawBeams(car, spec) {
     if (car.lights < 1) return;
@@ -530,7 +650,7 @@ export function createRenderer(canvas, initialWorld) {
   }
   function drawPins(R) {
     for (const p of world.pins) {
-      if (p.type === 'crosswalk') continue;
+      if (p.type === 'crosswalk' || p.type === 'pickup' || p.type === 'home') continue;
       if (Math.hypot(p.x - cam.x, p.y - cam.y) > R + 10) continue;
       ctx.save();
       ctx.translate(p.x, p.y);

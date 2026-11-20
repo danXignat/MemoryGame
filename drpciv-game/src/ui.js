@@ -26,6 +26,8 @@ const NAV_ICON = {
   left: '<path d="M18 20V11a5 5 0 0 0-5-5H7M11 2L6 6l5 4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
   roundabout: '<circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 22v-4M20 6l-3 3M8 4l4 2" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
   finish: '<path d="M6 21V4M6 5h12l-2.5 4 2.5 4H6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+  pickup: '<circle cx="12" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M5 21c0-4 3-7 7-7s7 3 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
+  home: '<path d="M3 11l9-7 9 7M5 10v10h14V10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/>',
   warn: '<path d="M12 3L2 20h20z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v5M12 17v.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
   fuel: '<path d="M5 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 20h12M15 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V8l-3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
 };
@@ -169,6 +171,15 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     toast.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(hideToast, 7000);
+  }
+
+  function showPersonToast(who, title, text) {
+    hideCard();
+    toast.className = 'info';
+    toast.innerHTML = `<div class="toastrow">${pimg(who)}<div><div class="verdict" style="color:var(--accent)">${esc(title)}</div><div class="msg" style="font-weight:500">${esc(text)}</div></div></div>`;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 6000);
   }
 
   function showInfo(title, text) {
@@ -321,8 +332,23 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     for (const l of world.laneTasks) tasks.push({ s: l.s, kind: l.to, en: `move to the ${l.to} lane — signal ${l.to}`, ro: `treci pe banda din ${l.to === 'left' ? 'stânga' : 'dreapta'} — semnalizează` });
     for (const o of world.obstacles) tasks.push({ s: o.s - 25, kind: 'warn', en: 'stopped car — signal left and pass it', ro: 'mașină oprită — semnalizează stânga și ocolește' });
     for (const h of world.hazardStops) tasks.push({ s: h.s, kind: 'warn', en: 'breakdown spot — stop with hazard lights on', ro: 'loc de pană — oprește cu avariile pornite' });
+    if (world.mission && s.pax) {
+      const px = s.pax;
+      if (px.phase === 'waiting') tasks.push({ s: world.mission.pickup.s, kind: 'pickup', en: 'pick up Alisia — stop at the pink circle', ro: 'ia-o pe Alisia — oprește la cercul roz' });
+      if (px.phase === 'in' && world.mission.destSpot) tasks.push({ s: world.mission.destSpot.s, kind: 'home', en: "Alisia's home — stop at the purple circle", ro: 'acasă la Alisia — oprește la cercul mov' });
+    }
     if (world.refuel) tasks.push({ s: world.refuel.s - 35, kind: 'fuel', en: 'fuel station — stop at the pump, engine off, refuel', ro: 'benzinărie — oprește la pompă, motorul oprit, alimentează' });
-    const tk = tasks.filter((q) => q.s - pr.s > -6 && q.s - pr.s < 150).sort((p1, p2) => p1.s - p2.s)[0];
+    const tk = tasks.filter((q) => q.s - pr.s > -12 && q.s - pr.s < 240).sort((p1, p2) => p1.s - p2.s)[0];
+    if (s.pax && (s.pax.phase === 'walking' || s.pax.phase === 'leaving')) {
+      const key = 'pax|' + s.pax.phase + lang();
+      if (key !== lastNav) {
+        lastNav = key;
+        E.nav.hidden = false;
+        E.navIcon.innerHTML = NAV_ICON.pickup;
+        E.navTxt.textContent = s.pax.phase === 'walking' ? (lang() === 'en' ? 'Alisia is getting in… stay stopped' : 'Alisia urcă în mașină… rămâi oprit') : lang() === 'en' ? 'Alisia is going home…' : 'Alisia merge acasă…';
+      }
+      return;
+    }
     if (!pr.onRoute && s.mode === 'test') {
       kind = null;
     } else if (tk && (!m || tk.s <= m.s)) {
@@ -1044,6 +1070,14 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       if (vn > 3) vibrate(18);
     });
     game.on('blink', (ph) => sfx.tick(ph));
+    game.on('boarded', (e) => {
+      sfx.ok();
+      showPersonToast('alisia', 'Alisia', e && e.missed ? (lang() === 'en' ? 'You drove past me! I ran after you. Next time stop at the circle.' : 'Ai trecut de mine! Am fugit după mașină. Data viitoare oprește la cerc.') : lang() === 'en' ? 'Hi Naty! Take me home to Sânpetru, please.' : 'Bună, Naty! Du-mă acasă în Sânpetru, te rog.');
+    });
+    game.on('paxLeave', () => showPersonToast('alisia', 'Alisia', lang() === 'en' ? 'Thanks for the safe drive! See you soon.' : 'Mersi pentru drumul liniștit! Ne vedem curând.'));
+    game.on('home', () => {
+      if (st().mode !== 'test') showPersonToast('alisia', 'Alisia', lang() === 'en' ? 'I am home. Try it in Test mode for the licence ending!' : 'Am ajuns acasă. Încearcă și în modul Test pentru finalul cu permisul!');
+    });
     game.on('lowfuel', () => {
       sfx.lowfuel();
       showInfo('Low fuel', 'Head for the nearest fuel station (green pin on the map).');

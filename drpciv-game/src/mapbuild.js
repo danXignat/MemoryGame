@@ -413,8 +413,11 @@ export function buildWorld(MAP) {
     : null;
   if (mission && mission.pickup) pins.push({ type: 'pickup', label: mission.pickup.name, x: mission.pickup.x, y: mission.pickup.y, s: mission.pickup.s });
   if (mission && mission.dest) {
-    const q = routeAt(length, {});
-    pins.push({ type: 'home', label: mission.dest.name, x: q.x - q.dy * 7, y: q.y + q.dx * 7, s: length });
+    // where you stop (beside the road, near the end) and her house behind it
+    const q = routeAt(length - 6, {});
+    mission.destSpot = { x: q.x - q.dy * 6.5, y: q.y + q.dx * 6.5, s: length - 6 };
+    mission.house = { x: q.x - q.dy * (half + 12), y: q.y + q.dx * (half + 12), heading: Math.atan2(q.dy, q.dx) };
+    pins.push({ type: 'home', label: mission.dest.name, x: mission.house.x, y: mission.house.y - 0.01, s: length });
   }
 
 
@@ -444,6 +447,9 @@ export function buildWorld(MAP) {
   const by1 = maxY + m;
   const roofs = ['#b5543c', '#a8483a', '#c26a4a', '#8c5a4a', '#9a7b58', '#7d8793'];
 
+  // keep the Final Boss spots (pick-up, her house) free of trees and houses
+  const keepClear = [mission && mission.house, mission && mission.pickup].filter(Boolean);
+  const blocked = (x, y, pad) => keepClear.some((k) => Math.hypot(x - k.x, y - k.y) < 15 + pad);
   const nearRing = (x, y, pad) => rings.some((r) => Math.hypot(x - r.cx, y - r.cy) < r.r + half + pad);
   for (let attempt = 0; attempt < 900 && houses.length < 34; attempt++) {
     const w = 10 + rnd() * 8;
@@ -457,7 +463,7 @@ export function buildWorld(MAP) {
       [x - w / 2, y + h / 2],
       [x + w / 2, y + h / 2],
     ];
-    if (pts.some(([px, py]) => queryRoad(px, py).dist < half + 7 || nearRing(px, py, 6))) continue;
+    if (pts.some(([px, py]) => queryRoad(px, py).dist < half + 7 || nearRing(px, py, 6) || blocked(px, py, 2))) continue;
     if (houses.some((o) => Math.abs(o.x - x) < (o.w + w) / 2 + 5 && Math.abs(o.y - y) < (o.h + h) / 2 + 5)) continue;
     houses.push({ x, y, w, h, roof: roofs[Math.floor(rnd() * roofs.length)] });
   }
@@ -465,7 +471,7 @@ export function buildWorld(MAP) {
     const x = bx0 + rnd() * (bx1 - bx0);
     const y = by0 + rnd() * (by1 - by0);
     const r = 1.6 + rnd() * 1.9;
-    if (queryRoad(x, y).dist < half + r + 2.2) continue;
+    if (queryRoad(x, y).dist < half + r + 2.2 || blocked(x, y, r)) continue;
     if (nearRing(x, y, r + 1) && !rings.some((rg) => Math.hypot(x - rg.cx, y - rg.cy) < rg.island - r)) continue;
     if (houses.some((o) => Math.abs(o.x - x) < o.w / 2 + r + 1.5 && Math.abs(o.y - y) < o.h / 2 + r + 1.5)) continue;
     if (trees.some((o) => Math.hypot(o.x - x, o.y - y) < o.r + r + 0.6)) continue;

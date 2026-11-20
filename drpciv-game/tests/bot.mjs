@@ -65,6 +65,10 @@ export function makeBot(game, world, map, kind = 'careful') {
               if (dist > -3 && dist < 60 && !(task.minV <= C.test.stopMaxKmh)) target = Math.min(target, stopAt(dist));
             }
             if (task.type === 'pickup' && task.s - s < 30) target = Math.min(target, stopAt(task.s - s - 1));
+          }
+          if (world.mission && world.mission.destSpot && st.pax && st.pax.phase !== 'waiting' && world.mission.destSpot.s - s < 40) target = Math.min(target, stopAt(world.mission.destSpot.s - s));
+          for (const task of st.test.tasks) {
+            if (task.status === 'done') continue;
             if (task.type === 'hazardStop' && task.s - s < 30) {
               if (!car.hazard && task.s - s < 25) game.toggleHazard();
               target = Math.min(target, stopAt(task.s - s - 1));

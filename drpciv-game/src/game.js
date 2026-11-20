@@ -744,17 +744,8 @@ export function createGame(world, opts = {}) {
         t.hold = 0;
         t.spot = world.mission.pickup;
       },
-      update(t, c) {
-        const d = Math.hypot(c.car.x - t.spot.x, c.car.y - t.spot.y);
-        if (d < 10 && c.kmh < 3) t.hold += c.dt;
-        else t.hold = Math.max(0, t.hold - c.dt);
-        if (t.hold > 1.2) {
-          state.passenger = true;
-          finish(t, true, 'pickup');
-        } else if (c.s > t.s + 16) {
-          state.passenger = true;
-          finish(t, false, 'pickup');
-        }
+      update(t) {
+        if (state.pax && state.pax.phase !== 'waiting' && state.pax.phase !== 'walking') finish(t, !state.pax.missed, 'pickup');
       },
     },
   };
@@ -845,7 +836,7 @@ export function createGame(world, opts = {}) {
       seconds: state.time - test.startTime,
       levelId: level ? level.id : null,
       boss: !!(level && level.boss),
-      passenger: state.passenger,
+      passenger: state.passenger || state.delivered,
       carId: state.spec.id,
       fuelSpent: state.fuelSpent,
     };
@@ -916,7 +907,7 @@ export function createGame(world, opts = {}) {
       HANDLERS[t.type].update(t, ctx);
       if (state.quiz) break;
     }
-    if (pr.onRoute && pr.s >= world.route.length - 0.8 && pr.vAlong > 0.5) {
+    if (!(world.mission && world.mission.dest) && pr.onRoute && pr.s >= world.route.length - 0.8 && pr.vAlong > 0.5) {
       test.reachedFinish = true;
       endTest();
     }
@@ -1034,6 +1025,74 @@ export function createGame(world, opts = {}) {
     }
   }
 
+  // ---- the passenger: waits at the pick-up spot, walks to the car, gets out at home ----
+  function updatePassenger(dt) {
+    const m = world.mission;
+    const p = state.pax;
+    if (!m || !p) return;
+    const car = state.car;
+    const kmh = Math.abs(car.v) * 3.6;
+    const side = HW + 0.7;
+    const door = { x: car.x - Math.sin(car.heading) * side, y: car.y + Math.cos(car.heading) * side };
+    const lerp = (a, b, t) => a + (b - a) * Math.min(1, Math.max(0, t));
+    if (p.phase === 'waiting') {
+      p.x = m.pickup.x;
+      p.y = m.pickup.y;
+      const near = Math.hypot(car.x - m.pickup.x, car.y - m.pickup.y) < 11;
+      if (near && kmh < 3) {
+        p.hold += dt;
+        if (p.hold > 0.5) {
+          p.phase = 'walking';
+          p.t = 0;
+          emit('paxWalk');
+        }
+      } else p.hold = 0;
+      if (state.prog.s > m.pickup.s + 16) {
+        // drove past: she runs after you and jumps in (it counts as a mistake)
+        p.missed = true;
+        p.phase = 'in';
+        state.passenger = true;
+        emit('boarded', { missed: true });
+      }
+    } else if (p.phase === 'walking') {
+      if (kmh < 3) p.t += dt / 1.8;
+      p.x = lerp(m.pickup.x, door.x, p.t);
+      p.y = lerp(m.pickup.y, door.y, p.t);
+      if (p.t >= 1) {
+        p.phase = 'in';
+        state.passenger = true;
+        state.mood = 'happy';
+        emit('boarded', { missed: false });
+      }
+    } else if (p.phase === 'in' && m.dest) {
+      const near = Math.hypot(car.x - m.destSpot.x, car.y - m.destSpot.y) < 12;
+      if (near && kmh < 3) {
+        p.hold2 += dt;
+        if (p.hold2 > 0.6) {
+          p.phase = 'leaving';
+          p.t = 0;
+          p.fromX = door.x;
+          p.fromY = door.y;
+          state.passenger = false;
+          state.delivered = true;
+          emit('paxLeave');
+        }
+      } else p.hold2 = 0;
+    } else if (p.phase === 'leaving') {
+      p.t += dt / 2;
+      p.x = lerp(p.fromX, m.house.x, p.t);
+      p.y = lerp(p.fromY, m.house.y, p.t);
+      if (p.t >= 1) {
+        p.phase = 'home';
+        emit('home');
+        if (state.mode === 'test' && state.test && !state.test.finished) {
+          state.test.reachedFinish = true;
+          endTest();
+        }
+      }
+    }
+  }
+
   function update(dt, input) {
     state.time += dt;
     stepCar(state.car, input, dt);
@@ -1042,6 +1101,7 @@ export function createGame(world, opts = {}) {
     updateProgress(dt);
     updateActiveSign();
     updateBlinkersAndStation(dt);
+    updatePassenger(dt);
     if (state.mode === 'test' && state.test && !state.test.finished) runRules(dt);
     state.shake = Math.max(0, state.shake - dt * 2.5);
   }
@@ -1073,6 +1133,8 @@ export function createGame(world, opts = {}) {
     state.shake = 0;
     state.activeSign = null;
     state.passenger = false;
+    state.delivered = false;
+    state.pax = world.mission ? { phase: 'waiting', t: 0, hold: 0, hold2: 0, x: 0, y: 0, missed: false } : null;
     state.refueling = null;
     state.fuelSpent = 0;
     state.fuelAdded = 0;
