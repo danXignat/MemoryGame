@@ -26,6 +26,8 @@ const NAV_ICON = {
   left: '<path d="M18 20V11a5 5 0 0 0-5-5H7M11 2L6 6l5 4" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>',
   roundabout: '<circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M12 22v-4M20 6l-3 3M8 4l4 2" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>',
   finish: '<path d="M6 21V4M6 5h12l-2.5 4 2.5 4H6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>',
+  warn: '<path d="M12 3L2 20h20z" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linejoin="round"/><path d="M12 9v5M12 17v.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>',
+  fuel: '<path d="M5 20V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v15M4 20h12M15 9h2.5a1.5 1.5 0 0 1 1.5 1.5V16a1.5 1.5 0 0 0 3 0V8l-3-3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>',
 };
 
 export function createUI({ settings, saveSettings, controls, renderer, actions }) {
@@ -79,7 +81,9 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   const card = $('#card');
   const toast = $('#toast');
   let cardSign = null;
-  let cardLastSeen = 0;
+  let cardShownAt = 0;
+  let lastActive = null;
+  const CARD_SECONDS = 5; // how long a sign card stays on screen
 
   function renderCard(sg) {
     const d = sg.def;
@@ -106,6 +110,16 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   }
   card.addEventListener('click', () => {
     if (cardSign) openLibrary(cardSign.key);
+  });
+
+  // tap a road sign on the map to read its explanation
+  $('#game').addEventListener('pointerdown', (e) => {
+    if (!G.game || modals.length) return;
+    const sg = renderer.signAt(e.clientX, e.clientY);
+    if (!sg) return;
+    unlock();
+    sfx.tap();
+    openLibrary(sg.key);
   });
 
   // -------------------------------------------------------- feedback toast
@@ -301,8 +315,20 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const m = world.maneuvers.find((x) => x.s > pr.s - 4);
     const remain = total - pr.s;
     const rounded = (v) => Math.max(10, Math.round(v / 10) * 10);
+    // level tasks that are not turns: lane changes, stopped car, breakdown spot, fuel station
+    const en = lang() === 'en';
+    const tasks = [];
+    for (const l of world.laneTasks) tasks.push({ s: l.s, kind: l.to, en: `move to the ${l.to} lane — signal ${l.to}`, ro: `treci pe banda din ${l.to === 'left' ? 'stânga' : 'dreapta'} — semnalizează` });
+    for (const o of world.obstacles) tasks.push({ s: o.s - 25, kind: 'warn', en: 'stopped car — signal left and pass it', ro: 'mașină oprită — semnalizează stânga și ocolește' });
+    for (const h of world.hazardStops) tasks.push({ s: h.s, kind: 'warn', en: 'breakdown spot — stop with hazard lights on', ro: 'loc de pană — oprește cu avariile pornite' });
+    if (world.refuel) tasks.push({ s: world.refuel.s - 35, kind: 'fuel', en: 'fuel station — stop at the pump, engine off, refuel', ro: 'benzinărie — oprește la pompă, motorul oprit, alimentează' });
+    const tk = tasks.filter((q) => q.s - pr.s > -6 && q.s - pr.s < 150).sort((p1, p2) => p1.s - p2.s)[0];
     if (!pr.onRoute && s.mode === 'test') {
       kind = null;
+    } else if (tk && (!m || tk.s <= m.s)) {
+      const dist = tk.s - pr.s;
+      kind = tk.kind;
+      text = dist < 15 ? (en ? tk.en[0].toUpperCase() + tk.en.slice(1) : tk.ro[0].toUpperCase() + tk.ro.slice(1)) : en ? `In ${rounded(dist)} m ${tk.en}` : `Peste ${rounded(dist)} m ${tk.ro}`;
     } else if (m && m.s - pr.s < 220) {
       const dist = m.s - pr.s;
       kind = m.type;
@@ -432,14 +458,16 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     updateScore();
 
     // the dock follows the sign you are approaching (Learn, and Test when indications are on)
+    //   shown once per approach, for about 5 seconds (long enough to read); tap a sign on the road for more
     const wantCard = !modals.length && (s.mode === 'learn' || (s.mode === 'test' && settings.hints));
-    if (wantCard) {
-      const now = performance.now();
-      if (a) {
-        cardLastSeen = now;
-        if (cardSign !== a && toast.hidden) showCard(a);
-      } else if (cardSign && now - cardLastSeen > 4500) hideCard();
-    } else if (!card.hidden) hideCard();
+    const now = performance.now();
+    if (!a) lastActive = null;
+    if (wantCard && a && a !== lastActive && toast.hidden) {
+      lastActive = a;
+      showCard(a);
+      cardShownAt = now;
+    }
+    if (cardSign && (!wantCard || now - cardShownAt > CARD_SECONDS * 1000)) hideCard();
   }
 
   function checkOrientation() {
@@ -784,10 +812,10 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
             const tag = l.id === 'free' ? 'FREE' : l.boss ? 'BOSS' : `L${l.n}`;
             return `<button type="button" class="lvtile ${l.playable ? 'play' : 'soon'} ${G.level && G.level.id === l.id ? 'sel' : ''}" data-lv="${l.id}">
               <span class="lvtag">${tag}</span><b>${esc(name(l.title))}</b><span class="lvd">${esc(l.district)}</span>
-              <span class="lvm">${WEATHER[l.weather]} · ${l.playable ? (done(l) ? 'Passed ✓' : 'Play') : 'Coming next'}</span></button>`;
+              <span class="lvm">${WEATHER[l.weather]} · ${l.boss && !done(LEVELS.find((x) => x.id === 'L15')) ? 'Locked: pass Level 15' : l.playable ? (done(l) ? 'Passed ✓' : 'Play') : 'Coming next'}</span></button>`;
           }).join('')}
         </div>
-        <p class="empty" style="text-align:left">The city is stylised. Level 6-15 are planned and already have their topic, district and weather. Open one to preview its conditions.</p></div>
+        <p class="empty" style="text-align:left">The city is stylised: level names are Brașov districts, not real street maps. The Final Boss unlocks after Level 15.</p></div>
       </div>`);
     m.el.addEventListener('click', (e) => {
       const b = e.target.closest('[data-lv]');
@@ -795,10 +823,26 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       const l = LEVELS.find((x) => x.id === b.dataset.lv);
       sfx.tap();
       m.close();
-      if (l.playable) actions.startLevel(l.id, { mode: l.id === 'free' ? 'learn' : settings.mode });
+      if (l.boss && !done(LEVELS.find((x) => x.id === 'L15'))) openBossLocked(l);
+      else if (l.playable) actions.startLevel(l.id, { mode: l.id === 'free' ? 'learn' : settings.mode });
       else openSoon(l);
     });
   }
+  function openBossLocked(l) {
+    const m = openModal(`
+      <div class="sheet" role="dialog" aria-label="Final Boss locked">
+        ${head('Final Boss is locked')}
+        <div class="sheet-body">
+          <p class="rule" style="margin-bottom:12px">Pass Level 15 (the licence test) to unlock the drive from Livada Poștei to Sânpetru.</p>
+          <div class="stack"><button type="button" class="btn" id="bossTry">Preview it anyway</button><button type="button" class="btn ghost" data-close>Close</button></div>
+        </div>
+      </div>`);
+    $('#bossTry', m.el).addEventListener('click', () => {
+      m.close();
+      actions.startLevel(l.id, { mode: settings.mode });
+    });
+  }
+
   function openSoon(l) {
     const m = openModal(`
       <div class="sheet" role="dialog" aria-label="Level preview">

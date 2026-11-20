@@ -74,9 +74,26 @@ export function createRenderer(canvas, initialWorld) {
   let anchorY = 0.5;
   let rain = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), v: 0.8 + Math.random() * 0.8 }));
 
+  function buildLaneLines(w) {
+    if (typeof Path2D === 'undefined' || !w.laneDividers || !w.laneDividers.length) return [];
+    const r = w.route;
+    return w.laneDividers.map((off) => {
+      const p = new Path2D();
+      for (let k = 0; k <= r.N; k += 2) {
+        const x = r.X[k] - r.DY[k] * off;
+        const y = r.Y[k] + r.DX[k] * off;
+        if (k === 0) p.moveTo(x, y);
+        else p.lineTo(x, y);
+      }
+      return p;
+    });
+  }
+  let laneLines = buildLaneLines(world);
+
   function setWorld(w) {
     world = w;
     paths = buildPaths(w);
+    laneLines = buildLaneLines(w);
     cam.ready = false;
   }
 
@@ -145,6 +162,7 @@ export function createRenderer(canvas, initialWorld) {
     drawHouses(R);
     for (const ai of state.traffic) drawCar(ai, null, ai.color, {});
     for (const n of state.npcs) drawCar(n, null, n.color, {});
+    for (const o of state.obstacles || []) drawCar(o, null, o.color, { hazard: true, blinkOn: Math.floor(time / 0.33) % 2 === 0 });
     drawPeds(state, time);
     drawBeams(state.car, state.spec);
     drawCar(state.car, state.spec, state.spec.color, { braking: state.car.braking, reversing: state.car.reversing, signal: state.car.signal, hazard: state.car.hazard, blinkOn, lights: state.car.lights, player: true, passenger: state.passenger, mood: state.mood, engineOn: state.car.engineOn });
@@ -181,6 +199,9 @@ export function createRenderer(canvas, initialWorld) {
     ctx.lineCap = 'butt';
     ctx.setLineDash([3, 4.5]);
     for (const p of paths) if (p.lane) ctx.stroke(p.path);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.setLineDash([2.5, 5]);
+    for (const p of laneLines) ctx.stroke(p);
     ctx.setLineDash([]);
   }
 
@@ -224,11 +245,16 @@ export function createRenderer(canvas, initialWorld) {
       ctx.fill();
       ctx.globalAlpha = 1;
       // pump
+      const px = st.pump ? st.pump.x : st.bay.x + 2.2;
+      const py = st.pump ? st.pump.y : st.bay.y - 6.2;
+      ctx.fillStyle = '#5b6470';
+      rr(ctx, px - 1.6, py - 1.6, 3.2, 3.2, 0.4);
+      ctx.fill();
       ctx.fillStyle = '#e63946';
-      rr(ctx, st.bay.x + 2.2, st.bay.y - 6.2, 1.5, 2.8, 0.3);
+      rr(ctx, px - 0.75, py - 1.3, 1.5, 2.6, 0.3);
       ctx.fill();
       ctx.fillStyle = '#f1f3f5';
-      ctx.fillRect(st.bay.x + 2.5, st.bay.y - 5.8, 0.9, 1);
+      ctx.fillRect(px - 0.45, py - 0.95, 0.9, 0.9);
     }
   }
 
@@ -500,7 +526,7 @@ export function createRenderer(canvas, initialWorld) {
 
   // ------------------------------------------------------------- map pins
   function pinColor(type) {
-    return { station: '#12b5a6', camera: '#e5484d', hazard: '#ff9f1c', pickup: '#ff5fa2', home: '#8f5bff', crosswalk: '#3b82f6' }[type] || '#3b82f6';
+    return { station: '#12b5a6', camera: '#e5484d', hazard: '#ff9f1c', breakdown: '#ff9f1c', roadwork: '#f08c00', police: '#3b5bdb', pickup: '#ff5fa2', home: '#8f5bff', crosswalk: '#3b82f6' }[type] || '#3b82f6';
   }
   function drawPins(R) {
     for (const p of world.pins) {
@@ -532,7 +558,7 @@ export function createRenderer(canvas, initialWorld) {
         ctx.lineTo(0.5, -2.2);
         ctx.lineTo(-0.5, -2.2);
         ctx.fill();
-      } else if (p.type === 'hazard') {
+      } else if (p.type === 'hazard' || p.type === 'breakdown' || p.type === 'roadwork') {
         ctx.beginPath();
         ctx.moveTo(0, -3.1);
         ctx.lineTo(0.8, -1.7);
@@ -778,6 +804,31 @@ export function createRenderer(canvas, initialWorld) {
     c.restore();
   }
 
+  /** Screen point (CSS px) -> world point (metres), the inverse of applyView. */
+  function screenToWorld(px, py) {
+    const r = canvas.getBoundingClientRect();
+    const dx = px - r.left - W / 2;
+    const dy = py - r.top - H * anchorY;
+    const c = Math.cos(-cam.angle);
+    const s = Math.sin(-cam.angle);
+    return { x: cam.x + (dx * c - dy * s) / cam.scale, y: cam.y + (dx * s + dy * c) / cam.scale };
+  }
+  /** The road sign drawn under a screen point (generous touch area), or null. */
+  function signAt(px, py) {
+    const p = screenToWorld(px, py);
+    const reach = C.world.signRadius * 1.6 + 14 / cam.scale;
+    let best = null;
+    let bd = reach;
+    for (const sg of world.signs) {
+      const d = Math.hypot(sg.x - p.x, sg.y - p.y);
+      if (d < bd) {
+        bd = d;
+        best = sg;
+      }
+    }
+    return best;
+  }
+
   resize();
-  return { resize, setWorld, updateCamera, draw, drawMinimap, cam, get portrait() { return portrait; } };
+  return { resize, setWorld, screenToWorld, signAt, updateCamera, draw, drawMinimap, cam, get portrait() { return portrait; } };
 }

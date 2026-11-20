@@ -266,6 +266,8 @@ export function buildWorld(MAP) {
   };
 
   // ------------------------------------------------------------- the signs
+  const signOff = Math.max(C.world.signOffset, half + 3.4);
+  const startLane = MAP.startLane ?? C.world.laneOffset;
   const signs = (MAP.signs || []).map((p, i) => {
     const def = SIGNS[p.sign];
     if (!def) throw new Error(`map.js: unknown sign "${p.sign}" (add it to signs.js first)`);
@@ -277,8 +279,8 @@ export function buildWorld(MAP) {
       id: `${p.sign}#${i}`,
       key: p.sign,
       def,
-      x: pt.x - pt.dy * side * C.world.signOffset,
-      y: pt.y + pt.dx * side * C.world.signOffset,
+      x: pt.x - pt.dy * side * signOff,
+      y: pt.y + pt.dx * side * signOff,
       s,
       dx: pt.dx,
       dy: pt.dy,
@@ -335,6 +337,8 @@ export function buildWorld(MAP) {
     path: makePath(n.points),
     kmh: n.kmh,
     every: n.every ?? 12,
+    loop: !!n.loop, // goes round and round (roundabout traffic)
+    count: n.count ?? 1,
     color: n.color || '#8c6bd6',
     lane: n.lane ?? C.traffic.laneOffset,
   }));
@@ -366,7 +370,7 @@ export function buildWorld(MAP) {
   });
 
   // ------------------------------------------------------------ gas stations
-  const stations = (MAP.stations || []).map((st, i) => ({ id: `station${i}`, name: st.name || 'Fuel', x: st.x, y: st.y, bay: st.bay || { x: st.x, y: st.y, r: 3.5 }, zone: st.zone || { x: st.x, y: st.y, r: 40 }, heading: st.heading ?? 0 }));
+  const stations = (MAP.stations || []).map((st, i) => ({ id: `station${i}`, name: st.name || 'Fuel', x: st.x, y: st.y, bay: st.bay || { x: st.x, y: st.y, r: 3.5 }, zone: st.zone || { x: st.x, y: st.y, r: 40 }, pump: st.pump || null, heading: st.heading ?? 0 }));
   for (const st of MAP.stations || []) {
     if (st.road) {
       const segs = [];
@@ -382,7 +386,8 @@ export function buildWorld(MAP) {
       const s = resolveAt(p.at, `pin ${p.type}`);
       const pt = routeAt(s, {});
       const side = p.side === 'left' ? -1 : 1;
-      pins.push({ type: p.type, label: p.label || '', x: pt.x - pt.dy * side * (p.offset ?? 6), y: pt.y + pt.dx * side * (p.offset ?? 6), s });
+      const po = p.offset ?? Math.max(6, half + 2);
+      pins.push({ type: p.type, label: p.label || '', x: pt.x - pt.dy * side * po, y: pt.y + pt.dx * side * po, s });
     } else pins.push({ type: p.type, label: p.label || '', x: p.x, y: p.y, s: null });
   }
   for (const st of stations) pins.push({ type: 'station', label: st.name, x: st.x, y: st.y, s: null });
@@ -411,6 +416,21 @@ export function buildWorld(MAP) {
     const q = routeAt(length, {});
     pins.push({ type: 'home', label: mission.dest.name, x: q.x - q.dy * 7, y: q.y + q.dx * 7, s: length });
   }
+
+
+  // ------------------------------------------- level extras (lanes, obstacles, refuel ...)
+  const onRoute = (at, label, lateral = 0) => {
+    const s = resolveAt(at, label);
+    const pt = routeAt(s, {});
+    return { s, x: pt.x - pt.dy * lateral, y: pt.y + pt.dx * lateral, dx: pt.dx, dy: pt.dy };
+  };
+  const obstacles = (MAP.obstacles || []).map((o, i) => ({ id: `obst${i}`, ...onRoute(o.at, `obstacle ${i + 1}`, o.lane ?? startLane) }));
+  for (const o of obstacles) pins.push({ type: 'hazard', label: 'Stopped car', x: o.x - o.dy * (half + 2), y: o.y + o.dx * (half + 2), s: o.s });
+  const hazardStops = (MAP.hazardStops || []).map((h, i) => ({ id: `hstop${i}`, ...onRoute(h.at, `breakdown spot ${i + 1}`, startLane) }));
+  for (const h of hazardStops) pins.push({ type: 'breakdown', label: 'Breakdown spot', x: h.x - h.dy * (half + 1.5), y: h.y + h.dx * (half + 1.5), s: h.s });
+  const laneTasks = (MAP.lanes || []).map((l, i) => ({ id: `lane${i}`, to: l.to, window: l.window ?? 80, divider: l.divider ?? (MAP.laneDividers ? MAP.laneDividers[0] : 3.75), s: resolveAt(l.at, `lane change ${i + 1}`) }));
+  const refuel = MAP.refuel ? { litres: MAP.refuel.litres ?? 10, ...onRoute(MAP.refuel.at, 'refuel') } : null;
+  const laneDividers = MAP.laneDividers || [];
 
   // ------------------------------------------------------ scenery (decoration)
   const rnd = mulberry32(20240611);
@@ -468,6 +488,12 @@ export function buildWorld(MAP) {
     signalTasks,
     maneuvers,
     mission,
+    obstacles,
+    hazardStops,
+    laneTasks,
+    refuel,
+    laneDividers,
+    startLane,
     weather: MAP.weather || 'day',
     houses,
     trees,
@@ -476,7 +502,7 @@ export function buildWorld(MAP) {
     queryRoad,
     start: (() => {
       const p = routeAt(0, {});
-      return { x: p.x - p.dy * C.world.laneOffset, y: p.y + p.dx * C.world.laneOffset, heading: Math.atan2(p.dy, p.dx) };
+      return { x: p.x - p.dy * startLane, y: p.y + p.dx * startLane, heading: Math.atan2(p.dy, p.dx) };
     })(),
   };
 }

@@ -64,6 +64,11 @@ const MSG_REASON = {
   signal: () => ({ ro: 'Corect! Ai semnalizat înainte de viraj.', en: 'Correct! You signalled before turning.' }),
   signalOff: () => ({ ro: 'Nu ai semnalizat înainte de viraj.', en: 'You did not signal before the turn.' }),
   signalWrong: () => ({ ro: 'Ai semnalizat în partea greșită.', en: 'You signalled the wrong side.' }),
+  refuel: (ok, i) => (ok ? { ro: `Ai alimentat ${i.l} L. Nu uita să pornești motorul.`, en: `You put in ${i.l} L. Remember to restart the engine.` } : { ro: 'Ai trecut de benzinărie fără să alimentezi.', en: 'You passed the fuel station without refuelling.' }),
+  lane: () => ({ ro: 'Corect! Ai semnalizat și ai schimbat banda.', en: 'Correct! You signalled and changed lane.' }),
+  laneNoSignal: () => ({ ro: 'Ai schimbat banda fără să semnalizezi.', en: 'You changed lane without signalling.' }),
+  laneMissed: () => ({ ro: 'Nu ai schimbat banda la timp.', en: 'You did not change lane in time.' }),
+  hazardStop: (ok) => (ok ? { ro: 'Corect! Ai oprit cu luminile de avarie aprinse.', en: 'Correct! You stopped with the hazard lights on.' } : { ro: 'La oprirea forțată trebuie să oprești cu avariile pornite.', en: 'For the forced stop you must stop with the hazard lights on.' }),
   pickup: (ok) => (ok ? { ro: 'Pasagerul a urcat. Drum bun!', en: 'Your passenger is in. Have a good trip!' } : { ro: 'Ai trecut de locul de întâlnire fără să oprești.', en: 'You drove past the meeting point without stopping.' }),
 };
 const MSG_BY_KEY = {
@@ -72,6 +77,7 @@ const MSG_BY_KEY = {
   noEntry: (ok) => (ok ? { ro: 'Corect! Nu ai intrat pe drumul cu acces interzis.', en: 'Correct! You did not enter the no-entry road.' } : { ro: 'Ai intrat pe un drum cu acces interzis.', en: 'You entered a no-entry road.' }),
 };
 
+const PSEUDO = (id, key, s) => ({ id, key, def: SIGNS[key], s, test: {}, zones: null });
 const SIGNAL_SIGN = (id, s) => ({ id, key: 'signalling', def: SIGNS.signalling, s, test: {}, zones: null });
 
 // ============================================================================
@@ -102,6 +108,8 @@ export function createGame(world, opts = {}) {
     station: null,
     refueling: null,
     fuelSpent: 0,
+    fuelAdded: 0,
+    obstacles: [],
     passenger: false,
     mood: 'happy', // passenger mood: happy | wince
     moodWhy: null, // brake | speed | rule
@@ -339,6 +347,7 @@ export function createGame(world, opts = {}) {
 
     // NPC cars with their own road (cross traffic)
     for (const def of world.npcDefs) {
+      if (def.loop) continue;
       def.timer = (def.timer ?? 0) - dt;
       if (def.timer <= 0 && state.npcs.filter((n) => n.def === def).every((n) => n.s > 18)) {
         def.timer = def.every;
@@ -348,7 +357,8 @@ export function createGame(world, opts = {}) {
     for (let i = state.npcs.length - 1; i >= 0; i--) {
       const n = state.npcs[i];
       n.s += n.v * dt;
-      if (n.s >= n.def.path.length) {
+      if (n.def.loop) n.s %= n.def.path.length;
+      else if (n.s >= n.def.path.length) {
         state.npcs.splice(i, 1);
         continue;
       }
@@ -358,6 +368,9 @@ export function createGame(world, opts = {}) {
       n.heading = Math.atan2(pt.dy, pt.dx);
       if (pushOutOfTraffic(state.car, n) > 3) issue('pedHit', C.exam.penalty.pedHit, { ro: 'Ai lovit un alt vehicul.', en: 'You hit another vehicle.' }, { title: { ro: 'Accident', en: 'Crash' } });
     }
+
+    // stopped cars (they do not move; you drive round them)
+    for (const o of state.obstacles) if (pushOutOfTraffic(state.car, o) > 3) issue('pedHit', C.exam.penalty.pedHit, { ro: 'Ai lovit o mașină oprită.', en: 'You hit a stopped car.' }, { title: { ro: 'Accident', en: 'Crash' } });
 
     // pedestrians
     const pr = state.prog;
@@ -625,7 +638,7 @@ export function createGame(world, opts = {}) {
         t.endS = t.sign.until ?? t.s + 80;
         t.wrong = 0;
         t.prevA = null;
-        t.ring = world.rings[0];
+        t.ring = world.rings.slice().sort((p, q) => Math.hypot(p.cx - t.sign.x, p.cy - t.sign.y) - Math.hypot(q.cx - t.sign.x, q.cy - t.sign.y))[0];
       },
       update(t, c) {
         if (t.status === 'pending' && c.crossed(t.s)) t.status = 'active';
@@ -671,6 +684,57 @@ export function createGame(world, opts = {}) {
         const car = c.car;
         if (car.signal === t.side && car.signalT >= 0.8) finish(t, true, 'signal');
         else finish(t, false, car.signal ? 'signalWrong' : 'signalOff');
+      },
+    },
+
+    // Refuel at the station on the route (engine off, at least `litres`)
+    refuel: {
+      init(t) {
+        t.need = t.p.litres;
+      },
+      update(t, c) {
+        if (state.fuelAdded >= t.need - 0.05) finish(t, true, 'refuel', { l: Math.round(state.fuelAdded) });
+        else if (c.s > t.s + 40 && !state.refueling) finish(t, false, 'refuel', {});
+      },
+    },
+
+    // Change lane inside a window, with the right signal on before crossing the lane line
+    lane: {
+      init(t) {
+        t.end = t.s + (t.p.window ?? 80);
+        t.toInner = t.p.to === 'left';
+        t.prevLat = null;
+      },
+      update(t, c) {
+        if (c.s < t.s - 30) return;
+        const lat = state.prog.lateral;
+        const d = t.p.divider;
+        if (t.prevLat != null && c.s >= t.s - 30) {
+          const crossed = t.toInner ? t.prevLat >= d && lat < d : t.prevLat <= d && lat > d;
+          if (crossed) {
+            const ok = c.car.signal === t.p.to && c.car.signalT >= 0.8;
+            finish(t, ok, ok ? 'lane' : 'laneNoSignal');
+            return;
+          }
+        }
+        t.prevLat = lat;
+        if (c.s > t.end) finish(t, false, 'laneMissed');
+      },
+    },
+
+    // Forced stop: stop at the marked spot with the hazard lights on
+    hazardStop: {
+      init(t) {
+        t.hold = 0;
+        t.spot = t.p.spot;
+      },
+      update(t, c) {
+        const near = Math.hypot(c.car.x - t.spot.x, c.car.y - t.spot.y) < 12;
+        if (near && c.kmh < 3) {
+          t.hold += c.dt;
+          if (t.hold > 2) finish(t, c.car.hazard, 'hazardStop');
+        } else t.hold = 0;
+        if (c.s > t.s + 18) finish(t, false, 'hazardStop');
       },
     },
 
@@ -746,6 +810,9 @@ export function createGame(world, opts = {}) {
     }
     for (const st of world.signalTasks) add(SIGNAL_SIGN(st.id, st.s), 'signal', { side: st.side, lead: st.lead }, st.s);
     if (world.mission && world.mission.pickup) add(SIGNAL_PICKUP(), 'pickup', {}, world.mission.pickup.s);
+    if (world.refuel) add(PSEUDO('refuel', 'refuel', world.refuel.s), 'refuel', { litres: world.refuel.litres }, world.refuel.s);
+    for (const l of world.laneTasks) add(PSEUDO(l.id, 'laneChange', l.s), 'lane', { to: l.to, window: l.window, divider: l.divider }, l.s);
+    for (const h of world.hazardStops) add(PSEUDO(h.id, 'hazardStop', h.s), 'hazardStop', { spot: h }, h.s);
     tasks.sort((a, b) => a.s - b.s);
     state.test = { tasks, score: 0, penalty: 0, log: [], max: tasks.length * T.pointsPerSign, finished: false, failedExam: false, summary: null, speedTask: null, startTime: state.time, lightsT: 0, lightsCool: 0, hazardT: 0, hazardCool: 0, stationFlag: false };
     curbCount = 0;
@@ -944,6 +1011,7 @@ export function createGame(world, opts = {}) {
         car.fuel += add;
         rf.left -= add;
         state.fuelSpent += add * C.fuel.pricePerLitre;
+        state.fuelAdded += add;
         if (rf.left <= 0.001) state.refueling = null;
         car.lowWarned = car.fuel / state.spec.tankL < C.fuel.lowFraction;
       }
@@ -989,10 +1057,15 @@ export function createGame(world, opts = {}) {
     state.npcs = [];
     state.peds = world.peds.map((p) => ({ ...p, side: p.startSide, phase: 'idle', timer: 0, t: 0, used: false, hit: false, px: p.x, py: p.y }));
     for (const def of world.npcDefs) {
+      if (def.loop) {
+        for (let i = 0; i < def.count; i++) state.npcs.push({ def, s: (def.path.length * (i + 0.5)) / def.count, v: def.kmh / 3.6, x: 0, y: 0, heading: 0, color: def.color, width: 1.8, length: 4.3 });
+        continue;
+      }
       def.timer = def.every;
       const gap = (def.kmh / 3.6) * def.every;
       for (let s0 = gap * 0.4; s0 < def.path.length - 20; s0 += gap) state.npcs.push({ def, s: s0, v: def.kmh / 3.6, x: 0, y: 0, heading: 0, color: def.color, width: 1.8, length: 4.3 });
     }
+    state.obstacles = world.obstacles.map((o) => ({ x: o.x, y: o.y, heading: Math.atan2(o.dy, o.dx), v: 0, length: 4.4, width: 1.8, color: '#b8bcc2', hazard: true }));
     spawned.clear();
     state.quiz = null;
     state.speedLimit = null;
@@ -1002,6 +1075,7 @@ export function createGame(world, opts = {}) {
     state.passenger = false;
     state.refueling = null;
     state.fuelSpent = 0;
+    state.fuelAdded = 0;
     curbCount = 0;
     updateProgress(0);
   }
@@ -1020,7 +1094,8 @@ export function createGame(world, opts = {}) {
     const loc = world.route.locate(old.x, old.y, null);
     const s = Math.max(0, loc.s - 4);
     const pt = world.route.at(s, {});
-    const car = makeCar({ x: pt.x - pt.dy * C.world.laneOffset, y: pt.y + pt.dx * C.world.laneOffset, heading: Math.atan2(pt.dy, pt.dx) });
+    const lane = world.startLane ?? C.world.laneOffset;
+    const car = makeCar({ x: pt.x - pt.dy * lane, y: pt.y + pt.dx * lane, heading: Math.atan2(pt.dy, pt.dx) });
     for (const k of ['fuel', 'signal', 'hazard', 'lights', 'engineOn', 'lowWarned']) car[k] = old[k];
     car.signalT = old.signalT;
     state.car = car;

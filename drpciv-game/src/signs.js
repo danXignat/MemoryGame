@@ -370,6 +370,37 @@ SIGNS.pickup = {
   art: { shape: 'square', fill: '#2a9d5c', border: '#ffffff', borderW: 0.05, symbol: { type: 'text', text: 'P', color: '#ffffff', size: 1.35, maxW: 1.2 } },
 };
 
+SIGNS.refuel = {
+  hidden: true,
+  category: 'information',
+  name: { ro: 'Alimentare', en: 'Refuelling' },
+  rule: {
+    ro: 'Intră semnalizând, oprește la pompă, oprește motorul, alimentează, apoi pornește și semnalizează la ieșire.',
+    en: 'Signal in, stop at the pump, switch the engine off, refuel, then restart and signal as you leave.',
+  },
+  art: { shape: 'square', fill: '#12a594', border: '#ffffff', borderW: 0.05, symbol: { type: 'text', text: 'F', color: '#ffffff', size: 1.3, maxW: 1.2 } },
+};
+SIGNS.laneChange = {
+  hidden: true,
+  category: 'mandatory',
+  name: { ro: 'Schimbarea benzii', en: 'Lane change' },
+  rule: {
+    ro: 'Verifică oglinzile, semnalizează din timp și schimbă banda lin.',
+    en: 'Check your mirrors, signal in good time and change lane smoothly.',
+  },
+  art: { shape: 'square', fill: '#1d6fd1', border: '#ffffff', borderW: 0.05, symbol: { type: 'arrowUp' } },
+};
+SIGNS.hazardStop = {
+  hidden: true,
+  category: 'warning',
+  name: { ro: 'Oprire cu avarii', en: 'Stop with hazard lights' },
+  rule: {
+    ro: 'La o oprire forțată (pană, pericol) pornește luminile de avarie și oprește în siguranță.',
+    en: 'In a forced stop (breakdown, danger) switch on the hazard lights and stop safely.',
+  },
+  art: { shape: 'triangleUp', fill: '#ffffff', border: '#d62828', borderW: 0.2, symbol: { type: 'text', text: '!', color: '#111111', size: 1.2, maxW: 0.6 } },
+};
+
 /** The signs you can see in the library and quizzes (hides the pseudo-signs). */
 export const visibleSignKeys = () => Object.keys(SIGNS).filter((k) => !SIGNS[k].hidden);
 

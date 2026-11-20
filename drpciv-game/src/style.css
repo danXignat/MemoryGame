@@ -2071,3 +2071,11 @@ p {
     --dock-l: calc(var(--edge) + var(--wheel) + 14px);
   }
 }
+
+/* fuel-station panel sits under the navigation banner, clear of the bottom dock */
+#station {
+  top: calc(var(--top) + var(--tb) + 58px);
+  bottom: auto;
+  z-index: 8;
+  max-width: 46vw;
+}

@@ -53,7 +53,7 @@ function runBot(levelId, kind, { carId = 'golf5', maxSeconds = 700, weather } = 
 }
 
 // -------------------------------------------------------- every level, careful
-for (const id of ['free', 'L1', 'L2', 'L3', 'L4', 'L5', 'boss']) {
+for (const id of LEVELS.filter((l) => l.playable).map((l) => l.id)) {
   const r = runBot(id, 'careful');
   const sum = r.summary;
   console.log(`\n${id}: finished=${r.st.test.finished} time=${r.t.toFixed(0)}s correct=${sum && sum.correct}/${sum && sum.total} penalty=${sum && sum.penalty} bumps=${r.log.bumps}`);
@@ -65,7 +65,7 @@ for (const id of ['free', 'L1', 'L2', 'L3', 'L4', 'L5', 'boss']) {
 }
 
 // ------------------------------------------------------------ reckless runs
-for (const id of ['free', 'L3', 'L4', 'L5']) {
+for (const id of ['free', 'L3', 'L4', 'L5', 'L6', 'L8', 'L9', 'L10', 'L13', 'L14', 'L15']) {
   const r = runBot(id, 'reckless');
   const sum = r.summary;
   console.log(`\n${id} reckless: penalty=${sum.penalty} eliminated=${sum.eliminated} correct=${sum.correct}/${sum.total}`);
@@ -78,6 +78,12 @@ for (const id of ['free', 'L3', 'L4', 'L5']) {
   check(r.summary.issues.some((i) => i.key === 'pedHit') || r.summary.tasks.some((t) => !t.ok && t.message && /pedestrian/i.test(t.message.en)), 'L5: not stopping for a pedestrian is caught');
   const r4 = runBot('L4', 'reckless');
   check(r4.summary.tasks.some((t) => t.key === 'giveWay' && !t.ok), 'L4: driving out in front of traffic fails Give Way');
+}
+
+// ------------------------------------------------------------ lane change without signal
+{
+  const r = runBot('L11', 'reckless');
+  check(r.summary.tasks.filter((t) => t.key === 'laneChange').every((t) => !t.ok), 'L11: lane changes without signalling are not accepted');
 }
 
 // ------------------------------------------------------------ night lights

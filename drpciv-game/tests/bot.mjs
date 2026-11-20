@@ -7,64 +7,105 @@ export function makeBot(game, world, map, kind = 'careful') {
   const st = game.state;
   const input = { steer: 0, gas: 0, brake: 0 };
   const tmp = {};
-  const arcs = map.route.segments
-    .filter((sg) => sg.type === 'arc')
-    .map((sg) => ({ range: world.route.segRanges[sg.id], v: Math.sqrt(3.2 * sg.radius) }));
-  const extraSlow = [];
-  if (world.rings.length) {
-    const ring = world.route.segRanges.ring;
-    extraSlow.push([ring[0] - 12, ring[1] + 22, 18 / 3.6]);
+  const arcs = map.route.segments.filter((sg) => sg.type === 'arc').map((sg) => ({ range: world.route.segRanges[sg.id], v: Math.sqrt(3.2 * sg.radius) }));
+  const slowZones = map.route.segments.filter((sg) => sg.roundabout).map((sg) => [world.route.segRanges[sg.id][0] - 14, world.route.segRanges[sg.id][1] + 22, 16 / 3.6]);
+  let laneTarget = world.startLane ?? C.world.laneOffset;
+  let refuelStage = 0;
+  let hold = 0;
+
+  function stopAt(dist) {
+    return dist <= 0.2 ? 0 : Math.sqrt(4.5 * dist);
   }
+
   return {
     input,
     step() {
       const car = st.car;
       const s = st.prog.s;
       const v = car.v;
+      let lane = laneTarget;
+      let target = (kind === 'reckless' ? 75 : 40) / 3.6;
+
+      if (kind !== 'reckless') {
+        for (const a of arcs) if (s > a.range[0] - 12 && s < a.range[1] + 4) target = Math.min(target, a.v);
+        for (const [a, b, vv] of slowZones) if (s > a && s < b) target = Math.min(target, vv);
+        for (const z of world.stations) if (Math.hypot(car.x - z.zone.x, car.y - z.zone.y) < z.zone.r + 30) target = Math.min(target, 18 / 3.6);
+        if (st.speedLimit) target = Math.min(target, (st.speedLimit - 4) / 3.6);
+        if ((st.weather === 'night' || st.weather === 'fog') && car.lights < 2) game.cycleLights();
+        for (const o of world.obstacles) {
+          const d = o.s - s;
+          if (d < 40 && d > -9) lane = -2.2;
+          if (d < -12 && d > -30 && car.signal === 'left') game.toggleSignal('left');
+        }
+        if (st.test) {
+          for (const task of st.test.tasks) {
+            if (task.status === 'done') {
+              if (task.type === 'lane' && car.signal === task.p.to && s > task.s && s < task.end + 25) game.toggleSignal(task.p.to);
+              if (task.type === 'hazardStop' && car.hazard) game.toggleHazard();
+              continue;
+            }
+            if (task.type === 'signal' && s > task.line - 45 && car.signal !== task.side) game.toggleSignal(task.side);
+            if (task.type === 'lane' && s > task.s - 40) {
+              if (car.signal !== task.p.to) game.toggleSignal(task.p.to);
+              if (s > task.s - 12 && car.signalT > 1) laneTarget = task.p.to === 'left' ? 1.9 : 5.6;
+              lane = laneTarget;
+            }
+            if (task.type === 'slow') {
+              const dist = task.line - s;
+              if (dist > -2 && dist < 45) {
+                target = Math.min(target, Math.sqrt((task.max - 5) ** 2 / 12.96 + 6 * Math.max(0, dist - 1)));
+                let wait = false;
+                if (task.ped && ['wait', 'cross'].includes(task.ped.phase)) wait = true;
+                if (task.conflict && st.npcs.some((n) => Math.hypot(n.x - task.conflict.x, n.y - task.conflict.y) < task.conflict.r + Math.max(12, task.conflict.r))) wait = true;
+                if (wait && dist > -1) target = Math.min(target, stopAt(dist - 1.5));
+              }
+            }
+            if (task.type === 'stop') {
+              const dist = task.line - s - 2.0;
+              if (dist > -3 && dist < 60 && !(task.minV <= C.test.stopMaxKmh)) target = Math.min(target, stopAt(dist));
+            }
+            if (task.type === 'pickup' && task.s - s < 30) target = Math.min(target, stopAt(task.s - s - 1));
+            if (task.type === 'hazardStop' && task.s - s < 30) {
+              if (!car.hazard && task.s - s < 25) game.toggleHazard();
+              target = Math.min(target, stopAt(task.s - s - 1));
+            }
+            if (task.type === 'refuel' && task.s - s < 30) {
+              const dist = task.s - s;
+              if (refuelStage === 0) target = Math.min(target, stopAt(dist - 0.5));
+              if (refuelStage === 0 && Math.abs(v) < 0.3 && st.station && st.station.inBay) {
+                if (car.engineOn) game.toggleEngine();
+                refuelStage = 1;
+              }
+              if (refuelStage === 1) {
+                target = 0;
+                if (!st.refueling && st.fuelAdded < task.p.litres) game.startRefuel(task.p.litres);
+              }
+            }
+            if (task.type === 'noOvertake' && task.status !== 'pending' && kind !== 'overtaker') for (const ai of st.traffic) if (ai.s > s && ai.s - s < 30) target = Math.min(target, Math.max(0, ai.v - (22 - (ai.s - s)) * 0.1));
+          }
+          // after refuelling: engine back on, then go
+          if (refuelStage === 1 && st.test.tasks.some((x) => x.type === 'refuel' && x.status === 'done')) {
+            target = 0;
+            if (!car.engineOn && car.starting <= 0) game.toggleEngine();
+            if (car.engineOn) refuelStage = 2;
+          }
+        }
+        if (kind !== 'overtaker') for (const ai of st.traffic) if (ai.s > s && ai.s - s < 26) target = Math.min(target, Math.max(0, ai.v * 0.92 - (14 - (ai.s - s)) * 0.12));
+      } else if (kind === 'reckless') {
+        for (const o of world.obstacles) if (o.s - s < 40 && o.s - s > -9) lane = -2.2;
+      }
+      if (kind === 'overtaker') for (const ai of st.traffic) if (ai.s > s - 10 && ai.s - s < 22) lane = -2.2;
+
+      // steering: pure pursuit to a point ahead on the route, in the chosen lane
       const look = 7 + Math.abs(v) * 0.5;
       const p = world.route.at(Math.min(world.route.length, s + look), tmp);
-      let lane = C.world.laneOffset;
-      if (kind === 'overtaker') for (const ai of st.traffic) if (ai.s > s - 10 && ai.s - s < 22) lane = -2.2;
       const tx = p.x - p.dy * lane;
       const ty = p.y + p.dx * lane;
       let err = Math.atan2(ty - car.y, tx - car.x) - car.heading;
       while (err > Math.PI) err -= 2 * Math.PI;
       while (err < -Math.PI) err += 2 * Math.PI;
       input.steer = Math.max(-1, Math.min(1, err * 2.2));
-
-      let target = (kind === 'reckless' ? 75 : 40) / 3.6;
-      if (kind !== 'reckless') {
-        for (const a of arcs) if (s > a.range[0] - 12 && s < a.range[1] + 4) target = Math.min(target, a.v);
-        for (const [a, b, vv] of extraSlow) if (s > a && s < b) target = Math.min(target, vv);
-        if (st.speedLimit) target = Math.min(target, (st.speedLimit - 4) / 3.6);
-        if (st.weather === 'night' && car.lights < 2) game.cycleLights();
-        if (st.test) {
-          for (const task of st.test.tasks) {
-            if (task.status === 'done') continue;
-            if (task.type === 'signal' && s > task.line - 45 && car.signal !== task.side) game.toggleSignal(task.side);
-            if (task.type === 'slow') {
-              const dist = task.line - s;
-              if (dist > -2 && dist < 45) {
-                target = Math.min(target, Math.sqrt((task.max - 5) ** 2 / 12.96 + 6 * Math.max(0, dist - 1)));
-                let hold = false;
-                if (task.ped && ['wait', 'cross'].includes(task.ped.phase)) hold = true;
-                if (task.conflict && st.npcs.some((n) => Math.hypot(n.x - task.conflict.x, n.y - task.conflict.y) < task.conflict.r + 28)) hold = true;
-                if (hold && dist > -1) target = dist - 1.5 <= 0.2 ? 0 : Math.min(target, Math.sqrt(5 * (dist - 1.5)));
-              }
-            }
-            if (task.type === 'stop') {
-              const dist = task.line - s - 2.0;
-              if (dist > -3 && dist < 60 && !(task.minV <= C.test.stopMaxKmh)) target = dist <= 0.2 ? 0 : Math.min(target, Math.sqrt(5 * dist));
-            }
-            if (task.type === 'pickup') {
-              const dist = task.s - s - 1;
-              if (dist < 30) target = dist <= 0.2 ? 0 : Math.min(target, Math.sqrt(4 * dist));
-            }
-            if (task.type === 'noOvertake' && task.status !== 'pending' && kind !== 'overtaker') for (const ai of st.traffic) if (ai.s > s && ai.s - s < 30) target = Math.min(target, Math.max(0, ai.v - (22 - (ai.s - s)) * 0.1));
-          }
-        }
-        if (kind !== 'overtaker') for (const ai of st.traffic) if (ai.s > s && ai.s - s < 26 && s > world.route.length * 0.3) target = Math.min(target, Math.max(0, ai.v * 0.92 - (14 - (ai.s - s)) * 0.12));
-      } else if (Math.abs(err) > 0.4) target = 25 / 3.6;
+      if (kind === 'reckless' && Math.abs(err) > 0.4) target = Math.min(target, 25 / 3.6);
 
       if (v < target - 0.1) {
         input.gas = 1;
@@ -80,6 +121,7 @@ export function makeBot(game, world, map, kind = 'careful') {
         input.gas = 0;
         input.brake = 0;
       }
+      hold = target === 0 ? hold + 1 : 0;
       game.update(C.fixedStep, input);
     },
   };

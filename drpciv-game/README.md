@@ -1,6 +1,6 @@
 # DRPCIV Road Signs
 
-A landscape-first 2D driving school for learning Romanian road signs. Five cars with different engines, 15 driving school levels (1-5 playable now, 6-15 scaffolded), Learn mode, exam-style Test mode with penalty points, fuel, headlights, weather and a Final Boss drive.
+Car.dat: a landscape-first 2D driving school for learning Romanian road signs. Five cars with different engines, 15 playable driving school levels, Free Roam, Learn mode, exam-style Test mode with penalty points, fuel, headlights, weather and a Final Boss drive (unlocked by passing Level 15).
 
 ## Run it with live reload (3 steps)
 
