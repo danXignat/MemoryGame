@@ -7,6 +7,7 @@
 import { CONFIG as C } from './config.js';
 import { getSignSprite } from './signart.js';
 import { portraitImage } from './portraits.js';
+import { carSprite, treeSprite, shadeColor } from './gfx.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -17,11 +18,11 @@ const wrap = (a) => {
 };
 
 const COL = {
-  grassA: '#5b9f4f',
+  grassA: '#5c9c4c',
   grassB: '#559948',
   island: '#6aa85a',
   curb: '#d7dadd',
-  asphalt: '#3d4249',
+  asphalt: '#41464d',
   centerLine: 'rgba(255,255,255,0.78)',
   paint: 'rgba(255,255,255,0.92)',
   tree: ['#2f7d3a', '#3a8c43', '#27703a'],
@@ -72,6 +73,33 @@ export function createRenderer(canvas, initialWorld) {
   let portrait = false;
   const cam = { x: 0, y: 0, angle: 0, scale: 10, ready: false };
   let anchorY = 0.5;
+  // patches of lighter and darker grass, made once per level (cheap to draw)
+  let spots = [];
+  function makeSpots(w) {
+    let x0 = Infinity;
+    let y0 = Infinity;
+    let x1 = -Infinity;
+    let y1 = -Infinity;
+    const r = w.route;
+    for (let k = 0; k <= r.N; k += 10) {
+      x0 = Math.min(x0, r.X[k]);
+      x1 = Math.max(x1, r.X[k]);
+      y0 = Math.min(y0, r.Y[k]);
+      y1 = Math.max(y1, r.Y[k]);
+    }
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const out = [];
+    const colors = ['rgba(120,180,90,0.22)', 'rgba(60,120,50,0.2)', 'rgba(140,190,95,0.16)', 'rgba(70,130,60,0.16)'];
+    for (let y = y0 - 140; y < y1 + 140; y += 16)
+      for (let x = x0 - 140; x < x1 + 140; x += 16) {
+        if (rnd() < 0.35) continue;
+        out.push({ x: x + rnd() * 16, y: y + rnd() * 16, rx: 3 + rnd() * 7, ry: 2 + rnd() * 5, a: rnd() * Math.PI, c: colors[Math.floor(rnd() * colors.length)] });
+      }
+    return out;
+  }
+  spots = makeSpots(world);
+  const pat = { grass: null, asphalt: null, pave: null };
   let rain = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), v: 0.8 + Math.random() * 0.8 }));
 
   function buildLaneLines(w) {
@@ -94,6 +122,7 @@ export function createRenderer(canvas, initialWorld) {
     world = w;
     paths = buildPaths(w);
     laneLines = buildLaneLines(w);
+    spots = makeSpots(w);
     cam.ready = false;
   }
 
@@ -147,7 +176,7 @@ export function createRenderer(canvas, initialWorld) {
     const weather = state.weather;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.fillStyle = COL.grassA;
+    ctx.fillStyle = '#5c9c4c';
     ctx.fillRect(0, 0, W, H);
     applyView(ctx, sx, sy);
     const R = Math.hypot(W, H) / cam.scale + 6;
@@ -182,26 +211,47 @@ export function createRenderer(canvas, initialWorld) {
   }
 
   function drawGrass(R) {
-    const G = 14;
-    ctx.fillStyle = COL.grassB;
-    const x0 = Math.floor((cam.x - R) / G);
-    const x1 = Math.ceil((cam.x + R) / G);
-    const y0 = Math.floor((cam.y - R) / G);
-    const y1 = Math.ceil((cam.y + R) / G);
-    for (let gx = x0; gx < x1; gx++) for (let gy = y0; gy < y1; gy++) if ((gx + gy) & 1) ctx.fillRect(gx * G, gy * G, G, G);
+    for (const p of spots) {
+      if (Math.abs(p.x - cam.x) > R + 10 || Math.abs(p.y - cam.y) > R + 10) continue;
+      ctx.fillStyle = p.c;
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.rx, p.ry, p.a, 0, TAU);
+      ctx.fill();
+    }
   }
 
   function drawRoads() {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.strokeStyle = COL.curb;
-    ctx.lineWidth = world.roadWidth + 1.5;
+    const rw = world.roadWidth;
+    // pavement (with slab joints), then the kerb, then asphalt
+    ctx.strokeStyle = '#c9c4b8';
+    ctx.lineWidth = rw + 4.6;
+    for (const p of paths) ctx.stroke(p.path);
+    ctx.lineCap = 'butt';
+    ctx.setLineDash([0.12, 1.88]);
+    ctx.strokeStyle = 'rgba(95,90,80,0.45)';
+    for (const p of paths) ctx.stroke(p.path);
+    ctx.setLineDash([]);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#9d9a92';
+    ctx.lineWidth = rw + 1.0;
+    for (const p of paths) ctx.stroke(p.path);
+    ctx.strokeStyle = '#e7e4dc';
+    ctx.lineWidth = rw + 0.75;
     for (const p of paths) ctx.stroke(p.path);
     ctx.strokeStyle = COL.asphalt;
-    ctx.lineWidth = world.roadWidth;
+    ctx.lineWidth = rw;
     for (const p of paths) ctx.stroke(p.path);
-    ctx.strokeStyle = COL.centerLine;
-    ctx.lineWidth = 0.22;
+    // white edge lines just inside the kerb
+    ctx.strokeStyle = 'rgba(245,245,240,0.8)';
+    ctx.lineWidth = rw - 0.5;
+    for (const p of paths) if (p.lane) ctx.stroke(p.path);
+    ctx.strokeStyle = COL.asphalt;
+    ctx.lineWidth = rw - 0.85;
+    for (const p of paths) if (p.lane) ctx.stroke(p.path);
+    ctx.strokeStyle = 'rgba(255,255,255,0.88)';
+    ctx.lineWidth = 0.18;
     ctx.lineCap = 'butt';
     ctx.setLineDash([3, 4.5]);
     for (const p of paths) if (p.lane) ctx.stroke(p.path);
@@ -226,7 +276,7 @@ export function createRenderer(canvas, initialWorld) {
 
   function drawIslands() {
     for (const r of world.rings) {
-      ctx.fillStyle = COL.curb;
+      ctx.fillStyle = '#e7e4dc';
       ctx.beginPath();
       ctx.arc(r.cx, r.cy, r.island + 0.75, 0, TAU);
       ctx.fill();
@@ -234,6 +284,18 @@ export function createRenderer(canvas, initialWorld) {
       ctx.beginPath();
       ctx.arc(r.cx, r.cy, r.island, 0, TAU);
       ctx.fill();
+      // a flower bed in the middle
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.beginPath();
+      ctx.arc(r.cx, r.cy, r.island * 0.55, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#c0567a';
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU;
+        ctx.beginPath();
+        ctx.arc(r.cx + Math.cos(a) * r.island * 0.4, r.cy + Math.sin(a) * r.island * 0.4, 0.45, 0, TAU);
+        ctx.fill();
+      }
     }
   }
 
@@ -305,9 +367,11 @@ export function createRenderer(canvas, initialWorld) {
       ctx.save();
       ctx.translate(l.x, l.y);
       ctx.rotate(l.angle);
-      ctx.fillStyle = '#4a4f57';
+      ctx.fillStyle = '#9d9a92';
+      ctx.fillRect(-l.w / 2 - 0.25, -l.h / 2 - 0.25, l.w + 0.5, l.h + 0.5);
+      ctx.fillStyle = COL.asphalt;
       ctx.fillRect(-l.w / 2, -l.h / 2, l.w, l.h);
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
       ctx.lineWidth = 0.12;
       ctx.beginPath();
       for (let x = -l.w / 2; x <= l.w / 2 + 0.01; x += 3) {
@@ -323,39 +387,102 @@ export function createRenderer(canvas, initialWorld) {
       ctx.translate(h.x, h.y);
       ctx.rotate(h.angle || 0);
       if (h.kind === 'block') {
-        const sh = 1.2 + (h.floors || 6) * 0.25; // taller blocks cast longer shadows
-        ctx.fillStyle = 'rgba(0,0,0,0.25)';
-        ctx.fillRect(-h.w / 2 + sh * 0.6, -h.h / 2 + sh, h.w, h.h);
-        ctx.fillStyle = h.roof;
+        const sh = 1.2 + (h.floors || 6) * 0.32; // taller blocks cast longer shadows
+        ctx.fillStyle = 'rgba(0,0,0,0.22)';
+        ctx.fillRect(-h.w / 2 + sh * 0.55, -h.h / 2 + sh, h.w, h.h);
+        ctx.fillStyle = 'rgba(0,0,0,0.12)';
+        ctx.fillRect(-h.w / 2 + sh * 0.3, -h.h / 2 + sh * 0.5, h.w, h.h);
+        // flat roof with a raised parapet
+        ctx.fillStyle = shadeColor(h.roof, -0.25);
         ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
-        ctx.strokeStyle = 'rgba(255,255,255,0.35)'; // parapet
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(-h.w / 2 + 0.3, -h.h / 2 + 0.3, h.w - 0.6, h.h - 0.6);
-        ctx.fillStyle = 'rgba(0,0,0,0.18)'; // stairwells / lift rooms
+        const g = ctx.createLinearGradient(0, -h.h / 2, 0, h.h / 2);
+        g.addColorStop(0, shadeColor(h.roof, 0.18));
+        g.addColorStop(1, shadeColor(h.roof, -0.08));
+        ctx.fillStyle = g;
+        ctx.fillRect(-h.w / 2 + 0.45, -h.h / 2 + 0.45, h.w - 0.9, h.h - 0.9);
+        ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+        ctx.lineWidth = 0.14;
+        ctx.strokeRect(-h.w / 2 + 0.1, -h.h / 2 + 0.1, h.w - 0.2, h.h - 0.2);
+        // stairwell / lift rooms with their own little shadows
         const n = Math.max(2, Math.round(h.w / 12));
         for (let i = 0; i < n; i++) {
           const x = -h.w / 2 + ((i + 0.5) * h.w) / n;
+          ctx.fillStyle = 'rgba(0,0,0,0.22)';
+          ctx.fillRect(x - 1.2 + 0.5, -1.4 + 0.6, 2.4, 2.8);
+          ctx.fillStyle = shadeColor(h.roof, 0.28);
           ctx.fillRect(x - 1.2, -1.4, 2.4, 2.8);
+          ctx.fillStyle = shadeColor(h.roof, -0.1);
+          ctx.fillRect(x - 1.2, 0.9, 2.4, 0.5);
         }
-        ctx.fillStyle = 'rgba(255,255,255,0.12)';
-        ctx.fillRect(-h.w / 2 + 2, h.h / 2 - 2.6, 3, 1.6);
-        ctx.fillRect(h.w / 2 - 5, -h.h / 2 + 1.2, 3, 1.6);
+        // air units and vents
+        ctx.fillStyle = '#d9dcdf';
+        ctx.fillRect(-h.w / 2 + 2, h.h / 2 - 2.6, 1.4, 1.1);
+        ctx.fillRect(h.w / 2 - 4, -h.h / 2 + 1.2, 1.4, 1.1);
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.beginPath();
+        ctx.arc(h.w / 2 - 6.5, h.h / 2 - 2, 0.45, 0, TAU);
+        ctx.arc(-h.w / 2 + 5.5, -h.h / 2 + 2, 0.45, 0, TAU);
+        ctx.fill();
       } else {
         if (h.garden) {
-          ctx.fillStyle = 'rgba(120,190,90,0.55)';
+          ctx.fillStyle = 'rgba(140,200,100,0.35)';
           ctx.fillRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
-          ctx.strokeStyle = '#d9c9a3'; // fence
-          ctx.lineWidth = 0.18;
+          ctx.strokeStyle = '#3f7d3a'; // hedge
+          ctx.lineWidth = 0.55;
           ctx.strokeRect(-h.w / 2 - 3, -h.h / 2 - 3, h.w + 6, h.h + 6);
+          ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+          ctx.lineWidth = 0.15;
+          ctx.strokeRect(-h.w / 2 - 3.15, -h.h / 2 - 3.15, h.w + 6.3, h.h + 6.3);
+          // a little path to the door
+          ctx.fillStyle = '#d8cfbd';
+          ctx.fillRect(-0.6, h.h / 2, 1.2, 3);
         }
-        ctx.fillStyle = COL.shadow;
-        ctx.fillRect(-h.w / 2 + 0.9, -h.h / 2 + 1.1, h.w, h.h);
-        ctx.fillStyle = h.roof;
-        ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h);
-        ctx.fillStyle = 'rgba(0,0,0,0.18)';
-        ctx.fillRect(-h.w / 2, -0.25, h.w, 0.5); // ridge
-        ctx.fillStyle = 'rgba(255,255,255,0.14)';
-        ctx.fillRect(-h.w / 2, -h.h / 2, h.w, h.h / 2 - 0.25);
+        ctx.fillStyle = 'rgba(0,0,0,0.28)';
+        ctx.fillRect(-h.w / 2 + 1.0, -h.h / 2 + 1.25, h.w, h.h);
+        // hip roof: four slopes, lit from the top left
+        const hw = h.w / 2;
+        const hh = h.h / 2;
+        const ridge = Math.max(0, hw - hh);
+        const face = (pts, f) => {
+          ctx.fillStyle = shadeColor(h.roof, f);
+          ctx.beginPath();
+          ctx.moveTo(pts[0], pts[1]);
+          for (let i = 2; i < pts.length; i += 2) ctx.lineTo(pts[i], pts[i + 1]);
+          ctx.closePath();
+          ctx.fill();
+        };
+        face([-hw, -hh, hw, -hh, ridge, 0, -ridge, 0], 0.16);
+        face([-hw, hh, hw, hh, ridge, 0, -ridge, 0], -0.22);
+        face([-hw, -hh, -ridge, 0, -hw, hh], 0.04);
+        face([hw, -hh, ridge, 0, hw, hh], -0.32);
+        ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+        ctx.lineWidth = 0.08;
+        ctx.beginPath();
+        ctx.moveTo(-ridge, 0);
+        ctx.lineTo(ridge, 0);
+        ctx.moveTo(-hw, -hh);
+        ctx.lineTo(-ridge, 0);
+        ctx.lineTo(-hw, hh);
+        ctx.moveTo(hw, -hh);
+        ctx.lineTo(ridge, 0);
+        ctx.lineTo(hw, hh);
+        ctx.stroke();
+        // tile rows
+        ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+        ctx.lineWidth = 0.06;
+        ctx.beginPath();
+        for (let y = -hh + 0.6; y < hh; y += 0.6) {
+          if (Math.abs(y) < 0.2) continue;
+          const x = hw - (hh - Math.abs(y));
+          ctx.moveTo(-x, y);
+          ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        // chimney
+        ctx.fillStyle = 'rgba(0,0,0,0.25)';
+        ctx.fillRect(ridge * 0.4 + 0.25, -hh * 0.45 + 0.3, 0.8, 0.8);
+        ctx.fillStyle = shadeColor(h.roof, -0.45);
+        ctx.fillRect(ridge * 0.4, -hh * 0.45, 0.8, 0.8);
       }
       ctx.restore();
     }
@@ -390,9 +517,17 @@ export function createRenderer(canvas, initialWorld) {
   function drawBushes(R) {
     for (const b of world.bushes || []) {
       if (Math.abs(b.x - cam.x) > R + 3 || Math.abs(b.y - cam.y) > R + 3) continue;
-      ctx.fillStyle = '#3f8f45';
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.beginPath();
+      ctx.arc(b.x + b.r * 0.3, b.y + b.r * 0.35, b.r, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#2f7a3a';
       ctx.beginPath();
       ctx.arc(b.x, b.y, b.r, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = '#4c9a4c';
+      ctx.beginPath();
+      ctx.arc(b.x - b.r * 0.25, b.y - b.r * 0.25, b.r * 0.62, 0, TAU);
       ctx.fill();
       if (b.flower) {
         ctx.fillStyle = b.flower;
@@ -408,18 +543,12 @@ export function createRenderer(canvas, initialWorld) {
   function drawTrees(R) {
     for (const t of world.trees) {
       if (Math.abs(t.x - cam.x) > R + 5 || Math.abs(t.y - cam.y) > R + 5) continue;
-      ctx.fillStyle = COL.shadow;
+      ctx.fillStyle = 'rgba(10,30,10,0.26)';
       ctx.beginPath();
-      ctx.arc(t.x + t.r * 0.35, t.y + t.r * 0.4, t.r, 0, TAU);
+      ctx.arc(t.x + t.r * 0.45, t.y + t.r * 0.55, t.r * 0.95, 0, TAU);
       ctx.fill();
-      ctx.fillStyle = COL.tree[Math.floor(t.shade * 2.99)];
-      ctx.beginPath();
-      ctx.arc(t.x, t.y, t.r, 0, TAU);
-      ctx.fill();
-      ctx.fillStyle = COL.treeLight;
-      ctx.beginPath();
-      ctx.arc(t.x - t.r * 0.25, t.y - t.r * 0.25, t.r * 0.58, 0, TAU);
-      ctx.fill();
+      const sp = treeSprite(Math.floor(t.shade * 5.99));
+      ctx.drawImage(sp.img, t.x - t.r * 1.25, t.y - t.r * 1.25, t.r * 2.5, t.r * 2.5);
     }
   }
 
@@ -675,15 +804,11 @@ export function createRenderer(canvas, initialWorld) {
     ctx.translate(car.x, car.y);
     ctx.rotate(car.heading);
 
-    ctx.fillStyle = COL.shadow;
-    rr(ctx, -L / 2 + 0.25, -Wd / 2 + 0.3, L, Wd, 0.6);
-    ctx.fill();
-
     ctx.fillStyle = '#16181b';
-    const wl = 0.85;
-    const ww = 0.34;
+    const wl = 0.78;
+    const ww = 0.3;
     const wx = L * 0.3;
-    const wy = Wd / 2 - 0.02;
+    const wy = Wd / 2 - 0.08;
     const steer = o.player ? car.steer : 0;
     for (const [x, y, s] of [[wx, -wy, steer], [wx, wy, steer], [-wx, -wy, 0], [-wx, wy, 0]]) {
       ctx.save();
@@ -692,28 +817,8 @@ export function createRenderer(canvas, initialWorld) {
       ctx.fillRect(-wl / 2, -ww / 2, wl, ww);
       ctx.restore();
     }
-
-    ctx.fillStyle = color;
-    rr(ctx, -L / 2, -Wd / 2 + 0.08, L, Wd - 0.16, 0.65);
-    ctx.fill();
-    ctx.fillStyle = 'rgba(255,255,255,0.18)';
-    rr(ctx, -L / 2 + 0.2, -Wd / 2 + 0.2, L - 0.4, 0.5, 0.25);
-    ctx.fill();
-
-    const cab = L * 0.26;
-    ctx.fillStyle = '#1d2a35';
-    rr(ctx, 0.15, -Wd / 2 + 0.28, cab, Wd - 0.56, 0.3);
-    ctx.fill();
-    rr(ctx, -L / 2 + 0.7, -Wd / 2 + 0.3, 0.85, Wd - 0.6, 0.25);
-    ctx.fill();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.9;
-    rr(ctx, -0.75, -Wd / 2 + 0.22, 0.95, Wd - 0.44, 0.2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = 'rgba(255,255,255,0.2)';
-    rr(ctx, -0.7, -Wd / 2 + 0.28, 0.8, 0.3, 0.12);
-    ctx.fill();
+    const sprite = carSprite(color, L, Wd, !!o.police);
+    ctx.drawImage(sprite.img, -sprite.w / 2, -sprite.h / 2, sprite.w, sprite.h);
 
     // people in the cabin (player's car only): driver left, passenger on the right
     if (o.player) {
@@ -765,9 +870,6 @@ export function createRenderer(canvas, initialWorld) {
     }
 
     if (o.police) {
-      ctx.fillStyle = '#1d4ed8'; // blue stripe
-      ctx.fillRect(-L / 2 + 0.3, -Wd / 2 + 0.08, L - 0.6, 0.28);
-      ctx.fillRect(-L / 2 + 0.3, Wd / 2 - 0.36, L - 0.6, 0.28);
       ctx.fillStyle = o.flash ? '#2563ff' : '#ff2d2d'; // light bar
       ctx.fillRect(-0.45, -Wd / 2 + 0.3, 0.5, Wd / 2 - 0.3);
       ctx.fillStyle = o.flash ? '#ff2d2d' : '#2563ff';
@@ -779,12 +881,16 @@ export function createRenderer(canvas, initialWorld) {
     }
     // lights
     const lit = o.lights >= 1;
-    ctx.fillStyle = lit ? '#fff6c4' : '#d9dbd0';
-    ctx.fillRect(L / 2 - 0.22, -Wd / 2 + 0.22, 0.2, 0.36);
-    ctx.fillRect(L / 2 - 0.22, Wd / 2 - 0.58, 0.2, 0.36);
-    ctx.fillStyle = o.braking ? '#ff2a1f' : lit ? '#c0261b' : '#8a1712';
-    ctx.fillRect(-L / 2 + 0.02, -Wd / 2 + 0.22, 0.2, 0.4);
-    ctx.fillRect(-L / 2 + 0.02, Wd / 2 - 0.62, 0.2, 0.4);
+    if (lit) {
+      ctx.fillStyle = '#fffbe0';
+      ctx.fillRect(L / 2 - 0.2, -Wd / 2 + 0.2, 0.16, 0.42);
+      ctx.fillRect(L / 2 - 0.2, Wd / 2 - 0.62, 0.16, 0.42);
+    }
+    if (o.braking || lit) {
+      ctx.fillStyle = o.braking ? '#ff2a1f' : '#c0261b';
+      ctx.fillRect(-L / 2 + 0.07, -Wd / 2 + 0.18, 0.15, 0.46);
+      ctx.fillRect(-L / 2 + 0.07, Wd / 2 - 0.64, 0.15, 0.46);
+    }
     if (o.braking) {
       ctx.fillStyle = 'rgba(255,40,30,0.28)';
       ctx.beginPath();
