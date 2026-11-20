@@ -160,6 +160,7 @@ export function createRenderer(canvas, initialWorld) {
     drawRoute(0.9);
     drawPaint();
     drawHouses(R, time);
+    drawBays(state, time);
     drawBushes(R);
     for (const ai of state.traffic) drawCar(ai, null, ai.color, {});
     const flash = Math.floor(time * 4) % 2;
@@ -423,6 +424,36 @@ export function createRenderer(canvas, initialWorld) {
   }
 
   // ---------------------------------------------------------- pedestrians
+  // free parking bays light up when you are near a car park and slow
+  function drawBays(state, time) {
+    if (!state.bayNear || Math.abs(state.car.v) > 6) return;
+    const pulse = 0.55 + 0.3 * Math.sin(time * 4);
+    for (const l of world.lots || []) {
+      if (Math.hypot(l.x - state.car.x, l.y - state.car.y) > l.w / 2 + 16) continue;
+      for (const b of l.bays) {
+        if (!b.free) continue;
+        const mine = state.parkedBay === b;
+        ctx.save();
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.angle);
+        ctx.fillStyle = mine ? 'rgba(46, 204, 113, 0.35)' : `rgba(46, 204, 113, ${0.12 * pulse})`;
+        ctx.fillRect(-2.5, -1.3, 5, 2.6);
+        ctx.strokeStyle = mine ? '#2ecc71' : `rgba(46, 204, 113, ${pulse})`;
+        ctx.lineWidth = 0.18;
+        ctx.setLineDash(mine ? [] : [0.6, 0.4]);
+        ctx.strokeRect(-2.5, -1.3, 5, 2.6);
+        ctx.setLineDash([]);
+        ctx.rotate(-b.angle - cam.angle);
+        ctx.fillStyle = mine ? '#2ecc71' : `rgba(255,255,255,${0.5 + 0.3 * pulse})`;
+        ctx.font = 'bold 1.6px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('P', 0, 0);
+        ctx.restore();
+      }
+    }
+  }
+
   function drawWalkers(state, time) {
     for (const w of state.walkers || []) {
       if (w.x == null || Math.hypot(w.x - cam.x, w.y - cam.y) > 80) continue;

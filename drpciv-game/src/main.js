@@ -10,7 +10,7 @@ import { createGame } from './game.js';
 import { createRenderer } from './render.js';
 import { createControls } from './controls.js';
 import { createUI } from './ui.js';
-import { setEnabled as setSound, unlock } from './audio.js';
+import { setEnabled as setSound, unlock, engineSound } from './audio.js';
 import { loadSettings, saveSettings as persist, addMistake } from './storage.js';
 import { CARS } from './cars.js';
 import { initPortraits } from './portraits.js';
@@ -104,6 +104,10 @@ function frame(now) {
     }
     if (steps >= 12) acc = 0;
   } else acc = 0;
+  {
+    const st = current.game.state;
+    engineSound({ on: st.car.engineOn, rpm: st.car.rpm, idle: st.spec.idle, redline: st.spec.redline, gas: st.car.gas, paused: ui.isBlocking() || document.hidden });
+  }
   renderer.updateCamera(current.game.state, dt, settings);
   renderer.draw(current.game.state, settings, now / 1000);
   ui.update();

@@ -40,7 +40,7 @@ const sameSet = (a, b) => a.length === b.length && a.every((x) => b.includes(x))
 /**
  * deps: { openModal, head, signImg(key, px), sfx, esc }
  */
-export function createTheory({ openModal, head, signImg, sfx, esc }) {
+export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = null }) {
   function open() {
     const stats = loadStats();
     const m = openModal(`
@@ -90,8 +90,9 @@ export function createTheory({ openModal, head, signImg, sfx, esc }) {
       return `<div class="bk-cover">
           <div class="bk-title"><small>Car.dat</small><h2>Cartea șoferului</h2><p>Teoria pentru chestionarele auto, categoria B</p></div>
           <ol class="bk-toc">${CHAPTERS.map(
-            (c, i) => `<li><button type="button" data-ch="${i}"><img src="${signImg(c.sign, 64)}" alt="" /><span><b>${i + 1}. ${esc(c.title)}</b><small>${c.pages.length} pagini · ${questionsFor(c.id).length} întrebări${rs.ch[c.id] != null ? ` · test ${rs.ch[c.id]}%` : ''}</small></span>${rs.read[c.id] ? '<i class="bk-done">✓</i>' : ''}</button></li>`
+            (c, i) => `<li><button type="button" data-ch="${i}"><img src="${signImg(c.sign, 64)}" alt="" /><span><b>${i + 1}. ${esc(c.title)}</b><small>${c.pages.length} pagini · ${questionsFor(c.id).length} întrebări${rs.ch[c.id] != null ? ` · test ${rs.ch[c.id]}%` : ''}</small></span>${rs.ch[c.id] >= 80 ? '<i class="bk-done" title="Lecție rezolvată">✓</i>' : rs.read[c.id] ? '<i class="bk-read" title="Citit">📖</i>' : ''}</button></li>`
           ).join('')}</ol>
+          <p class="bk-progress">Lecții rezolvate: <b>${CHAPTERS.filter((c) => rs.ch[c.id] >= 80).length} din ${CHAPTERS.length}</b> · o lecție e rezolvată când treci testul ei cu cel puțin 80%.</p>
           <p class="bk-note">Scrisă pentru joc după Codul rutier. Verifică pe drpciv.ro informațiile importante.</p>
         </div>`;
     }
@@ -295,6 +296,10 @@ export function createTheory({ openModal, head, signImg, sfx, esc }) {
           <button type="button" class="btn ghost" data-close>Înapoi la joc</button>
           <button type="button" class="btn" id="thAgain">Alt chestionar</button>
         </div>`;
+      if (opts.chapter && passed && celebrate) {
+        const c = CHAPTERS.find((x) => x.id === opts.chapter);
+        celebrate(null, { title: 'Felicitări!', sub: `Ai rezolvat lecția „${c ? c.title : ''}” cu ${Math.round((right / total) * 100)}%.` });
+      }
       body.querySelector('#thAgain').onclick = () => {
         m.close();
         run(practice, opts);

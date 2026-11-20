@@ -96,7 +96,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     if (e.code === 'Escape' && modals.length) modals[modals.length - 1].close();
   });
   const head = (title, extra = '') => `<div class="sheet-head"><h2>${title}</h2>${extra}<button type="button" class="x" data-close aria-label="Close">&times;</button></div>`;
-  const theory = createTheory({ openModal, head, signImg: (key, px) => img(key, px), sfx, esc });
+  const theory = createTheory({ openModal, head, signImg: (key, px) => img(key, px), sfx, esc, celebrate: (then, text) => celebrate(then, text) });
 
   // ------------------------------------------------------------ sign card
   const card = $('#card');
@@ -717,6 +717,32 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   }
 
   // ----------------------------------------------------------------- results
+  // ------------------------------------------------------- level celebration
+  function celebrate(then, text) {
+    const en = text ? false : lang() === 'en'; // the theory book is in Romanian
+    const colors = ['#ffd166', '#06d6a0', '#ef476f', '#118ab2', '#f78c6b', '#c77dff'];
+    const bits = Array.from({ length: 70 }, (_, i) => `<i style="left:${Math.random() * 100}%;background:${colors[i % colors.length]};animation-delay:${(Math.random() * 1.2).toFixed(2)}s;animation-duration:${(2.2 + Math.random() * 1.6).toFixed(2)}s;transform:rotate(${Math.floor(Math.random() * 360)}deg)"></i>`).join('');
+    const title = text ? text.title : en ? 'Congratulations!' : 'Felicitări!';
+    const sub = text ? text.sub : en ? 'You completed this level!' : 'Ai completat acest nivel!';
+    const m = openModal(
+      `<div class="party">${bits}</div>
+       <div class="sheet celebrate" role="dialog" aria-label="${esc(title)}">
+         <div class="trophy">🏆</div>
+         <h2>${esc(title)}</h2>
+         <p>${esc(sub)}</p>
+         ${pimg('naty', 'sm')}
+         <button type="button" class="btn big" data-go>${then ? (en ? 'See results' : 'Vezi rezultatul') : en ? 'Continue' : 'Continuă'}</button>
+       </div>`,
+      { dismiss: false }
+    );
+    sfx.fanfare ? sfx.fanfare() : sfx.ok();
+    vibrate([60, 40, 60, 40, 120]);
+    m.el.querySelector('[data-go]').addEventListener('click', () => {
+      m.close();
+      if (then) then();
+    });
+  }
+
   function onFinish(sum) {
     const level = G.level;
     if (level) {
@@ -725,6 +751,10 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       saveSettings();
     }
     if (sum.boss && sum.passed && sum.reachedFinish) return openEnding(sum);
+    if (sum.passed && sum.reachedFinish && !sum._celebrated) {
+      sum._celebrated = true;
+      return celebrate(() => onFinish(sum));
+    }
     const pct = sum.max ? Math.round((sum.score / sum.max) * 100) : 0;
     const mins = Math.floor(sum.seconds / 60);
     const secs = String(Math.round(sum.seconds % 60)).padStart(2, '0');
@@ -1130,6 +1160,12 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       if (c.ok) showInfo(en ? 'Speed camera: OK' : 'Radar: OK', en ? `You passed at ${c.kmh} km/h (limit ${c.lim}).` : `Ai trecut cu ${c.kmh} km/h (limita ${c.lim}).`);
       else showInfo(en ? 'Speed camera: too fast!' : 'Radar: prea repede!', en ? `${c.kmh} km/h in a ${c.lim} km/h zone. In Test mode this costs penalty points.` : `${c.kmh} km/h unde limita e ${c.lim}. În modul Test primești puncte de penalizare.`);
     });
+    game.on('parked', (p) => {
+      const en = lang() === 'en';
+      sfx.ok();
+      showInfo(`${en ? 'Parked!' : 'Parcat corect!'} ${'★'.repeat(p.stars)}${'☆'.repeat(3 - p.stars)}`, en ? `${p.reverse ? 'Reverse parking' : 'Nose-in parking'}. ${p.stars === 3 ? 'Perfectly straight in the bay.' : 'Try to sit straighter in the middle of the bay.'}` : `${p.reverse ? 'Parcare cu spatele' : 'Parcare cu fața'}. ${p.stars === 3 ? 'Perfect, drept în mijlocul locului.' : 'Încearcă să stai mai drept, în mijlocul locului.'}`);
+    });
+    game.on('levelDone', () => celebrate(null));
     game.on('gaveWay', () => {
       if (st().mode !== 'learn') return;
       const en = lang() === 'en';

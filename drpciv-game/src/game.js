@@ -263,6 +263,55 @@ export function createGame(world, opts = {}) {
   }
 
   /** Keep the car on the asphalt: soft push-back, slow-down and sliding along the curb. */
+  // ---- car parks: drive in, park in a free bay
+  const lotsNear = [];
+  function inLot(x, y) {
+    for (const l of lotsNear) {
+      const d = l.drive;
+      const cs = Math.cos(-d.angle);
+      const sn = Math.sin(-d.angle);
+      const lx = (x - d.x) * cs - (y - d.y) * sn;
+      const ly = (x - d.x) * sn + (y - d.y) * cs;
+      if (Math.abs(lx) < d.w / 2 && Math.abs(ly) < d.h / 2) return true;
+    }
+    return false;
+  }
+  function stepParking(dt) {
+    const car = state.car;
+    lotsNear.length = 0;
+    for (const l of world.lots || []) if (Math.hypot(l.x - car.x, l.y - car.y) < l.w / 2 + 14) lotsNear.push(l);
+    // parked cars are solid
+    for (const pc of world.parked || []) if (Math.abs(pc.x - car.x) < 7 && Math.abs(pc.y - car.y) < 7) pushOutOfTraffic(car, { ...pc, v: 0 });
+    // in a free bay, straight (nose or tail first), stopped?
+    let bay = null;
+    let quality = 0;
+    for (const l of lotsNear)
+      for (const b of l.bays) {
+        if (!b.free) continue;
+        const cs = Math.cos(-b.angle);
+        const sn = Math.sin(-b.angle);
+        const along = (car.x - b.x) * cs - (car.y - b.y) * sn; // into the bay
+        const across = (car.x - b.x) * sn + (car.y - b.y) * cs;
+        const straight = Math.abs(Math.cos(car.heading - b.angle));
+        if (Math.abs(along) < 1.0 && Math.abs(across) < 0.55 && straight > 0.97) {
+          bay = b;
+          quality = Math.max(0, 1 - Math.abs(across) / 0.55) * 0.5 + Math.max(0, (straight - 0.97) / 0.03) * 0.5;
+        }
+      }
+    state.bayNear = lotsNear.length > 0;
+    if (bay && Math.abs(car.v) < 0.15) {
+      state.parkT = (state.parkT || 0) + dt;
+      if (state.parkT > 0.8 && state.parkedBay !== bay) {
+        state.parkedBay = bay;
+        const stars = quality > 0.75 ? 3 : quality > 0.4 ? 2 : 1;
+        emit('parked', { stars, reverse: Math.cos(car.heading - bay.angle) < 0 });
+      }
+    } else {
+      state.parkT = 0;
+      if (!bay) state.parkedBay = null;
+    }
+  }
+
   function collideRoad(car, dt) {
     const limit = world.half + C.collision.margin;
     let touched = false;
@@ -273,7 +322,10 @@ export function createGame(world, opts = {}) {
       let wnx = 0;
       let wny = 0;
       for (const [lx, ly] of BODY_POINTS) {
-        const q = world.queryRoad(car.x + c * lx - s * ly, car.y + s * lx + c * ly);
+        const px = car.x + c * lx - s * ly;
+        const py = car.y + s * lx + c * ly;
+        const q = world.queryRoad(px, py);
+        if (q.dist > limit && inLot(px, py)) continue; // car parks are drivable
         const pen = q.dist - limit;
         if (pen > worst) {
           worst = pen;
@@ -1372,6 +1424,7 @@ export function createGame(world, opts = {}) {
   function update(dt, input) {
     state.time += dt;
     stepCar(state.car, input, dt);
+    stepParking(dt);
     collideRoad(state.car, dt);
     stepTraffic(dt);
     updateProgress(dt);
@@ -1379,6 +1432,10 @@ export function createGame(world, opts = {}) {
     updateBlinkersAndStation(dt);
     updatePassenger(dt);
     checkCameras();
+    if (state.mode === 'learn' && !state.learnDone && !(world.mission && world.mission.dest) && state.prog.onRoute && state.prog.s >= world.route.length - 0.8 && state.prog.vAlong > 0.5) {
+      state.learnDone = true;
+      emit('levelDone', { learn: true });
+    }
     if (state.mode === 'test' && state.test && !state.test.finished) runRules(dt);
     state.shake = Math.max(0, state.shake - dt * 2.5);
   }
@@ -1392,6 +1449,8 @@ export function createGame(world, opts = {}) {
     state.prog = freshProgress();
     state.traffic = [];
     state.npcs = [];
+    state.learnDone = false;
+    state.parkedBay = null;
     state.walkers = (world.walkers || []).map((w) => ({ ...w, cur: w.s, x: 0, y: 0, heading: 0 }));
     flowTimer = 1;
     if (net) for (const leg of net.legs) leg.timer = 2 + Math.random() * 6;

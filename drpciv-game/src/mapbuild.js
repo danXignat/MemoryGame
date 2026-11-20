@@ -696,12 +696,20 @@ export function buildWorld(MAP) {
       // a small car park between the block and the road
       const lotOff = half + 5;
       const lot = { x: p.x + nx * lotOff, y: p.y + ny * lotOff, w: w * 0.8, h: 6, angle: ang };
-      if (rectPoints(lot.x, lot.y, lot.w, lot.h, ang).every(([px, py]) => queryRoad(px, py).dist >= half + 1.2)) {
+      if (rectPoints(lot.x, lot.y, lot.w, lot.h, ang).every(([px, py]) => queryRoad(px, py).dist >= half + 1.2) && !signs.some((sg) => inRect({ ...lot, h: lot.h + 4 }, sg.x, sg.y, 2.5))) {
         lots.push(lot);
+        // you can drive in: the lot plus the strip to the road edge, and park in the free bays
+        lot.nx = nx;
+        lot.ny = ny;
+        lot.drive = { x: lot.x - nx * 1.6, y: lot.y - ny * 1.6, w: lot.w + 1, h: lot.h + 3.4, angle: ang };
+        lot.bays = [];
         const n = Math.floor(lot.w / 3);
         for (let i = 0; i < n; i++) {
-          if (rnd() < 0.35) continue;
           const t = (i - (n - 1) / 2) * 3;
+          const bay = { x: lot.x + Math.cos(ang) * t, y: lot.y + Math.sin(ang) * t, angle: ang + Math.PI / 2, free: true };
+          lot.bays.push(bay);
+          if (rnd() < 0.35) continue;
+          bay.free = false;
           parked.push({ x: lot.x + Math.cos(ang) * t, y: lot.y + Math.sin(ang) * t, heading: ang + Math.PI / 2 * (rnd() < 0.5 ? 1 : -1), length: 4.2, width: 1.8, color: carColors[Math.floor(rnd() * carColors.length)] });
         }
       }
