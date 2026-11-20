@@ -2,7 +2,7 @@
 // Used to publish the game as a link that opens on a phone without any install.
 //   npm run artifact
 import { build } from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
 
 const root = new URL('..', import.meta.url).pathname;
 const bundle = await build({
@@ -21,13 +21,27 @@ const title = html.match(/<title>([^<]*)<\/title>/)[1];
 const fonts = [...html.matchAll(/<link[^>]+(?:fonts\.googleapis|fonts\.gstatic)[^>]*>/g)].map((m) => m[0]).join('\n');
 const body = html.match(/<body>([\s\S]*?)<script type="module"/)[1].trim();
 
+// photos from public/assets become data URIs so the single page has them too
+const assets = {};
+const dir = root + 'public/assets/';
+if (existsSync(dir)) {
+  for (const f of readdirSync(dir)) {
+    const m = f.match(/^(naty|alisia|dan|dangf)\.(jpe?g|png|webp)$/i);
+    if (!m) continue;
+    const mime = m[2].toLowerCase() === 'png' ? 'image/png' : m[2].toLowerCase() === 'webp' ? 'image/webp' : 'image/jpeg';
+    assets[m[1].toLowerCase()] = `data:${mime};base64,${readFileSync(dir + f).toString('base64')}`;
+  }
+}
+console.log('embedded photos:', Object.keys(assets).join(', ') || 'none (placeholders will be used)');
+const assetScript = Object.keys(assets).length ? `<script>window.__ASSETS=${JSON.stringify(assets)};</script>\n` : '';
+
 const out = `<title>${title}</title>
 ${fonts}
 <style>
 ${css}
 </style>
 ${body}
-<script>
+${assetScript}<script>
 ${js}
 </script>
 `;

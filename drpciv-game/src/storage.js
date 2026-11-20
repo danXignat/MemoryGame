@@ -11,6 +11,7 @@ export const DEFAULTS = {
   rotate: true,
   sound: true,
   mode: 'learn',
+  hints: true, // show sign indications with live status in Test mode
   level: 'L1',
   car: 'golf5',
   progress: {}, // levelId -> { best: score, passed: bool }

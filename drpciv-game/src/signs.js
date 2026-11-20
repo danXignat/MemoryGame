@@ -375,3 +375,179 @@ export const visibleSignKeys = () => Object.keys(SIGNS).filter((k) => !SIGNS[k].
 
 /** Handy helper: pick the text in the chosen language. */
 export const tr = (obj, lang) => (obj ? obj[lang] ?? obj.en ?? obj.ro ?? '' : '');
+
+// ============================================================================
+//  INDICATIONS: what to DO when you meet each sign, what it means legally, and the
+//  mix-up that catches people in the DRPCIV exam. Shown on the approach card,
+//  in Test mode (with a live status) and in the Sign Library.
+//  Written from general knowledge and driving-school guides: check the official text.
+// ============================================================================
+const IND = (doRo, doEn, legalRo, legalEn, trapRo, trapEn) => ({
+  do: { ro: doRo, en: doEn },
+  legal: { ro: legalRo, en: legalEn },
+  trap: { ro: trapRo, en: trapEn },
+});
+
+const INDICATIONS = {
+  stop: IND(
+    'Oprește complet înainte de linia de oprire, verifică toate direcțiile, semnalizează și pornești doar când e liber.',
+    'Full stop before the line, check every direction, signal, then go only when it is clear.',
+    'Obligă conducătorul să oprească și să cedeze trecerea vehiculelor de pe drumul pe care intră.',
+    'Obliges the driver to stop and give way to traffic on the road being joined.',
+    'Nu e suficient să încetinești: oprești la linie, nu după ea, chiar dacă drumul pare gol.',
+    'Slowing down is not enough: you stop at the line, not past it, even if the road looks empty.'
+  ),
+  giveWay: IND(
+    'Redu viteza, privește în ambele părți și oprește dacă vine cineva pe drumul cu prioritate.',
+    'Slow down, look both ways and stop if anyone is coming on the priority road.',
+    'Obligă la cedarea trecerii vehiculelor de pe drumul cu prioritate.',
+    'Obliges you to give way to vehicles on the priority road.',
+    'Nu înseamnă oprire obligatorie ca la STOP, dar oprești dacă situația din trafic o cere.',
+    'It is not a compulsory stop like STOP, but you must stop when the traffic requires it.'
+  ),
+  priorityRoad: IND(
+    'Menține traseul, dar rămâi atent la vehiculele care intră din drumurile laterale.',
+    'Keep going, but stay alert for vehicles joining from side roads.',
+    'Îți dă prioritate de trecere în intersecțiile următoare, până la indicatorul de sfârșit.',
+    'Gives you right of way at the next junctions, until the end-of-priority sign.',
+    'Prioritatea ține până la indicatorul de sfârșit, nu pe tot drumul.',
+    'The priority lasts until the end sign, not along the whole road.'
+  ),
+  speed30: IND(
+    'Ține viteza sub 30 km/h și evită frânările bruște.',
+    'Keep under 30 km/h and avoid harsh braking.',
+    'Interzice depășirea vitezei indicate pe sectorul următor.',
+    'Forbids exceeding the shown speed on the stretch ahead.',
+    'Limita începe la indicator: trebuie să ai deja viteza corectă când treci pe lângă el.',
+    'The limit starts at the sign, so you must already be at the right speed when you pass it.'
+  ),
+  speed50: IND(
+    'Ține viteza sub 50 km/h și evită frânările bruște.',
+    'Keep under 50 km/h and avoid harsh braking.',
+    'Interzice depășirea vitezei indicate pe sectorul următor.',
+    'Forbids exceeding the shown speed on the stretch ahead.',
+    'Limita începe la indicator: trebuie să ai deja viteza corectă când treci pe lângă el.',
+    'The limit starts at the sign, so you must already be at the right speed when you pass it.'
+  ),
+  noOvertaking: IND(
+    'Nu depăși alte vehicule pe sectorul următor. Rămâi în spatele celui mai lent.',
+    'Do not overtake other vehicles on the stretch ahead. Stay behind the slower one.',
+    'Interzice depășirea vehiculelor cu motor, cu excepția mopedelor și motocicletelor fără ataș.',
+    'Forbids overtaking motor vehicles, except mopeds and solo motorcycles.',
+    'Interdicția durează până la semnul de sfârșit; nu o încheie o intersecție.',
+    'The ban lasts until the end sign; a junction does not cancel it.'
+  ),
+  endNoOvertaking: IND(
+    'Poți depăși din nou, dar doar dacă este sigur și permis.',
+    'You may overtake again, but only if it is safe and allowed.',
+    'Marchează sfârșitul interdicției de depășire.',
+    'Marks the end of the overtaking ban.',
+    'Nu înseamnă că depășirea e permisă oricum: verifică marcajul și vizibilitatea.',
+    'It does not make overtaking allowed everywhere: check the road markings and visibility.'
+  ),
+  noStopping: IND(
+    'Nu opri și nu staționa pe sector, nici pentru scurt timp.',
+    'Do not stop or park on this stretch, not even briefly.',
+    'Interzice oprirea voluntară; unde oprirea este interzisă, este interzisă și staționarea.',
+    'Forbids voluntary stopping; where stopping is banned, parking is banned too.',
+    'Nu o confunda cu Staționarea interzisă, care permite oprirea scurtă.',
+    'Do not mix it up with No parking, which still allows a short stop.'
+  ),
+  noParking: IND(
+    'Poți opri scurt (de exemplu pentru urcarea unui pasager), dar nu parca.',
+    'You may stop briefly (for example to let a passenger in), but do not park.',
+    'Interzice staționarea pe sectorul următor.',
+    'Forbids parking on the stretch ahead.',
+    'Nu o confunda cu Oprirea interzisă (cu X roșu), care interzice și oprirea.',
+    'Do not mix it up with No stopping (red X), which forbids stopping as well.'
+  ),
+  noEntry: IND(
+    'Nu intra pe acest drum. Alege altă cale.',
+    'Do not enter this road. Choose another way.',
+    'Interzice accesul vehiculelor în această direcție.',
+    'Forbids vehicles entering in this direction.',
+    'Nu o confunda cu Sens unic: Accesul interzis te oprește să intri, Sens unic doar informează.',
+    'Do not mix it up with One-way: No entry stops you entering, One-way only informs.'
+  ),
+  roundabout: IND(
+    'Semnalizează la intrare și la ieșire, circulă în sens invers acelor de ceasornic și cedează cum indică semnele.',
+    'Signal in and out, drive counter-clockwise and give way as the signs say.',
+    'Obligă la circulația în sens giratoriu, în sens invers acelor de ceasornic.',
+    'Obliges you to drive round counter-clockwise.',
+    'Cine are prioritate depinde de semnele de la intrare (de exemplu Cedează trecerea), nu doar de sensul giratoriu.',
+    'Who has priority depends on the signs at the entry (for example Give Way), not just the roundabout itself.'
+  ),
+  turnRight: IND(
+    'Semnalizează din timp și virează la dreapta. Nu mergi înainte.',
+    'Signal early and turn right. Do not go straight on.',
+    'Obligă la direcția indicată.',
+    'Obliges you to take the direction shown.',
+    'Obligă: nu ai voie nici înainte, nici la stânga.',
+    'It is an order: no straight on and no left turn.'
+  ),
+  turnLeft: IND(
+    'Semnalizează din timp și virează la stânga. Nu mergi înainte.',
+    'Signal early and turn left. Do not go straight on.',
+    'Obligă la direcția indicată.',
+    'Obliges you to take the direction shown.',
+    'Obligă: nu ai voie nici înainte, nici la dreapta.',
+    'It is an order: no straight on and no right turn.'
+  ),
+  curveRight: IND(
+    'Redu viteza înainte de curbă, nu în curbă, și rămâi pe banda ta.',
+    'Slow down before the curve, not in it, and stay in your lane.',
+    'Avertizează asupra unei curbe periculoase la dreapta.',
+    'Warns of a dangerous curve to the right.',
+    'Frânezi înainte de intrarea în curbă, nu la mijlocul ei.',
+    'You brake before entering the curve, not halfway through it.'
+  ),
+  curveLeft: IND(
+    'Redu viteza înainte de curbă, nu în curbă, și rămâi pe banda ta.',
+    'Slow down before the curve, not in it, and stay in your lane.',
+    'Avertizează asupra unei curbe periculoase la stânga.',
+    'Warns of a dangerous curve to the left.',
+    'Frânezi înainte de intrarea în curbă, nu la mijlocul ei.',
+    'You brake before entering the curve, not halfway through it.'
+  ),
+  narrowRoad: IND(
+    'Redu viteza și fii pregătit să cedezi vehiculelor din sens opus.',
+    'Slow down and be ready to give way to oncoming vehicles.',
+    'Avertizează că drumul se îngustează.',
+    'Warns that the road narrows.',
+    'Indicatorul doar avertizează; cine are prioritate decid alte semne.',
+    'The sign only warns; other signs decide who has priority.'
+  ),
+  children: IND(
+    'Redu viteza și fii pregătit să oprești.',
+    'Slow down and be ready to stop.',
+    'Avertizează că pot apărea copii pe carosabil.',
+    'Warns that children may be on the road.',
+    'Atenția rămâne necesară și în afara orelor de școală.',
+    'Stay careful outside school hours too.'
+  ),
+  pedestrian: IND(
+    'Redu viteza și oprește dacă pietonul traversează sau este pe cale să o facă.',
+    'Slow down and stop if a pedestrian is crossing or about to cross.',
+    'Marchează trecerea pentru pietoni; pietonii angajați au prioritate.',
+    'Marks a pedestrian crossing; pedestrians already crossing have priority.',
+    'Acorzi prioritate și pietonului care urmează să se angajeze, nu doar celui de pe carosabil.',
+    'You also yield to a pedestrian about to step out, not only to one already on the road.'
+  ),
+  oneWay: IND(
+    'Circulă doar în sensul săgeții.',
+    'Drive only in the direction of the arrow.',
+    'Informează că circulația se face într-un singur sens.',
+    'Tells you traffic flows in one direction only.',
+    'Nu o confunda cu Accesul interzis (cerc roșu).',
+    'Do not mix it up with No entry (red disc).'
+  ),
+  parking: IND(
+    'Poți parca în locul amenajat.',
+    'You may park in the marked place.',
+    'Indică un loc amenajat pentru parcare.',
+    'Shows a place set aside for parking.',
+    'Citește panourile adiționale: pot limita timpul sau categoria de vehicule.',
+    'Read any plates under it: they can limit time or vehicle type.'
+  ),
+};
+for (const [k, v] of Object.entries(INDICATIONS)) SIGNS[k].ind = v;

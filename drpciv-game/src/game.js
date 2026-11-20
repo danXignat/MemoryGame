@@ -104,6 +104,7 @@ export function createGame(world, opts = {}) {
     fuelSpent: 0,
     passenger: false,
     mood: 'happy', // passenger mood: happy | wince
+    moodWhy: null, // brake | speed | rule
     moodT: 0,
     blink: 0,
   };
@@ -451,6 +452,7 @@ export function createGame(world, opts = {}) {
     t.penalty += pts;
     t.log.push({ key, pts, message, title: extra.title || null, signKey: extra.signKey || null });
     state.mood = 'wince';
+    state.moodWhy = 'rule';
     state.moodT = 2;
     emit('feedback', { taskId: null, issue: true, issueKey: key, signKey: extra.signKey || null, def: extra.def || null, title: extra.title || null, ok: false, points: 0, penalty: pts, totalPenalty: t.penalty, score: t.score, message, quiz: false });
     checkEliminated();
@@ -477,6 +479,7 @@ export function createGame(world, opts = {}) {
     t.message = message;
     if (!ok) {
       state.mood = 'wince';
+      state.moodWhy = 'rule';
       state.moodT = 2;
     }
     emit('feedback', { taskId: t.id, signKey: t.sign.key, def: t.sign.def, ok, points: ok ? T.pointsPerSign : 0, penalty: pen, totalPenalty: test.penalty, score: test.score, message, quiz: t.type === 'quiz' });
@@ -947,10 +950,19 @@ export function createGame(world, opts = {}) {
     }
     // passenger mood
     state.moodT = Math.max(0, state.moodT - dt);
-    if (state.moodT <= 0) state.mood = 'happy';
+    if (state.moodT <= 0) {
+      state.mood = 'happy';
+      state.moodWhy = null;
+    }
     if (state.passenger && car.brakeP > 0.85 && car.v > 6) {
       state.mood = 'wince';
+      state.moodWhy = 'brake';
       state.moodT = 1.2;
+    }
+    if (state.passenger && state.mode === 'test' && state.speedLimit && Math.abs(car.v) * 3.6 > state.speedLimit + C.test.speedTolerance + 4) {
+      state.mood = 'wince';
+      state.moodWhy = 'speed';
+      state.moodT = 1;
     }
   }
 
@@ -1063,7 +1075,28 @@ export function createGame(world, opts = {}) {
     state.weather = w;
   };
 
+  /** What the sign you are approaching asks of you, how far away it is, and (Test) whether you are meeting it. */
+  function indication() {
+    const sg = state.activeSign;
+    if (!sg) return null;
+    const pr = state.prog;
+    const car = state.car;
+    const dist = pr.onRoute && pr.s <= sg.s + 2 ? Math.max(0, sg.s - pr.s) : Math.hypot(sg.x - car.x, sg.y - car.y);
+    let status = 'info';
+    if (state.mode === 'test' && state.test) {
+      const t = state.test.tasks.find((x) => x.sign === sg);
+      if (t) {
+        status = 'watch';
+        if (t.status === 'done') status = t.ok ? 'ok' : 'violated';
+        else if (t.type === 'speed' && t.status === 'active') status = Math.abs(car.v) * 3.6 > t.limit + T.speedTolerance ? 'violated' : 'ok';
+        else if (t.type === 'noStop' && t.status === 'active') status = Math.abs(car.v) * 3.6 < T.noStopKmh ? 'violated' : 'ok';
+        else if (t.type === 'noOvertake' && t.status === 'active') status = 'ok';
+      }
+    }
+    return { sign: sg, dist, status };
+  }
+
   setMode('learn');
 
-  return { state, world, level, on, update, setMode, restart: () => setMode(state.mode), resetCar, endTest, answerQuiz, closeQuiz, toggleSignal, toggleHazard, cycleLights, toggleEngine, startRefuel, stopRefuel, setCar, setWeather };
+  return { indication, state, world, level, on, update, setMode, restart: () => setMode(state.mode), resetCar, endTest, answerQuiz, closeQuiz, toggleSignal, toggleHazard, cycleLights, toggleEngine, startRefuel, stopRefuel, setCar, setWeather };
 }

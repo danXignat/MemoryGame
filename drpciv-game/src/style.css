@@ -1596,3 +1596,242 @@ p {
     top: calc(var(--top) + var(--tb) * 2 + 66px);
   }
 }
+
+/* ====================== portraits, indications, search ====================== */
+.pf {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #223;
+  flex: none;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+.pf.sm {
+  width: 30px;
+  height: 30px;
+}
+.avatar {
+  width: var(--tb);
+  height: var(--tb);
+  pointer-events: auto;
+}
+#pax {
+  height: 34px;
+  padding: 0 10px 0 3px;
+  gap: 7px;
+  border-color: rgba(47, 191, 113, 0.8);
+}
+#pax .pf {
+  width: 26px;
+  height: 26px;
+  border-width: 2px;
+  border-color: #2fbf71;
+}
+#pax.wince {
+  border-color: #ff9f1c;
+}
+#pax.wince .pf {
+  border-color: #ff9f1c;
+}
+#paxTxt {
+  font-weight: 700;
+  color: #ffd166;
+}
+
+.pill.alert {
+  max-width: min(36vw, 330px);
+  gap: 8px;
+  align-items: center;
+  padding: 4px 10px 4px 5px;
+  text-align: left;
+}
+.pill.alert .at {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+.pill.alert .at b {
+  font: 700 11.5px/1.2 var(--font-ui);
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.pill.alert .at small {
+  font-size: 10.5px;
+  opacity: 0.8;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+.dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+  background: #8aa0ad;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+.dot.ok {
+  background: #3ddc84;
+  box-shadow: 0 0 8px #3ddc84;
+}
+.dot.violated {
+  background: #ff5d52;
+  box-shadow: 0 0 8px #ff5d52;
+}
+.dot.watch {
+  background: #ffc928;
+}
+.mode-test #stage {
+  top: calc(var(--top) + var(--tb) + 72px);
+}
+.donow {
+  margin-top: 5px;
+  font-size: clamp(11.5px, 1.8vw, 13px);
+  line-height: 1.3;
+  padding: 5px 8px;
+  border-radius: 9px;
+  background: var(--surface-2);
+}
+.donow b {
+  color: var(--accent);
+  margin-right: 3px;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+}
+#card:not(.pinned) .rule {
+  display: none;
+}
+#card.pinned .rule {
+  display: block;
+}
+.pin b {
+  color: var(--fg);
+  margin-right: 4px;
+}
+
+.searchbar {
+  flex: none;
+  padding: 0 18px 8px;
+  user-select: text;
+}
+.searchbar input {
+  width: 100%;
+  height: 42px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--fg);
+  font: inherit;
+  padding: 0 14px;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.isecs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.isec {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.isec h4 {
+  margin: 0 0 3px;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.isec p {
+  font-size: 13px;
+  line-height: 1.35;
+}
+.isec.trap {
+  background: var(--bad-soft);
+}
+.isec.trap h4 {
+  color: var(--bad);
+}
+
+.credit {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: center;
+  font-size: 12.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.duo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 4px;
+  font-weight: 700;
+}
+.duo .pf {
+  width: 54px;
+  height: 54px;
+  border-color: var(--surface);
+}
+.duo i {
+  font-style: normal;
+  color: var(--muted);
+}
+.lphoto {
+  overflow: hidden;
+}
+.lphoto .pf {
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  border: 0;
+  box-shadow: none;
+}
+.toastrow .pf {
+  width: 44px;
+  height: 44px;
+}
+
+/* ---- tighter top bar with the avatar (kept last) ---- */
+:root {
+  --tb: clamp(28px, 4.1vw, 40px);
+}
+#pillScore .k {
+  display: none;
+}
+@media (min-width: 1000px) {
+  .tb.txt span {
+    display: inline;
+  }
+}
+@media (min-width: 820px) and (max-width: 999px) {
+  .tb.txt span {
+    display: none;
+  }
+}
+#card .donow {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+#card.pinned .donow {
+  -webkit-line-clamp: unset;
+}
+#limit {
+  top: calc(var(--top) + (var(--tb) + 4px) + 30px + 56px + 38px);
+}
+.pill.alert {
+  max-width: min(30vw, 300px);
+}
+#nav {
+  max-width: 36vw;
+}

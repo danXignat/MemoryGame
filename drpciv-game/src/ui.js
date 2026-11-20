@@ -12,6 +12,7 @@ import { CARS, CAR_ORDER } from './cars.js';
 import { LEVELS } from './levels.js';
 import { sfx, vibrate, unlock, setEnabled as setSoundEnabled } from './audio.js';
 import { addMistake, forgiveMistake, topMistakes } from './storage.js';
+import { PEOPLE, pimg } from './portraits.js';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -83,13 +84,15 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
 
   function renderCard(sg) {
     const d = sg.def;
+    const ind = d.ind;
     card.innerHTML = `
       <div class="cardrow">
         <img src="${img(sg.key, 192)}" alt="" />
         <div>
-          <div class="pillrow">${catPill(d.category)}<span class="pin">${pinned ? 'Pinned. Tap to close' : 'Tap to keep open'}</span></div>
+          <div class="pillrow">${catPill(d.category)}<span class="pin"><b id="cardDist"></b> ${pinned ? 'Tap to close' : 'Tap for full rule'}</span></div>
           <div class="nameRo">${esc(d.name.ro)}</div>
           <div class="nameEn">${esc(d.name.en)}</div>
+          ${ind ? `<div class="donow"><b>${lang() === 'en' ? 'Do now' : 'Acum'}</b> ${esc(tr(ind.do, lang()))}</div>` : ''}
           <p class="rule">${esc(tr(d.rule, lang()))}</p>
         </div>
       </div>`;
@@ -150,6 +153,17 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     toastTimer = setTimeout(hideToast, fb.ok ? 3200 : 7000);
   }
 
+  function showDanTip(level, mode) {
+    if (!level || !level.tip) return;
+    const who = level.n % 2 ? 'dan' : 'dangf';
+    hideCard();
+    toast.className = 'info';
+    toast.innerHTML = `<div class="toastrow">${pimg(who)}<div><div class="verdict" style="color:var(--accent)">${esc(PEOPLE[who].name)} ${lang() === 'en' ? 'says' : 'zice'}</div><div class="msg" style="font-weight:500">${esc(tr(level.tip, lang()))}</div>${mode === 'test' ? '<p class="rule">Test: follow the purple route. 21 penalty points means failed.</p>' : ''}</div></div>`;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 7000);
+  }
+
   function showInfo(title, text) {
     hideCard();
     toast.className = 'info';
@@ -162,7 +176,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   // ---------------------------------------------------------------- HUD
   const E = {
     pts: $('#pts'), pen: $('#pen'), lvName: $('#lvName'), fuelPill: $('#pillFuel'), fuelFill: $('#fuelFill'), fuelTxt: $('#fuelTxt'),
-    progTxt: $('#progTxt'), progK: $('#progK'), alert: $('#alertPill'), alertImg: $('#alertImg'), alertTxt: $('#alertTxt'),
+    progTxt: $('#progTxt'), progK: $('#progK'), alert: $('#alertPill'), alertImg: $('#alertImg'), alertTxt: $('#alertTxt'), alertDist: $('#alertDist'), alertDot: $('#alertDot'), pax: $('#pax'), paxTxt: $('#paxTxt'),
     limit: $('#limit'), limNum: $('#limNum'), nav: $('#nav'), navIcon: $('#navIcon'), navTxt: $('#navTxt'), wrong: $('#wrongWay'),
     sigL: $('#bSigL'), sigR: $('#bSigR'), haz: $('#bHaz'), lights: $('#bLights'), lightLv: $('#lightLv'), eng: $('#bEng'),
     station: $('#station'), speedoCv: $('#speedoCv'), miniCv: $('#minimapCv'), rotate: $('#rotate'),
@@ -400,14 +414,33 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       E.progK.textContent = 'route';
     }
 
-    // sign alert pill
+    // sign indication: what the sign asks, how far, and whether you are meeting it (Test)
     const a = s.activeSign;
-    E.alert.hidden = !(a && s.mode === 'test');
-    if (a && E.alert.dataset.k !== a.key + s.mode + lang()) {
-      E.alert.dataset.k = a.key + s.mode + lang();
-      E.alertImg.src = img(a.key, 96);
-      E.alertTxt.textContent = s.mode === 'learn' ? tr(a.def.name, lang()) : '';
-      E.alertTxt.hidden = s.mode !== 'learn';
+    const ind = a ? G.game.indication() : null;
+    const showAlert = !!(ind && s.mode === 'test' && settings.hints && ind.sign.def.ind);
+    E.alert.hidden = !showAlert;
+    if (showAlert) {
+      const k = ind.sign.key + lang();
+      if (E.alert.dataset.k !== k) {
+        E.alert.dataset.k = k;
+        E.alertImg.src = img(ind.sign.key, 96);
+        E.alertTxt.textContent = tr(ind.sign.def.ind.do, lang());
+      }
+      E.alertDist.textContent = `${Math.round(ind.dist)} m · ${{ ok: lang() === 'en' ? 'OK' : 'Corect', violated: lang() === 'en' ? 'Violated' : 'Încălcat', watch: lang() === 'en' ? 'Watch' : 'Atenție', info: '' }[ind.status]}`;
+      E.alertDot.className = 'dot ' + ind.status;
+    }
+    if (!card.hidden && ind) {
+      const el = $('#cardDist', card);
+      if (el) el.textContent = `${Math.round(ind.dist)} m`;
+    }
+
+    // Alisia (passenger) reacts to how you drive
+    E.pax.hidden = !s.passenger;
+    if (s.passenger) {
+      const wince = s.mood === 'wince';
+      const txt = !wince ? '' : { brake: lang() === 'en' ? 'Easy on the brakes!' : 'Mai ușor la frână!', speed: lang() === 'en' ? 'Slow down!' : 'Încet, te rog!', rule: lang() === 'en' ? 'Careful!' : 'Atenție!' }[s.moodWhy] || '';
+      E.pax.classList.toggle('wince', wince);
+      if (E.paxTxt.textContent !== txt) E.paxTxt.textContent = txt;
     }
 
     updateNav(s);
@@ -438,10 +471,12 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   // ------------------------------------------------------------ sign library
   function openLibrary(startKey = null) {
     let filter = 'all';
+    let query = '';
     let openKey = startKey;
     const m = openModal(`
       <div class="sheet wide" role="dialog" aria-label="Road sign library">
         ${head('<span id="libTitle">Road Sign Library</span>', '<button type="button" class="x" id="libLang" style="font-size:13px;font-weight:800"></button>')}
+        <div class="searchbar" id="libSearchBar"><input id="libSearch" type="search" placeholder="Search a sign, a rule or an exam trap" autocomplete="off" /></div>
         <div class="chips" id="libChips"></div>
         <div class="sheet-body" id="libBody"></div>
       </div>`);
@@ -451,14 +486,21 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       $('#libLang', m.el).textContent = lang().toUpperCase();
       $('#libTitle', m.el).textContent = openKey ? tr(SIGNS[openKey].name, lang()) : 'Road Sign Library';
       chips.hidden = !!openKey;
+      $('#libSearchBar', m.el).hidden = !!openKey;
       if (openKey) return renderDetail();
       chips.innerHTML = ['all', ...CAT_ORDER].map((k) => `<button type="button" class="fchip ${k === filter ? 'on' : ''}" data-f="${k}">${k === 'all' ? 'All' : esc(tr(CATEGORIES[k], lang()))}</button>`).join('');
       const keys = visibleSignKeys()
         .filter((k) => filter === 'all' || SIGNS[k].category === filter)
+        .filter((k) => {
+          if (!query) return true;
+          const sg = SIGNS[k];
+          const hay = [sg.name.ro, sg.name.en, sg.rule.ro, sg.rule.en, sg.ind && sg.ind.do.en, sg.ind && sg.ind.trap.en, sg.ind && sg.ind.legal.en].join(' ').toLowerCase();
+          return hay.includes(query);
+        })
         .sort((a, b) => CAT_ORDER.indexOf(SIGNS[a].category) - CAT_ORDER.indexOf(SIGNS[b].category));
-      body.innerHTML = `<div class="grid">${keys
+      body.innerHTML = keys.length ? `<div class="grid">${keys
         .map((k) => `<button type="button" class="tile" data-k="${k}" style="--cat:${CATEGORIES[SIGNS[k].category].color}"><img src="${img(k, 192)}" alt="" /><b>${esc(SIGNS[k].name.ro)}</b><small>${esc(SIGNS[k].name.en)}</small></button>`)
-        .join('')}</div>`;
+        .join('')}</div>` : '<p class="empty">No sign matches that search.</p>';
       body.scrollTop = 0;
     }
     function renderDetail() {
@@ -473,9 +515,14 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
             <div class="nameRo">${esc(s.name.ro)}</div>
             <div class="nameEn">${esc(s.name.en)}</div>
             <p class="rule">${esc(tr(s.rule, lang()))}</p>
-            <p class="rule">${esc(tr(s.rule, other))}</p>
           </div>
-        </div>`;
+        </div>
+        ${s.ind ? `<div class="isecs">
+          <div class="isec"><h4>${lang() === 'en' ? 'Do now' : 'Acum'}</h4><p>${esc(tr(s.ind.do, lang()))}</p></div>
+          <div class="isec"><h4>${lang() === 'en' ? 'Legal meaning' : 'Semnificație'}</h4><p>${esc(tr(s.ind.legal, lang()))}</p></div>
+          <div class="isec trap"><h4>${lang() === 'en' ? 'Common exam trap' : 'Capcană la examen'}</h4><p>${esc(tr(s.ind.trap, lang()))}</p></div>
+        </div><p class="empty" style="text-align:left;padding:8px 0 0">${esc(tr(s.rule, other))}</p>
+        <p class="empty" style="text-align:left;padding:4px 0 0;font-size:11px">Check the official text (OUG 195/2002, Annex 2) before relying on this for the exam.</p>` : ''}`;
       body.scrollTop = 0;
     }
     m.el.addEventListener('click', (e) => {
@@ -493,6 +540,10 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         openKey = null;
         render();
       } else if (e.target.closest('#libLang')) setLang(lang() === 'en' ? 'ro' : 'en');
+    });
+    $('#libSearch', m.el).addEventListener('input', (e) => {
+      query = e.target.value.trim().toLowerCase();
+      render();
     });
     m.rerender = render;
     render();
@@ -678,12 +729,13 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
           <div class="c1">
             <div class="licence">
               <div class="lhead"><span>ROMÂNIA</span><b>PERMIS DE CONDUCERE</b></div>
-              <div class="lbody"><div class="lphoto">B</div>
+              <div class="lbody"><div class="lphoto">${pimg('naty')}</div>
                 <div><div class="lk">Categoria</div><b>B</b><div class="lk">Autoturism</div><b>${esc(car.name)}</b><div class="lk">Penalizări</div><b>${sum.penalty} / ${sum.failAt}</b></div></div>
             </div>
           </div>
           <div class="c2">
             <h2 class="endtitle">Ai ajuns acasă.</h2>
+            <div class="duo">${pimg('naty')}<span>Naty</span><i>&amp;</i>${pimg('alisia')}<span>${esc(who)}</span></div>
             <p class="endmsg">${esc(who)} a ajuns cu bine în Sânpetru, la ${esc('Str. Sfinții Constantin și Elena 41')}. Ai fost atent la semne, la viteză și la semnalizare. Drum bun mereu.</p>
             <p class="endmsg en">${esc(who)} is home safe in Sânpetru. You watched the signs, your speed and your signals the whole way.</p>
             <div class="stats">
@@ -692,7 +744,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
               <div><b>${Math.floor(sum.seconds / 60)}:${String(Math.round(sum.seconds % 60)).padStart(2, '0')}</b><span>time</span></div>
               <div><b>${sum.fuelSpent.toFixed(0)}</b><span>RON fuel</span></div>
             </div>
-            <p class="route">Livada Poștei &rarr; Sânpetru, Str. Sfinții Constantin și Elena 41</p>
+            <p class="route">Livada Poștei &rarr; Sânpetru, Str. Sfinții Constantin și Elena 41 · Developed by Naty</p>
             <div class="stack"><button type="button" class="btn" id="eAgain">Drive again</button><button type="button" class="btn ghost" id="eLevels">All levels</button></div>
           </div>
         </div>
@@ -788,6 +840,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         <div class="sheet-body">
           <div class="row"><span>Rule language<small>Sign names show in Romanian and English</small></span><div class="seg2" data-set="lang"><button type="button" data-v="en">EN</button><button type="button" data-v="ro">RO</button></div></div>
           <div class="row"><span>Conditions<small>Night, rain and fog need low beams (L key)</small></span><div class="seg2" data-set="weather">${Object.keys(WEATHER).map((w) => `<button type="button" data-v="${w}">${WEATHER[w]}</button>`).join('')}</div></div>
+          <div class="row"><span>Test indications<small>Show what each sign asks, with live status</small></span><div class="seg2" data-set="hints"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
           <div class="row"><span>Camera</span><div class="seg2" data-set="rotate"><button type="button" data-v="1">Turning</button><button type="button" data-v="0">Fixed</button></div></div>
           <div class="row"><span>Sound &amp; vibration</span><div class="seg2" data-set="sound"><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button></div></div>
           <div class="stack two" style="margin-top:12px">
@@ -801,7 +854,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         </div>
       </div>`);
     const sync = () => {
-      const vals = { lang: settings.lang, weather: st().weather, rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
+      const vals = { lang: settings.lang, weather: st().weather, hints: settings.hints ? '1' : '0', rotate: settings.rotate ? '1' : '0', sound: settings.sound ? '1' : '0' };
       for (const g of m.el.querySelectorAll('[data-set]')) for (const b of g.querySelectorAll('button')) b.classList.toggle('on', b.dataset.v === vals[g.dataset.set]);
     };
     sync();
@@ -811,6 +864,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       const key = b.parentElement.dataset.set;
       if (key === 'lang') setLang(b.dataset.v);
       if (key === 'weather') G.game.setWeather(b.dataset.v);
+      if (key === 'hints') settings.hints = b.dataset.v === '1';
       if (key === 'rotate') settings.rotate = b.dataset.v === '1';
       if (key === 'sound') {
         settings.sound = b.dataset.v === '1';
@@ -861,6 +915,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         <div class="signrow">${keys.map((k) => `<img src="${img(k, 128)}" alt="" />`).join('')}</div>
         <h1>DRPCIV Road Signs</h1>
         <p>Learn the Romanian road signs in a driving school with 15 levels.</p>
+        <div class="credit">${pimg('naty', 'sm')}<span>Developed by Naty</span></div>
         <div class="stack two">
           <button type="button" class="btn big" data-go="learn">Learn mode<small>Signs explain themselves</small></button>
           <button type="button" class="btn big ghost" data-go="test">Test mode<small>Penalty points like the exam</small></button>
@@ -922,10 +977,11 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   E.eng.addEventListener('click', () => act('engine'));
   $('#bCar').addEventListener('click', () => (unlock(), openCars()));
   $('#bLevel').addEventListener('click', () => (unlock(), openLevels()));
+  $('#bSigns').addEventListener('click', () => (unlock(), openLibrary()));
   $('#bRestart').addEventListener('click', () => (unlock(), restartLevel()));
   $('#bMenu').addEventListener('click', () => (unlock(), openMenu()));
   E.alert.addEventListener('click', () => {
-    if (st().activeSign && st().mode === 'learn') openLibrary(st().activeSign.key);
+    if (st().activeSign) openLibrary(st().activeSign.key);
   });
 
   // ------------------------------------------------------------ attach a game
@@ -965,6 +1021,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     update,
     act,
     showInfo,
+    showDanTip,
     isBlocking: () => modals.length > 0 || !!(G.game && st().quiz) || !E.rotate.hidden,
     openWelcome,
     switchMode,

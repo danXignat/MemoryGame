@@ -13,6 +13,7 @@ import { createUI } from './ui.js';
 import { setEnabled as setSound, unlock } from './audio.js';
 import { loadSettings, saveSettings as persist, addMistake } from './storage.js';
 import { CARS } from './cars.js';
+import { initPortraits } from './portraits.js';
 
 // If something breaks on the phone, show the message instead of a blank screen.
 let fatalShown = false;
@@ -40,7 +41,7 @@ const worldFor = (level) => (worlds[level.id] ||= buildWorld(getMap(level)));
 let current = { game: null, world: null, level: null };
 
 const renderer = createRenderer(canvas, worldFor(getLevel('L1')));
-renderer.loadPassenger('./assets/passenger.png'); // optional photo; a drawn figure is used if the file is missing
+initPortraits(); // photos from public/assets, drawn placeholders until they are found
 
 const controls = createControls({
   onReset: () => current.game && current.game.resetCar(),
@@ -76,7 +77,7 @@ function startSession(level, { mode = 'learn', weather } = {}) {
   settings.mode = mode;
   saveSettings();
   ui.closeAll();
-  if (mode === 'test') ui.showInfo('Test started', 'Follow the purple route and obey every sign. 21 penalty points means failed.');
+  ui.showDanTip(level, mode);
 }
 
 new ResizeObserver(() => renderer.resize()).observe(canvas);

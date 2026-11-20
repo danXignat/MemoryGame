@@ -6,6 +6,7 @@
 
 import { CONFIG as C } from './config.js';
 import { getSignSprite } from './signart.js';
+import { portraitImage } from './portraits.js';
 
 const TAU = Math.PI * 2;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -71,16 +72,7 @@ export function createRenderer(canvas, initialWorld) {
   let portrait = false;
   const cam = { x: 0, y: 0, angle: 0, scale: 10, ready: false };
   let anchorY = 0.5;
-  let passengerImg = null;
   let rain = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), v: 0.8 + Math.random() * 0.8 }));
-
-  // optional portrait of the passenger (public/assets/passenger.png). Falls back to a drawn figure.
-  function loadPassenger(url) {
-    const im = new Image();
-    im.onload = () => (passengerImg = im);
-    im.onerror = () => (passengerImg = null);
-    im.src = url;
-  }
 
   function setWorld(w) {
     world = w;
@@ -421,14 +413,27 @@ export function createRenderer(canvas, initialWorld) {
 
     // people in the cabin (player's car only): driver left, passenger on the right
     if (o.player) {
-      ctx.fillStyle = '#c9a98f';
-      ctx.beginPath();
-      ctx.arc(0.0, -Wd * 0.22, 0.26, 0, TAU);
-      ctx.fill();
+      const natyImg = portraitImage('naty');
+      ctx.save();
+      ctx.translate(0.0, -Wd * 0.22);
+      ctx.rotate(-(car.heading + cam.angle));
+      if (natyImg) {
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.36, 0, TAU);
+        ctx.clip();
+        ctx.drawImage(natyImg, -0.36, -0.36, 0.72, 0.72);
+      } else {
+        ctx.fillStyle = '#c9a98f';
+        ctx.beginPath();
+        ctx.arc(0, 0, 0.26, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
       if (o.passenger) {
         ctx.save();
         ctx.translate(0.0, Wd * 0.22);
         ctx.rotate(-(car.heading + cam.angle)); // keep the face upright on screen
+        const passengerImg = portraitImage('alisia');
         if (passengerImg) {
           ctx.save();
           ctx.beginPath();
@@ -774,5 +779,5 @@ export function createRenderer(canvas, initialWorld) {
   }
 
   resize();
-  return { resize, setWorld, updateCamera, draw, drawMinimap, loadPassenger, cam, get portrait() { return portrait; } };
+  return { resize, setWorld, updateCamera, draw, drawMinimap, cam, get portrait() { return portrait; } };
 }

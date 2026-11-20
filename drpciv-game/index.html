@@ -20,6 +20,7 @@
         <!-- top-left: points, level, fuel -->
         <div id="tl">
           <div class="trow">
+            <img class="pf avatar" data-portrait="naty" alt="Naty" src="" />
             <div class="pill" id="pillScore"><span class="k">PTS</span><b id="pts">0</b><span class="pen" id="pen" hidden>Pen 0/21</span></div>
           </div>
           <div class="pill" id="pillFuel">
@@ -27,6 +28,7 @@
             <span class="fbar"><i id="fuelFill"></i></span><span id="fuelTxt">60%</span>
           </div>
           <div class="pill zone" id="pillZone"><span id="lvName">Bartolomeu</span></div>
+          <div class="pill pax" id="pax" hidden><img class="pf" data-portrait="alisia" alt="Alisia" src="" /><span id="paxTxt"></span></div>
         </div>
 
         <!-- top-centre: signals, lights, engine, car / level / mode / restart -->
@@ -38,6 +40,7 @@
           <button type="button" class="tb" id="bEng" aria-label="Engine start or stop"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 3v9M6.6 6.6a8 8 0 1 0 10.8 0" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
           <span class="sep"></span>
           <button type="button" class="tb txt" id="bCar" aria-label="Choose a car"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 15v-3l2-4.5A2 2 0 0 1 6.8 6h10.4a2 2 0 0 1 1.8 1.5L21 12v3M3 15h18M3 15v2.5h3V15M18 15v2.5h3V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="7.5" cy="12.3" r="1.1" fill="currentColor"/><circle cx="16.5" cy="12.3" r="1.1" fill="currentColor"/></svg><span>Car</span></button>
+          <button type="button" class="tb txt" id="bSigns" aria-label="Road sign library"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M5 4h9a4 4 0 0 1 4 4v12H9a4 4 0 0 1-4-4V4z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><path d="M9 9h5M9 13h5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg><span>Signs</span></button>
           <button type="button" class="tb txt" id="bLevel" aria-label="Choose a level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M6 21V4M6 5h12l-2.5 4L18 13H6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Level</span></button>
           <div class="seg mini" id="modeSeg" role="group" aria-label="Game mode"><button type="button" data-mode="learn" class="on">Learn</button><button type="button" data-mode="test">Test</button></div>
           <button type="button" class="tb" id="bRestart" aria-label="Restart level"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M3.5 3.5v5h5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -47,7 +50,7 @@
         <!-- top-right: progress + sign alert -->
         <div id="tr">
           <div class="pill" id="pillProg"><span id="progTxt">0/0</span><span class="k" id="progK">checks</span></div>
-          <button type="button" class="pill alert" id="alertPill" hidden><img id="alertImg" alt="" /><span id="alertTxt"></span></button>
+          <button type="button" class="pill alert" id="alertPill" hidden><img id="alertImg" alt="" /><span class="at"><b id="alertTxt"></b><small id="alertDist"></small></span><i class="dot" id="alertDot"></i></button>
         </div>
 
         <div id="limit" hidden aria-label="Speed limit"><span id="limNum">50</span></div>
