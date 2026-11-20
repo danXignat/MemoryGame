@@ -1235,7 +1235,7 @@ export function createGame(world, opts = {}) {
       HANDLERS[t.type].update(t, ctx);
       if (state.quiz) break;
     }
-    if (!(world.mission && world.mission.dest) && pr.onRoute && pr.s >= world.route.length - 0.8 && pr.vAlong > 0.5) {
+    if (atFinish()) {
       test.reachedFinish = true;
       endTest();
     }
@@ -1421,6 +1421,15 @@ export function createGame(world, opts = {}) {
     }
   }
 
+  /** Past the chequered line? (also when you stop right after it) */
+  const routeEnd = world.route.at(world.route.length, {});
+  function atFinish() {
+    const pr = state.prog;
+    if (world.mission && world.mission.dest) return false; // the Final Boss ends at Alisia's house
+    const nearEnd = Math.hypot(state.car.x - routeEnd.x, state.car.y - routeEnd.y) < 7;
+    return (pr.onRoute && pr.s >= world.route.length - 2.5 && pr.vAlong > -0.5) || (nearEnd && pr.s > world.route.length - 12);
+  }
+
   function update(dt, input) {
     state.time += dt;
     stepCar(state.car, input, dt);
@@ -1432,9 +1441,9 @@ export function createGame(world, opts = {}) {
     updateBlinkersAndStation(dt);
     updatePassenger(dt);
     checkCameras();
-    if (state.mode === 'learn' && !state.learnDone && !(world.mission && world.mission.dest) && state.prog.onRoute && state.prog.s >= world.route.length - 0.8 && state.prog.vAlong > 0.5) {
+    if (state.mode === 'learn' && !state.learnDone && atFinish()) {
       state.learnDone = true;
-      emit('levelDone', { learn: true });
+      emit('levelDone', { learn: true, seconds: state.time - (state.learnStart || 0) });
     }
     if (state.mode === 'test' && state.test && !state.test.finished) runRules(dt);
     state.shake = Math.max(0, state.shake - dt * 2.5);
@@ -1450,6 +1459,7 @@ export function createGame(world, opts = {}) {
     state.traffic = [];
     state.npcs = [];
     state.learnDone = false;
+    state.learnStart = state.time;
     state.parkedBay = null;
     state.walkers = (world.walkers || []).map((w) => ({ ...w, cur: w.s, x: 0, y: 0, heading: 0 }));
     flowTimer = 1;

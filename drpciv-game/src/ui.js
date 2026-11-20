@@ -739,7 +739,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
 
   // ----------------------------------------------------------------- results
   // ------------------------------------------------------- level celebration
-  function celebrate(then, text) {
+  function celebrate(then, text, extra = null) {
     const en = text ? false : lang() === 'en'; // the theory book is in Romanian
     const colors = ['#ffd166', '#06d6a0', '#ef476f', '#118ab2', '#f78c6b', '#c77dff'];
     const bits = Array.from({ length: 70 }, (_, i) => `<i style="left:${Math.random() * 100}%;background:${colors[i % colors.length]};animation-delay:${(Math.random() * 1.2).toFixed(2)}s;animation-duration:${(2.2 + Math.random() * 1.6).toFixed(2)}s;transform:rotate(${Math.floor(Math.random() * 360)}deg)"></i>`).join('');
@@ -751,16 +751,50 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
          <div class="trophy">🏆</div>
          <h2>${esc(title)}</h2>
          <p>${esc(sub)}</p>
+         ${extra && extra.level ? `<div class="cel-level">${esc(extra.level)}</div>` : ''}
+         ${extra && extra.stats ? `<div class="cel-stats">${extra.stats.map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join('')}</div>` : ''}
          ${pimg('naty', 'sm')}
-         <button type="button" class="btn big" data-go>${then ? (en ? 'See results' : 'Vezi rezultatul') : en ? 'Continue' : 'Continuă'}</button>
+         ${
+           extra && extra.buttons
+             ? `<div class="cel-btns">${extra.buttons.map((b, i) => `<button type="button" class="btn ${b.primary ? '' : 'ghost'}" data-b="${i}">${esc(b.label)}</button>`).join('')}</div>`
+             : `<button type="button" class="btn big" data-go>${then ? (en ? 'See results' : 'Vezi rezultatul') : en ? 'Continue' : 'Continuă'}</button>`
+         }
        </div>`,
       { dismiss: false }
     );
     sfx.fanfare ? sfx.fanfare() : sfx.ok();
     vibrate([60, 40, 60, 40, 120]);
-    m.el.querySelector('[data-go]').addEventListener('click', () => {
-      m.close();
-      if (then) then();
+    const go = m.el.querySelector('[data-go]');
+    if (go)
+      go.addEventListener('click', () => {
+        m.close();
+        if (then) then();
+      });
+    for (const b of m.el.querySelectorAll('[data-b]'))
+      b.addEventListener('click', () => {
+        m.close();
+        extra.buttons[+b.dataset.b].fn();
+      });
+  }
+
+  /** The end-of-level screen in Learn mode: time, next level, play again. */
+  function levelDoneScreen(e) {
+    const en = lang() === 'en';
+    const level = G.level;
+    const next = level ? LEVELS.find((l) => l.n === level.n + 1 && l.playable) : null;
+    const secs = Math.max(0, Math.round(e.seconds || 0));
+    const signs = (G.world.signs || []).length;
+    celebrate(null, null, {
+      level: level ? `${level.id === 'free' ? 'Free Roam' : (en ? 'Level ' : 'Nivelul ') + level.n} · ${tr(level.title, lang())}` : '',
+      stats: [
+        [en ? 'time' : 'timp', `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`],
+        [en ? 'signs on the way' : 'indicatoare pe traseu', String(signs)],
+      ],
+      buttons: [
+        ...(next ? [{ label: en ? `Next: level ${next.n}` : `Nivelul ${next.n}`, primary: true, fn: () => actions.startLevel(next.id, { mode: 'learn' }) }] : []),
+        { label: en ? 'Try it in Test mode' : 'Încearcă în modul Test', primary: !next, fn: () => switchMode('test') },
+        { label: en ? 'Play again' : 'Joacă din nou', fn: () => restartLevel() },
+      ],
     });
   }
 
@@ -774,7 +808,16 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     if (sum.boss && sum.passed && sum.reachedFinish) return openEnding(sum);
     if (sum.passed && sum.reachedFinish && !sum._celebrated) {
       sum._celebrated = true;
-      return celebrate(() => onFinish(sum));
+      const en = lang() === 'en';
+      const secs = Math.round(sum.seconds || 0);
+      return celebrate(() => onFinish(sum), null, {
+        level: level ? `${level.id === 'free' ? 'Free Roam' : (en ? 'Level ' : 'Nivelul ') + level.n} · ${tr(level.title, lang())}` : '',
+        stats: [
+          [en ? 'checks right' : 'verificări corecte', `${sum.tasks.filter((t) => t.ok).length}/${sum.tasks.length}`],
+          [en ? 'penalty' : 'penalizare', `${sum.penalty}/21`],
+          [en ? 'time' : 'timp', `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`],
+        ],
+      });
     }
     const pct = sum.max ? Math.round((sum.score / sum.max) * 100) : 0;
     const mins = Math.floor(sum.seconds / 60);
@@ -1186,7 +1229,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       sfx.ok();
       showInfo(`${en ? 'Parked!' : 'Parcat corect!'} ${'★'.repeat(p.stars)}${'☆'.repeat(3 - p.stars)}`, en ? `${p.reverse ? 'Reverse parking' : 'Nose-in parking'}. ${p.stars === 3 ? 'Perfectly straight in the bay.' : 'Try to sit straighter in the middle of the bay.'}` : `${p.reverse ? 'Parcare cu spatele' : 'Parcare cu fața'}. ${p.stars === 3 ? 'Perfect, drept în mijlocul locului.' : 'Încearcă să stai mai drept, în mijlocul locului.'}`);
     });
-    game.on('levelDone', () => celebrate(null));
+    game.on('levelDone', (e) => levelDoneScreen(e));
     game.on('gaveWay', () => {
       if (st().mode !== 'learn') return;
       const en = lang() === 'en';

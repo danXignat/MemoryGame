@@ -3039,3 +3039,54 @@ p {
   margin: 0 0 10px;
   font-family: Inter, system-ui, sans-serif;
 }
+.cel-level {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--muted, #5b6b73);
+  margin-top: -2px;
+}
+.cel-stats {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 6px 0 4px;
+  width: 100%;
+}
+.cel-stats > div {
+  flex: 1;
+  display: grid;
+  padding: 8px 6px;
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+.cel-stats b {
+  font: 700 22px/1 var(--font-num);
+}
+.cel-stats small {
+  font-size: 11.5px;
+  opacity: 0.75;
+}
+.cel-btns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+  width: 100%;
+  margin-top: 8px;
+}
+.cel-btns .btn {
+  height: 46px;
+  font-size: 14.5px;
+}
+@media (max-height: 420px) {
+  .overlay.center .sheet.celebrate {
+    width: min(calc(100% - 24px), 560px);
+    padding: 10px 16px 14px;
+    gap: 2px;
+  }
+  .celebrate .pf {
+    display: none;
+  }
+  .cel-stats b {
+    font-size: 18px;
+  }
+}
