@@ -838,7 +838,8 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const catRows = CAT_ORDER.filter((k) => sum.cats[k].total)
       .map((k) => {
         const c = sum.cats[k];
-        return `<div class="catrow" style="--cat:${CATEGORIES[k].color}"><span class="label">${esc(tr(CATEGORIES[k], lang()))}</span><span class="val">${c.correct}/${c.total}</span><div class="bar"><i style="width:${Math.round((c.correct / c.total) * 100)}%"></i></div></div>`;
+        const f = c.correct / c.total;
+        return `<div class="catrow" style="--cat:${CATEGORIES[k].color};--fill:${f >= 1 ? 'var(--ok)' : f >= 0.5 ? '#d99a00' : 'var(--bad)'}"><span class="label">${esc(tr(CATEGORIES[k], lang()))}</span><span class="val">${c.correct}/${c.total}</span><div class="bar"><i style="width:${Math.round((c.correct / c.total) * 100)}%"></i></div></div>`;
       })
       .join('');
     const wrong = sum.tasks.filter((t) => !t.ok);
@@ -854,7 +855,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
         ${head(`${level ? esc(name(level.title)) : 'Test'} · result`)}
         <div class="sheet-body cols">
           <div class="c1">
-            <div class="score"><div class="big ${sum.passed ? 'okc' : 'badc'}">${sum.passed ? 'PASSED' : 'FAILED'}</div><div class="pct">${esc(verdict)}</div></div>
+            <div class="score"><div class="big ${sum.passed ? 'okc' : 'badc'}">${sum.passed ? 'PASSED' : 'FAILED'}</div>${verdict === 'Passed' || verdict === 'Not passed' ? '' : `<div class="pct">${esc(verdict)}</div>`}</div>
             <div class="stats">
               <div><b>${sum.score}</b><span>points</span></div>
               <div><b class="${sum.penalty >= sum.failAt ? 'badc' : ''}">${sum.penalty}</b><span>penalty / ${sum.failAt}</span></div>

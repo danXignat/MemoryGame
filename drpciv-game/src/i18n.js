@@ -69,6 +69,7 @@ const EXACT = {
   'No mistakes saved yet, so this was a random round. Mistakes you make in Test mode show up here.': 'Nu ai încă greșeli salvate, așa că a fost o rundă la întâmplare. Greșelile din modul Test apar aici.',
   // results
   PASSED: 'ADMIS',
+  FAILED: 'RESPINS',
   Passed: 'Admis',
   'NOT PASSED': 'RESPINS',
   'Not passed': 'Respins',

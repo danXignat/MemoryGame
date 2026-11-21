@@ -65,7 +65,7 @@ HUD, kept airy:
 - top-left: Naty's avatar, score (+ "Pen x/21" in Test), fuel gauge, level pill "L6 · Calea București ✓ 2/5" (progress), passenger badge;
 - top-centre: one slim capsule with left blinker, hazards, right blinker, lights (OFF/LOW/HIGH), engine start/stop;
 - top-right: ☰ menu button and a round Waze-style minimap (north-up, blue route);
-- purple navigation banner with the next turn ("Peste 70 m virează la stânga — semnalizează");
+- graphite navigation banner with a blue lead bar and the next turn ("Peste 70 m virează la stânga — semnalizează");
 - bottom: arrows (left), speedometer with gear and rpm arc, pedals (right);
 - bottom-centre "dock": the sign indication card, toasts, tips;
 - speed-limit badge that blinks when you are over.
@@ -151,6 +151,14 @@ Every level ends with a **celebration**: confetti, trophy, fanfare, vibration, "
 - **2.5D buildings:** walls lean away from the screen centre like a camera looking down. Apartment blocks with a window on every floor (lit at night), parapet, lift rooms; houses with hip roofs, eaves and a chimney; churches with towers and spires; factories with saw-tooth roofs; signs on roofs (CORESI, GARA BRAȘOV, DRPCIV). Cast shadows grow with height.
 - Trees as layered crowns (6 tints) on trunks, lifted with height; bushes and flowers; street lamps on poles.
 - Keep it fast on phones: sprites made once, no full-screen textures; about 5–10 ms per frame.
+
+### Visual language (instrument cluster)
+
+- Palette: graphite HUD panels with 1px hairlines, one navigation blue for the route and active choices, signal amber only for things that blink, green/red only for ok/wrong. No violet, no neon glows.
+- Type: Barlow Condensed for headings and every number (tabular figures, so scores, speed and timers never jitter); Inter for body text; metadata lighter and smaller than titles.
+- Shape: small radii (8–14px), hairlines and luminance steps instead of heavy shadows; lists as rows with dividers, not piles of cards.
+- Touch: pressed state = brighter fill plus a sharp edge, never a size change; HUD text cannot be selected; safe areas respected; 8px spacing grid.
+- Results: one verdict (ADMIS / RESPINS), stats on hairlines, category bars coloured by how you did (green full, amber half, red low) with the category colour as a small dot.
 
 ## 12. Brașov geography per district
 

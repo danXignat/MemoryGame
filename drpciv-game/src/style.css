@@ -3384,3 +3384,95 @@ p {
     flex: 1;
   }
 }
+
+/* ---- impeccable, pass 2: results, level list, close buttons ---- */
+/* results: one verdict, stats on hairlines instead of grey boxes */
+.stats {
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+.stats div {
+  background: none;
+  border-radius: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.stats div:nth-child(odd) {
+  padding-right: 16px;
+  border-right: 1px solid var(--line);
+}
+.stats div:nth-child(even) {
+  padding-left: 16px;
+}
+.stats span {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+}
+/* category bars: the bar shows how you did; the category colour is a small dot */
+.catrow .label::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 8px;
+  vertical-align: 1px;
+  background: var(--cat);
+}
+.bar {
+  height: 6px;
+  border-radius: 3px;
+}
+.bar i {
+  background: var(--fill, var(--accent));
+  border-radius: 3px;
+}
+
+/* level list: rows of a schedule, not a pile of cards */
+.lvgrid {
+  gap: 0 16px;
+}
+.lvtile {
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 10px 8px 10px 0;
+  box-shadow: none;
+}
+.lvtile.sel {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  box-shadow: inset 3px 0 0 var(--accent);
+  padding-left: 12px;
+}
+.lvtile:active {
+  background: var(--surface-2);
+}
+.lvtag {
+  font-variant-numeric: tabular-nums;
+}
+.lvtile b {
+  font-weight: 700;
+}
+.lvd {
+  color: var(--muted);
+}
+.lvm {
+  font-weight: 500;
+  color: var(--muted);
+  opacity: 0.85;
+  font-size: 12px;
+}
+
+/* close buttons: quiet, hairline, still a 40px touch target */
+.x {
+  width: 40px;
+  height: 40px;
+  background: transparent;
+  border: 1px solid var(--line);
+  font-size: 20px;
+}
+.x:active {
+  background: var(--surface-2);
+}
