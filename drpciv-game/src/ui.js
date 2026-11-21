@@ -237,7 +237,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
   function showParked(p, en) {
     hideCard();
     toast.className = 'info parked';
-    const stars = [0, 1, 2].map((i) => `<i class="star ${i < p.stars ? 'on' : ''}" style="animation-delay:${0.15 + i * 0.12}s">★</i>`).join('');
+    const stars = [0, 1, 2].map((i) => `<i class="star ${i < p.stars ? 'on' : ''}" style="animation-delay:${0.15 + i * 0.12}s"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M12 2.6l2.9 6 6.5.9-4.8 4.5 1.2 6.5L12 17.4l-5.8 3.1 1.2-6.5L2.6 9.5l6.5-.9z" fill="currentColor"/></svg></i>`).join('');
     const how = en ? (p.reverse ? 'Reverse parking' : 'Nose-in parking') : p.reverse ? 'Parcare cu spatele' : 'Parcare cu fața';
     const tip = p.stars === 3 ? (en ? 'Perfectly straight in the bay.' : 'Perfect, drept în mijlocul locului.') : en ? 'Sit straighter in the middle of the bay for 3 stars.' : 'Stai mai drept, în mijlocul locului, pentru 3 stele.';
     toast.innerHTML = `<div class="toastrow noimg"><div><div class="verdict" style="color:var(--ok)">${en ? 'Parked!' : 'Parcat corect!'} <span class="stars">${stars}</span></div><div class="msg" style="font-weight:500">${esc(how)}. ${esc(tip)}</div></div></div>`;
@@ -809,7 +809,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const m = openModal(
       `<div class="party">${bits}</div>
        <div class="sheet celebrate" role="dialog" aria-label="${esc(title)}">
-         <div class="trophy">🏆</div>
+         <div class="trophy"><svg viewBox="0 0 64 64" width="64" height="64" aria-hidden="true"><path d="M20 8h24v14a12 12 0 0 1-24 0V8z" fill="#f5b301"/><path d="M20 12H10v4c0 7 4 11 10 12M44 12h10v4c0 7-4 11-10 12" fill="none" stroke="#d99a00" stroke-width="3.5" stroke-linecap="round"/><path d="M32 34v10M22 56h20l-3-12H25z" fill="#d99a00"/><path d="M25 12v9a7 7 0 0 0 4 6.3" fill="none" stroke="#ffe27a" stroke-width="2.5" stroke-linecap="round"/></svg></div>
          <h2>${esc(title)}</h2>
          <p>${esc(sub)}</p>
          ${extra && extra.level ? `<div class="cel-level">${esc(extra.level)}</div>` : ''}

@@ -660,6 +660,14 @@ export function buildWorld(MAP) {
   const by1 = maxY + m;
   const roofs = ['#b5543c', '#a8483a', '#c26a4a', '#8c5a4a', '#9a7b58', '#7d8793', '#6d7f5a'];
   const blockRoofs = ['#8d949c', '#9aa1a8', '#7f8790', '#a3a29a'];
+  const blockLooks = [
+    { wall: '#e9d9b8', roof: '#b9a493', accent: '#c9843c' }, // sand, brown roof, ochre strip
+    { wall: '#e8c7c0', roof: '#b3a2a8', accent: '#b8505a' }, // dusty pink
+    { wall: '#cfdbe3', roof: '#9fb0be', accent: '#3d79a8' }, // pale blue
+    { wall: '#dfe0d2', roof: '#a9b09a', accent: '#6d9a58' }, // greenish white
+    { wall: '#e6e1d8', roof: '#b4b8bd', accent: '#d2a02a' }, // off-white, mustard
+    { wall: '#d6c5b4', roof: '#a8917f', accent: '#8d4b36' }, // clay
+  ];
   const carColors = ['#c0392b', '#2c3e50', '#ecf0f1', '#7f8c8d', '#2980b9', '#16a085', '#d35400', '#8e44ad', '#f1c40f'];
 
   // keep the Final Boss spots (pick-up, her house) free
@@ -818,7 +826,7 @@ export function buildWorld(MAP) {
 
   // landmarks: special buildings placed beside the route
   const LANDMARK = {
-    blackchurch: { w: 44, h: 20, kind: 'church', wall: '#6b625a', roof: '#3d3a37', height: 16, tower: { w: 9, h: 9, height: 42, at: -0.5 }, label: 'Biserica Neagră' },
+    blackchurch: { w: 44, h: 20, kind: 'church', wall: '#8a7f74', roof: '#5b5855', height: 16, tower: { w: 9, h: 9, height: 42, at: -0.5 }, label: 'Biserica Neagră' },
     church: { w: 20, h: 10, kind: 'church', wall: '#f1ebe0', roof: '#5a5f66', height: 8, tower: { w: 5, h: 5, height: 24, at: -0.5 } },
     townhall: { w: 22, h: 14, kind: 'house', wall: '#efc76a', roof: '#a8483a', height: 9, tower: { w: 5, h: 5, height: 26, at: 0 } },
     mall: { w: 70, h: 34, kind: 'block', wall: '#dfe4ea', roof: '#b7bec7', floors: 3, sign: 'CORESI' },
@@ -922,7 +930,9 @@ export function buildWorld(MAP) {
       const x = p.x + nx * off;
       const y = p.y + ny * off;
       if (!fits(x, y, w, h, ang, 4)) return 0;
-      houses.push({ x, y, w, h, angle: ang, kind: 'block', roof: blockRoofs[Math.floor(rnd() * blockRoofs.length)], floors: 4 + Math.floor(rnd() * 7) });
+      // Romanian apartment blocks: pastel render, a coloured stairwell strip, balconies on some
+      const look = blockLooks[Math.floor(rnd() * blockLooks.length)];
+      houses.push({ x, y, w, h, angle: ang, kind: 'block', roof: look.roof, wall: look.wall, accent: look.accent, balconies: rnd() < 0.6, floors: 4 + Math.floor(rnd() * 7) });
       // a small car park between the block and the road
       const lotOff = half + 5;
       const lot = { x: p.x + nx * lotOff, y: p.y + ny * lotOff, w: w * 0.8, h: 6, angle: ang };

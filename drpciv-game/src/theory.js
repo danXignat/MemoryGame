@@ -72,7 +72,7 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
           })()}
           ${stats.runs ? `<p class="thstats">Cel mai bun rezultat: <b>${stats.best}/${EXAM.count}</b> · admis de ${stats.passed} ${stats.passed === 1 ? 'dată' : 'ori'} din ${stats.runs}</p>` : ''}
           <div class="stack three">
-            <button type="button" class="btn big ghost bk-open" data-th="book">📖 Cartea<small>Citește teoria pe capitole</small></button>
+            <button type="button" class="btn big ghost bk-open" data-th="book"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" style="vertical-align:-4px;margin-right:6px"><path d="M12 6.5C10 5 7 4.5 3 5v13c4-.5 7 0 9 1.5M12 6.5C14 5 17 4.5 21 5v13c-4-.5-7 0-9 1.5M12 6.5v13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Cartea<small>Citește teoria pe capitole</small></button>
             <button type="button" class="btn big" data-th="exam">Examen<small>Afli rezultatul la final</small></button>
             <button type="button" class="btn big ghost" data-th="practice">Antrenament<small>Vezi răspunsul corect după fiecare întrebare</small></button>
           </div>
@@ -123,7 +123,7 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
             return `<button type="button" class="btn bk-cont" data-cont>Continuă cu „${esc(CHAPTERS[pos.ch].title)}”, pagina ${pos.p + 1}</button>`;
           })()}
           <ol class="bk-toc">${CHAPTERS.map(
-            (c, i) => `<li><button type="button" data-ch="${i}"><img src="${signImg(c.sign, 64)}" alt="" /><span><b>${i + 1}. ${esc(c.title)}</b><small>${c.pages.length} pagini · ${questionsFor(c.id).length} întrebări${rs.ch[c.id] != null ? ` · test ${rs.ch[c.id]}%` : ''}</small></span>${rs.ch[c.id] >= 80 ? '<i class="bk-done" title="Lecție rezolvată">✓</i>' : rs.read[c.id] ? '<i class="bk-read" title="Citit">📖</i>' : ''}</button></li>`
+            (c, i) => `<li><button type="button" data-ch="${i}"><img src="${signImg(c.sign, 64)}" alt="" /><span><b>${i + 1}. ${esc(c.title)}</b><small>${c.pages.length} pagini · ${questionsFor(c.id).length} întrebări${rs.ch[c.id] != null ? ` · test ${rs.ch[c.id]}%` : ''}</small></span>${rs.ch[c.id] >= 80 ? '<i class="bk-done" title="Lecție rezolvată">✓</i>' : rs.read[c.id] ? '<i class="bk-read" title="Citit">citit</i>' : ''}</button></li>`
           ).join('')}</ol>
           <p class="bk-progress">Lecții rezolvate: <b>${CHAPTERS.filter((c) => rs.ch[c.id] >= 80).length} din ${CHAPTERS.length}</b> · o lecție e rezolvată când treci testul ei cu cel puțin 80%.</p>
           <p class="bk-note">Am scris-o pentru joc, după Codul rutier. Înainte de examen, mai verifică o dată pe drpciv.ro.</p>

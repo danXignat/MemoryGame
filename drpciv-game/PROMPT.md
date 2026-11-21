@@ -159,6 +159,9 @@ Every level ends with a small party: confetti, a trophy, a fanfare and a buzz of
 - Grass has soft light and dark patches. Pavements have slab joints and white kerbs. Asphalt has white edge lines and a dashed centre line. Zebra crossings, stop lines and a chequered finish line.
 - Cars are drawn once as sprites: metallic paint, windscreen and rear glass with a reflection, roof, mirrors and a soft shadow. Headlights, brake lights, blinkers and the reversing light are drawn live on top. Police cars get their own livery.
 - Buildings are 2.5D: their walls lean away from the centre of the screen, as if a camera were looking down. Blocks of flats have a window on every floor (some lit at night), a parapet and lift rooms. Houses have hipped roofs, eaves and a chimney. Churches have towers and spires. Factories have saw-tooth roofs. Some roofs carry a name: CORESI, GARA BRAȘOV, DRPCIV. Taller buildings throw longer shadows.
+- Blocks of flats look like real Romanian blocks: a pastel render (sand, dusty pink, pale blue, greenish white, off-white, clay) with a coloured stairwell strip, a dark entrance door at the foot of each stairwell, balconies on some, and a darker foot on every wall so they sit on the ground. The wall lean is strong enough to read as depth.
+- The scene has atmosphere: a pale haze toward the far edge of the screen, a warm light from the top left and a soft vignette that pulls the eye to the car. All of it is one image made once per screen size.
+- No emoji anywhere in the interface. The trophy, the book and the parking stars are drawn icons.
 - Trees are layered crowns in six shades of green on visible trunks, and they lean with height too. Add bushes, flowers and street lamps on poles.
 - It has to stay quick on a phone: draw sprites once, no textures over the whole screen, around 5–10 ms per frame.
 

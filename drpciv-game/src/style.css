@@ -3765,3 +3765,16 @@ p {
 .cel-stats > div + div {
   border-left: 1px solid var(--line);
 }
+.celebrate .trophy svg {
+  display: block;
+  margin: 0 auto;
+}
+.bk-read {
+  font: 600 11px Inter, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+}
+#toast.parked .star svg {
+  display: block;
+}

@@ -127,6 +127,43 @@ export function createRenderer(canvas, initialWorld) {
     cam.ready = false;
   }
 
+  // atmosphere: made once per screen size, drawn each frame without creating anything
+  let atmo = null;
+  function buildAtmo() {
+    const a = document.createElement('canvas');
+    a.width = Math.max(2, Math.round(W / 2));
+    a.height = Math.max(2, Math.round(H / 2));
+    const g = a.getContext('2d');
+    const w = a.width;
+    const h = a.height;
+    // distance haze: the far side of the screen (top) fades into pale air
+    const haze = g.createLinearGradient(0, 0, 0, h * 0.55);
+    haze.addColorStop(0, 'rgba(206,224,238,0.2)');
+    haze.addColorStop(1, 'rgba(206,224,238,0)');
+    g.fillStyle = haze;
+    g.fillRect(0, 0, w, h);
+    // warm sun from the top left
+    const sun = g.createRadialGradient(w * 0.12, h * 0.05, 0, w * 0.12, h * 0.05, w * 0.7);
+    sun.addColorStop(0, 'rgba(255,226,170,0.16)');
+    sun.addColorStop(1, 'rgba(255,226,170,0)');
+    g.fillStyle = sun;
+    g.fillRect(0, 0, w, h);
+    // vignette: pulls the eye to the car
+    const vig = g.createRadialGradient(w / 2, h * 0.62, Math.min(w, h) * 0.35, w / 2, h * 0.62, Math.max(w, h) * 0.72);
+    vig.addColorStop(0, 'rgba(8,16,12,0)');
+    vig.addColorStop(1, 'rgba(8,16,12,0.34)');
+    g.fillStyle = vig;
+    g.fillRect(0, 0, w, h);
+    atmo = a;
+  }
+  function drawAtmosphere(weather) {
+    if (!atmo) buildAtmo();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = weather === 'night' ? 0.5 : 1;
+    ctx.drawImage(atmo, 0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+
   function resize() {
     dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     W = Math.max(1, canvas.clientWidth);
@@ -136,6 +173,7 @@ export function createRenderer(canvas, initialWorld) {
     off.width = canvas.width;
     off.height = canvas.height;
     portrait = H > W;
+    atmo = null;
   }
 
   // -------------------------------------------------------------- camera
@@ -333,7 +371,7 @@ export function createRenderer(canvas, initialWorld) {
       const c = Math.cos(-cam.angle);
       const sn = Math.sin(-cam.angle);
       C3 = { x: cam.x + (-dy * sn) / cam.scale, y: cam.y + (dy * c) / cam.scale };
-      K3 = 0.45 / (H / cam.scale);
+      K3 = 0.6 / (H / cam.scale);
     }
     const blinkOn = state.blink === 1;
 
@@ -367,6 +405,7 @@ export function createRenderer(canvas, initialWorld) {
     drawSignFx(state);
     drawGeoLabels(R);
 
+    drawAtmosphere(weather);
     if (weather === 'fog') drawFog(state);
     if (weather === 'night') drawNight(state, sx, sy);
     if (weather === 'rain') drawRain(time);
@@ -940,6 +979,52 @@ export function createRenderer(canvas, initialWorld) {
             if (night && ((r * 7 + c * 13 + Math.round(h.x)) % 5 < 2)) litWindows.push([bl, br, tr, tl]);
           }
         }
+        ctx.fill();
+        // facade detail: coloured stairwell strips, balconies, an entrance
+        if (block && h.accent) {
+          const stairs = Math.max(2, Math.round(h.w / 12));
+          const along = i % 2 === 0 ? stairs : Math.max(1, Math.round(h.h / 12));
+          ctx.fillStyle = h.accent;
+          for (let k = 0; k < along; k++) {
+            const u0 = (k + 0.5) / along - 0.035;
+            const u1 = (k + 0.5) / along + 0.035;
+            quad(lerp2(lerp2(a, top[i], 0), lerp2(b, top[(i + 1) % 4], 0), u0), lerp2(lerp2(a, top[i], 0), lerp2(b, top[(i + 1) % 4], 0), u1), lerp2(lerp2(a, top[i], 1), lerp2(b, top[(i + 1) % 4], 1), u1), lerp2(lerp2(a, top[i], 1), lerp2(b, top[(i + 1) % 4], 1), u0));
+            ctx.fill();
+          }
+          // dark entrance door at the foot of each stairwell
+          ctx.fillStyle = 'rgba(20,25,30,0.7)';
+          for (let k = 0; k < along; k++) {
+            const u0 = (k + 0.5) / along - 0.02;
+            const u1 = (k + 0.5) / along + 0.02;
+            quad(lerp2(a, b, u0), lerp2(a, b, u1), lerp2(lerp2(a, top[i], 0.07), lerp2(b, top[(i + 1) % 4], 0.07), u1), lerp2(lerp2(a, top[i], 0.07), lerp2(b, top[(i + 1) % 4], 0.07), u0));
+            ctx.fill();
+          }
+        }
+        if (block && h.balconies && floors > 2) {
+          ctx.fillStyle = 'rgba(0,0,0,0.2)';
+          ctx.beginPath();
+          for (let r = 1; r < rows; r += 2) {
+            const t = (r + 0.12) / rows;
+            for (let c = 0; c < cols; c += 2) {
+              const u0 = (c + 0.2) / cols;
+              const u1 = (c + 0.8) / cols;
+              const bl = lerp2(lerp2(a, top[i], t), lerp2(b, top[(i + 1) % 4], t), u0);
+              const br = lerp2(lerp2(a, top[i], t), lerp2(b, top[(i + 1) % 4], t), u1);
+              const t2 = t + 0.1 / rows;
+              const tr = lerp2(lerp2(a, top[i], t2), lerp2(b, top[(i + 1) % 4], t2), u1);
+              const tl = lerp2(lerp2(a, top[i], t2), lerp2(b, top[(i + 1) % 4], t2), u0);
+              ctx.moveTo(bl[0], bl[1]);
+              ctx.lineTo(br[0], br[1]);
+              ctx.lineTo(tr[0], tr[1]);
+              ctx.lineTo(tl[0], tl[1]);
+              ctx.closePath();
+            }
+          }
+          ctx.fill();
+        }
+        // ambient occlusion: the foot of every wall is a little darker
+        ctx.fillStyle = 'rgba(0,0,0,0.16)';
+        quad(a, b, lerp2(b, top[(i + 1) % 4], 0.1), lerp2(a, top[i], 0.1));
         ctx.fill();
         // floor lines on blocks
         if (block) {
