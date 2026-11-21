@@ -3778,3 +3778,404 @@ p {
 #toast.parked .star svg {
   display: block;
 }
+
+/* =====================================================================
+   GAME MENUS (kept last)
+   Palette taken from the Car.dat logo: black, electric blue, wheel yellow,
+   white and the chequered flag. Panels are dark, buttons are cut at an angle,
+   the main action is yellow, and every sheet starts with a chequered strip.
+   The paper book and the exam screen stay light on purpose.
+   ===================================================================== */
+:root {
+  --g-black: #070a0e;
+  --g-panel: #0e141a;
+  --g-panel-2: #18222c;
+  --g-blue: #1e8cff;
+  --g-blue-deep: #0b4fa8;
+  --g-yellow: #ffc928;
+  --g-ink: #f3f6f8;
+  --g-mute: #94a3af;
+}
+.overlay {
+  background: rgba(3, 6, 9, 0.74);
+}
+.overlay .sheet:not(.exam) {
+  --surface: var(--g-panel);
+  --surface-2: var(--g-panel-2);
+  --fg: var(--g-ink);
+  --muted: var(--g-mute);
+  --line: rgba(255, 255, 255, 0.11);
+  --accent: var(--g-blue);
+  --accent-ink: #ffffff;
+  --ok: #3ddc84;
+  --bad: #ff6b60;
+  background: linear-gradient(180deg, #121a22 0, var(--g-panel) 120px);
+  color: var(--g-ink);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.6);
+}
+/* chequered strip across the top of every game sheet */
+.overlay .sheet:not(.exam)::before {
+  content: '';
+  flex: none;
+  height: 8px;
+  background: repeating-conic-gradient(#f4f6f8 0 25%, #0a0d11 0 50%) 0 0 / 16px 16px;
+  opacity: 0.92;
+}
+.overlay .sheet:not(.exam) .sheet-head {
+  padding-top: 12px;
+}
+.overlay .sheet:not(.exam) .sheet-head h2 {
+  font-family: var(--font-num);
+  font-size: 26px;
+  font-style: italic;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--g-ink);
+}
+.overlay .sheet:not(.exam) .sheet-head h2::after {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 3px;
+  margin-top: 4px;
+  background: var(--g-yellow);
+  transform: skewX(-30deg);
+}
+.overlay .sheet:not(.exam) .x {
+  background: transparent;
+  color: var(--g-ink);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
+}
+
+/* ---- buttons: cut corners, bold caps, yellow for the main action ---- */
+.overlay .sheet:not(.exam) .btn {
+  font-family: var(--font-num);
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border: 0;
+  border-radius: 0;
+  background: var(--g-yellow);
+  color: #10151a;
+  clip-path: polygon(10px 0, 100% 0, calc(100% - 10px) 100%, 0 100%);
+  box-shadow: none;
+  transition: filter 0.1s, transform 0.1s var(--ease-out);
+}
+.overlay .sheet:not(.exam) .btn small {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 11.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 0.72;
+}
+.overlay .sheet:not(.exam) .btn.ghost {
+  background: var(--g-panel-2);
+  color: var(--g-ink);
+  box-shadow: inset 4px 0 0 var(--g-blue);
+}
+.overlay .sheet:not(.exam) .btn.warn {
+  background: #ff5a4d;
+  color: #fff;
+}
+.overlay .sheet:not(.exam) .btn:active {
+  filter: brightness(1.12);
+  transform: translateX(2px);
+}
+.overlay .sheet:not(.exam) .btn:disabled {
+  opacity: 0.4;
+}
+
+/* ---- menu tiles: dark slabs with a clipped corner and a yellow icon ---- */
+.overlay .sheet:not(.exam) .mtile {
+  background: var(--g-panel-2);
+  border: 0;
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+  box-shadow: inset 0 -3px 0 var(--g-blue);
+  color: var(--g-ink);
+  font-family: var(--font-num);
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.overlay .sheet:not(.exam) .mtile svg {
+  color: var(--g-yellow);
+}
+.overlay .sheet:not(.exam) .mtile:active {
+  background: #213040;
+}
+
+/* ---- switches: the chosen one is electric blue with a slanted edge ---- */
+.overlay .sheet:not(.exam) .seg2 {
+  background: #0a0f14;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+}
+.overlay .sheet:not(.exam) .seg2 button {
+  color: var(--g-mute);
+  font-family: var(--font-num);
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 4px;
+}
+.overlay .sheet:not(.exam) .seg2 button.on {
+  background: var(--g-blue);
+  color: #fff;
+  clip-path: polygon(6px 0, 100% 0, calc(100% - 6px) 100%, 0 100%);
+}
+.overlay .sheet:not(.exam) .row > span {
+  font-weight: 700;
+}
+
+/* ---- level list and car picker ---- */
+.overlay .sheet:not(.exam) .lvtile {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+.overlay .sheet:not(.exam) .lvtag {
+  font-family: var(--font-num);
+  font-style: italic;
+  font-size: 22px;
+  color: var(--g-blue);
+}
+.overlay .sheet:not(.exam) .lvtile.sel {
+  background: linear-gradient(90deg, rgba(30, 140, 255, 0.16), transparent 70%);
+  box-shadow: inset 4px 0 0 var(--g-yellow);
+}
+.overlay .sheet:not(.exam) .lvtile:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+.overlay .sheet:not(.exam) .carcard {
+  background: var(--g-panel-2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0;
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+.overlay .sheet:not(.exam) .carcard.sel {
+  border-color: var(--g-blue);
+  box-shadow: inset 0 0 0 1px var(--g-blue), inset 0 -4px 0 var(--g-yellow);
+}
+.overlay .sheet:not(.exam) .carcard .chead b {
+  font-family: var(--font-num);
+  font-size: 22px;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+.overlay .sheet:not(.exam) .sb i {
+  background: rgba(255, 255, 255, 0.14);
+  transform: skewX(-20deg);
+}
+.overlay .sheet:not(.exam) .sb i.on {
+  background: var(--g-blue);
+}
+.overlay .sheet:not(.exam) .diff {
+  border-radius: 0;
+  clip-path: polygon(5px 0, 100% 0, calc(100% - 5px) 100%, 0 100%);
+}
+
+/* ---- sign library, chips, quiz options, results ---- */
+.overlay .sheet:not(.exam) .tile {
+  background: var(--g-panel-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 3px solid var(--cat, var(--g-blue));
+  border-radius: 4px;
+}
+.overlay .sheet:not(.exam) .chips button {
+  background: transparent;
+  color: var(--g-mute);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-family: var(--font-num);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.overlay .sheet:not(.exam) .chips button.on {
+  background: var(--g-yellow);
+  color: #10151a;
+  border-color: var(--g-yellow);
+}
+.overlay .sheet:not(.exam) .searchbar input {
+  background: #0a0f14;
+  color: var(--g-ink);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.overlay .sheet:not(.exam) .opt {
+  background: var(--g-panel-2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--g-ink);
+}
+.overlay .sheet:not(.exam) .stats {
+  border-top-color: rgba(255, 255, 255, 0.12);
+}
+.overlay .sheet:not(.exam) .score .big {
+  font-style: italic;
+  letter-spacing: 0.05em;
+}
+
+/* ---- start screen: the logo on black with a blue glow and a chequered road ---- */
+.overlay:has(.welcome) {
+  background: radial-gradient(ellipse at 50% 38%, rgba(30, 140, 255, 0.35), rgba(3, 6, 9, 0.96) 62%), #03060a;
+}
+.overlay:has(.welcome) .sheet {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+.overlay:has(.welcome) .sheet::before {
+  display: none;
+}
+.overlay:has(.welcome) .logobox {
+  background: transparent;
+  padding: 0;
+  filter: drop-shadow(0 10px 30px rgba(30, 140, 255, 0.45));
+}
+.overlay:has(.welcome) .credit {
+  color: var(--g-mute);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+.overlay:has(.welcome) .stack.three {
+  gap: 10px;
+}
+.overlay:has(.welcome) .btn.big {
+  padding: 12px 18px;
+  font-size: 20px;
+}
+.overlay:has(.welcome)::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 12px;
+  background: repeating-conic-gradient(#f4f6f8 0 25%, #0a0d11 0 50%) 0 0 / 24px 24px;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.wlang.seg2 {
+  background: rgba(0, 0, 0, 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .overlay .sheet:not(.exam) .btn {
+    transition: none;
+  }
+}
+/* settings rows: condensed caps titles, small quiet descriptions */
+.overlay .sheet:not(.exam) .row > span {
+  font-family: var(--font-num);
+  font-size: 19px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.overlay .sheet:not(.exam) .row > span small {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--g-mute);
+}
+/* start screen on a sideways phone: logo on the left, the three modes on the right */
+@media (orientation: landscape) and (max-height: 520px) {
+  .overlay:has(.welcome) .sheet {
+    width: min(100% - 32px, 760px);
+    max-height: none;
+    overflow: visible;
+  }
+  .overlay:has(.welcome) .welcome {
+    grid-template-columns: minmax(150px, 34%) 1fr;
+    grid-template-areas: 'logo lang' 'logo desc' 'logo stack' 'logo credit';
+    align-items: center;
+    text-align: left;
+    gap: 6px 28px;
+    padding: 4px 8px 20px;
+  }
+  .overlay:has(.welcome) .logobox {
+    grid-area: logo;
+  }
+  .overlay:has(.welcome) .wlang {
+    grid-area: lang;
+    position: static;
+    justify-self: end;
+    margin: 0;
+  }
+  .overlay:has(.welcome) .wlang button {
+    height: 28px;
+  }
+  .overlay:has(.welcome) .welcome > p {
+    grid-area: desc;
+    font-size: 12.5px;
+    line-height: 1.3;
+    margin: 0;
+  }
+  .overlay:has(.welcome) .stack.three {
+    grid-area: stack;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .overlay:has(.welcome) .credit {
+    grid-area: credit;
+    justify-content: flex-start;
+  }
+  .overlay:has(.welcome) .btn.big {
+    height: auto;
+    min-height: 40px;
+    padding: 4px 18px 4px 22px;
+    font-size: 18px;
+    display: flex;
+    flex-direction: row !important;
+    flex-wrap: nowrap;
+    align-items: baseline;
+    justify-content: flex-start;
+    gap: 14px;
+    text-align: left;
+  }
+  .overlay:has(.welcome) .btn.big small {
+    display: inline !important;
+    font-size: 11.5px;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .overlay:has(.welcome) .logo {
+    width: min(36vh, 190px);
+  }
+}
+@media (orientation: landscape) and (max-height: 330px) {
+  .overlay:has(.welcome) .welcome > p {
+    display: none;
+  }
+  .overlay:has(.welcome) .btn.big {
+    min-height: 36px;
+  }
+}
+
+/* chestionare intro: same game panel, the resume card and notes adapted */
+.overlay .sheet.theory:not(.exam) .thresume {
+  background: rgba(30, 140, 255, 0.12);
+  border: 1px solid rgba(30, 140, 255, 0.45);
+  color: var(--g-ink);
+}
+.overlay .sheet.theory:not(.exam) .thstats {
+  background: var(--g-panel-2);
+}
+.overlay .sheet.theory:not(.exam) .thnote {
+  color: var(--g-mute);
+  opacity: 1;
+}
+.overlay .sheet.theory:not(.exam) .btn.bk-open {
+  background: var(--g-panel-2);
+  color: var(--g-ink);
+  border: 0;
+}
+.overlay .sheet.theory:not(.exam) .btn.bk-open svg {
+  color: var(--g-yellow);
+}
