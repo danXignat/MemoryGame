@@ -68,6 +68,10 @@ export const sfx = {
     tone(1047, 0.5, 0.5, 'triangle', 0.14);
     tone(1319, 0.5, 0.5, 'sine', 0.08);
   },
+  penalty() {
+    tone(220, 0, 0.16, 'square', 0.09, 160);
+    tone(150, 0.14, 0.24, 'square', 0.08, 110);
+  },
   tap() {
     tone(520, 0, 0.05, 'triangle', 0.08);
   },
@@ -125,6 +129,41 @@ export function engineSound({ on, rpm, idle, redline, gas, paused }) {
     eng.filter.frequency.setTargetAtTime(260 + 900 * gas + 700 * r, t, 0.08);
     const vol = live ? 0.035 + 0.075 * gas + 0.03 * r : 0;
     eng.out.gain.setTargetAtTime(vol, t, live ? 0.06 : 0.12);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// ------------------------------------------------------------------ tyre squeal
+//  Band-passed noise (one buffer, made once) that rises when the tyres slide.
+let sq = null;
+function makeSqueal() {
+  const len = ac.sampleRate;
+  const buf = ac.createBuffer(1, len, ac.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = ac.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 1800;
+  bp.Q.value = 6;
+  const g = ac.createGain();
+  g.gain.value = 0;
+  src.connect(bp).connect(g).connect(ac.destination);
+  src.start();
+  return { g, bp };
+}
+/** amount 0..1 (0 = silent); called every frame */
+export function squealSound(amount, paused) {
+  if (!ac) return;
+  try {
+    if (!sq) sq = makeSqueal();
+    const t = ac.currentTime;
+    const a = enabled && !paused ? Math.max(0, Math.min(1, amount)) : 0;
+    sq.g.gain.setTargetAtTime(a * 0.05, t, a > 0 ? 0.04 : 0.09);
+    sq.bp.frequency.setTargetAtTime(1500 + a * 900, t, 0.1);
   } catch (e) {
     /* ignore */
   }

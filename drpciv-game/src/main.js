@@ -10,7 +10,7 @@ import { createGame } from './game.js';
 import { createRenderer } from './render.js';
 import { createControls } from './controls.js';
 import { createUI } from './ui.js';
-import { setEnabled as setSound, unlock, engineSound } from './audio.js';
+import { setEnabled as setSound, unlock, engineSound, squealSound } from './audio.js';
 import { loadSettings, saveSettings as persist, addMistake } from './storage.js';
 import { CARS } from './cars.js';
 import { initPortraits } from './portraits.js';
@@ -107,6 +107,9 @@ function frame(now) {
   {
     const st = current.game.state;
     engineSound({ on: st.car.engineOn, rpm: st.car.rpm, idle: st.spec.idle, redline: st.spec.redline, gas: st.car.gas, paused: ui.isBlocking() || document.hidden });
+    const v = Math.abs(st.car.v);
+    const slide = st.car.brakeP > 0.8 && v > 7 ? Math.min(1, (v - 7) / 8) : Math.abs(st.car.steer || 0) > 0.45 && v > 13 ? 0.6 : 0;
+    squealSound(slide, ui.isBlocking() || document.hidden);
   }
   renderer.updateCamera(current.game.state, dt, settings);
   renderer.draw(current.game.state, settings, now / 1000);

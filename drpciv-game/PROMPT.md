@@ -162,6 +162,13 @@ Every level ends with a small party: confetti, a trophy, a fanfare and a buzz of
 - Trees are layered crowns in six shades of green on visible trunks, and they lean with height too. Add bushes, flowers and street lamps on poles.
 - It has to stay quick on a phone: draw sprites once, no textures over the whole screen, around 5–10 ms per frame.
 
+### Game feel
+
+- Hard braking at speed leaves skid marks that fade over about 14 seconds and puffs a little tyre smoke, with a tyre squeal made in code. A crash throws sparks from the front and shakes the camera with a smooth wobble that dies out, not random jitter.
+- A real exam mistake (5 points or more) flashes the screen edges red once, plays a low buzz and vibrates longer. Small mistakes keep the soft chime.
+- Cards, messages, the navigation banner and menus slide or spring in with ease-out curves. The speed-limit badge pulses when you're over instead of blinking. All of it switches off for people who ask their phone for reduced motion.
+- Particles and skid marks live in fixed-size pools, so nothing new is created while the game runs.
+
 ### Look and feel
 
 - Colours: graphite HUD panels with 1px hairlines. One navigation blue for the route and for whatever is selected. Amber only for things that blink. Green and red only for right and wrong. No violet, no neon glow.

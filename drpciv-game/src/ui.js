@@ -183,8 +183,15 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       sfx.ok();
       vibrate(20);
     } else {
-      sfx.bad();
-      vibrate([40, 40, 60]);
+      if (fb.penalty >= 5) {
+        // a real exam mistake: buzz, red edge flash, longer vibration
+        sfx.penalty();
+        const app = document.getElementById('app');
+        app.classList.remove('penflash');
+        void app.offsetWidth;
+        app.classList.add('penflash');
+      } else sfx.bad();
+      vibrate(fb.penalty >= 5 ? [60, 40, 120] : [40, 40, 60]);
       if (!fb.issue && fb.signKey && !SIGNS[fb.signKey].hidden) addMistake(fb.signKey);
     }
     if (fb.quiz) return;

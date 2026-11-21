@@ -123,6 +123,7 @@ export function createRenderer(canvas, initialWorld) {
     paths = buildPaths(w);
     laneLines = buildLaneLines(w);
     spots = makeSpots(w);
+    resetFx();
     cam.ready = false;
   }
 
@@ -167,12 +168,152 @@ export function createRenderer(canvas, initialWorld) {
     c.translate(-cam.x, -cam.y);
   };
 
+
+  // ------------------------------------------------------------ game feel (fx)
+  //  Fixed-size pools, no objects made per frame:
+  //   - skid marks: a ring of line segments that fade out (hard braking only)
+  //   - particles: tyre smoke when you brake hard, sparks when you crash
+  const SKID_MAX = 480;
+  const skid = new Float32Array(SKID_MAX * 5); // x0 y0 x1 y1 born
+  let skidHead = 0;
+  const lastWheel = new Float32Array(4); // previous rear-wheel points (lx ly rx ry)
+  let skidOn = false;
+  const P_MAX = 220;
+  const px = new Float32Array(P_MAX);
+  const py = new Float32Array(P_MAX);
+  const pvx = new Float32Array(P_MAX);
+  const pvy = new Float32Array(P_MAX);
+  const plife = new Float32Array(P_MAX); // seconds left
+  const pmax = new Float32Array(P_MAX);
+  const pkind = new Uint8Array(P_MAX); // 1 smoke, 2 spark
+  let pNext = 0;
+  let fxTime = 0;
+  let lastShake = 0;
+  function emit(kind, x, y, vx, vy, life) {
+    const i = pNext;
+    pNext = (pNext + 1) % P_MAX;
+    px[i] = x;
+    py[i] = y;
+    pvx[i] = vx;
+    pvy[i] = vy;
+    plife[i] = life;
+    pmax[i] = life;
+    pkind[i] = kind;
+  }
+  function addSkid(ax, ay, bx, by, time) {
+    const o = skidHead * 5;
+    skid[o] = ax;
+    skid[o + 1] = ay;
+    skid[o + 2] = bx;
+    skid[o + 3] = by;
+    skid[o + 4] = time;
+    skidHead = (skidHead + 1) % SKID_MAX;
+  }
+  function updateFx(state, time) {
+    const dt = Math.min(0.05, Math.max(0, time - fxTime));
+    fxTime = time;
+    const car = state.car;
+    const spec = state.spec;
+    const c = Math.cos(car.heading);
+    const sn = Math.sin(car.heading);
+    const back = -spec.length * 0.3;
+    const side = spec.width / 2 - 0.12;
+    const lx = car.x + c * back + sn * side;
+    const ly = car.y + sn * back - c * side;
+    const rx = car.x + c * back - sn * side;
+    const ry = car.y + sn * back + c * side;
+    // hard braking at speed (or a sharp turn that lets the tyres slide): marks + a little smoke
+    const v = Math.abs(car.v);
+    const hard = (car.brakeP > 0.8 && v > 7) || (Math.abs(car.steer || 0) > 0.45 && v > 13);
+    if (hard && dt > 0) {
+      if (skidOn) {
+        addSkid(lastWheel[0], lastWheel[1], lx, ly, time);
+        addSkid(lastWheel[2], lastWheel[3], rx, ry, time);
+      }
+      if (Math.random() < dt * 22) {
+        const k = Math.random() < 0.5;
+        emit(1, k ? lx : rx, k ? ly : ry, -c * v * 0.08 + (Math.random() - 0.5) * 0.8, -sn * v * 0.08 + (Math.random() - 0.5) * 0.8, 0.7 + Math.random() * 0.5);
+      }
+    }
+    skidOn = hard;
+    lastWheel[0] = lx;
+    lastWheel[1] = ly;
+    lastWheel[2] = rx;
+    lastWheel[3] = ry;
+    // a fresh jolt (collision) throws sparks from the front corners
+    if (state.shake > lastShake + 0.15) {
+      const fx = car.x + c * spec.length * 0.5;
+      const fy = car.y + sn * spec.length * 0.5;
+      const n = Math.round(10 + state.shake * 14);
+      for (let i = 0; i < n; i++) {
+        const a = car.heading + Math.PI + (Math.random() - 0.5) * 2.4;
+        const sp = 4 + Math.random() * 9;
+        emit(2, fx + (Math.random() - 0.5) * spec.width, fy + (Math.random() - 0.5) * spec.width, Math.cos(a) * sp, Math.sin(a) * sp, 0.25 + Math.random() * 0.3);
+      }
+    }
+    lastShake = state.shake;
+    for (let i = 0; i < P_MAX; i++) {
+      if (plife[i] <= 0) continue;
+      plife[i] -= dt;
+      px[i] += pvx[i] * dt;
+      py[i] += pvy[i] * dt;
+      const drag = pkind[i] === 2 ? 0.86 : 0.94;
+      pvx[i] *= drag;
+      pvy[i] *= drag;
+    }
+  }
+  function drawSkids() {
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 0.28;
+    ctx.strokeStyle = '#141416';
+    for (let i = 0; i < SKID_MAX; i++) {
+      const o = i * 5;
+      const age = fxTime - skid[o + 4];
+      if (!skid[o + 4] || age > 14) continue;
+      ctx.globalAlpha = 0.32 * (1 - age / 14);
+      ctx.beginPath();
+      ctx.moveTo(skid[o], skid[o + 1]);
+      ctx.lineTo(skid[o + 2], skid[o + 3]);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawParticles() {
+    for (let i = 0; i < P_MAX; i++) {
+      if (plife[i] <= 0) continue;
+      const t = 1 - plife[i] / pmax[i]; // 0 new ... 1 gone
+      if (pkind[i] === 1) {
+        ctx.globalAlpha = 0.35 * (1 - t);
+        ctx.fillStyle = '#d2d4d6';
+        ctx.beginPath();
+        ctx.arc(px[i], py[i], 0.4 + t * 1.6, 0, TAU);
+        ctx.fill();
+      } else {
+        ctx.globalAlpha = 1 - t;
+        ctx.strokeStyle = t < 0.5 ? '#ffd35a' : '#ff8a3c';
+        ctx.lineWidth = 0.12;
+        ctx.beginPath();
+        ctx.moveTo(px[i], py[i]);
+        ctx.lineTo(px[i] - pvx[i] * 0.03, py[i] - pvy[i] * 0.03);
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function resetFx() {
+    plife.fill(0);
+    skid.fill(0);
+    skidOn = false;
+    lastShake = 0;
+  }
+
   // ---------------------------------------------------------------- draw
   function draw(state, settings, time) {
     anchorY = settings.rotate ? (portrait ? C.camera.anchorYPortrait : C.camera.anchorYLandscape) : 0.5;
-    const k = state.shake;
-    const sx = (Math.random() - 0.5) * k * 10;
-    const sy = (Math.random() - 0.5) * k * 10;
+    const k = state.shake * state.shake; // eases out as it decays
+    const sx = k ? Math.sin(time * 47) * k * 7 + Math.sin(time * 83) * k * 3 : 0;
+    const sy = k ? Math.cos(time * 53) * k * 7 + Math.sin(time * 71) * k * 3 : 0;
+    updateFx(state, time);
     const weather = state.weather;
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -197,6 +338,7 @@ export function createRenderer(canvas, initialWorld) {
     drawStations(state);
     drawRoute(0.9);
     drawPaint();
+    drawSkids();
     drawHouses(R, time);
     drawBays(state, time);
     drawBushes(R);
@@ -209,6 +351,7 @@ export function createRenderer(canvas, initialWorld) {
     drawMission(state, settings, time);
     drawBeams(state.car, state.spec);
     drawCar(state.car, state.spec, state.spec.color, { braking: state.car.braking, reversing: state.car.reversing, signal: state.car.signal, hazard: state.car.hazard, blinkOn, lights: state.car.lights, player: true, passenger: state.passenger, mood: state.mood, engineOn: state.car.engineOn });
+    drawParticles();
     drawBuildings3D(R, weather === 'night');
     drawTrees(R);
     drawLamps(R);
