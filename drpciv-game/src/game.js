@@ -1212,6 +1212,14 @@ export function createGame(world, opts = {}) {
       test.lightsCool = 25;
       issue('lights', C.exam.penalty.lights, { ro: 'Pe întuneric sau ceață trebuie să folosești faza scurtă.', en: 'In the dark or in fog you must use low beams.' }, { title: { ro: 'Faruri', en: 'Headlights' } });
     }
+    // high beams in the face of an oncoming driver
+    if (oncomingDazzled()) test.glareT = (test.glareT || 0) + dt;
+    else test.glareT = 0;
+    test.glareCool = (test.glareCool || 0) - dt;
+    if (test.glareT > 2 && test.glareCool <= 0) {
+      test.glareCool = 20;
+      issue('lights', C.exam.penalty.lights, { ro: 'Faza lungă orbește șoferul din față: la întâlnire treci pe faza scurtă.', en: 'High beams dazzle the oncoming driver: dip to low beams when you meet someone.' }, { title: { ro: 'Faza lungă', en: 'High beams' } });
+    }
     // hazard lights used while driving normally
     if (car.hazard && ctx.kmh > 20) test.hazardT += dt;
     else test.hazardT = 0;
@@ -1421,6 +1429,21 @@ export function createGame(world, opts = {}) {
     }
   }
 
+  /** High beams on and a car coming towards you, close in front? */
+  function oncomingDazzled() {
+    const car = state.car;
+    if (car.lights < 3) return false;
+    const fx = Math.cos(car.heading);
+    const fy = Math.sin(car.heading);
+    return state.npcs.some((n) => {
+      if (!n.init) return false;
+      const rx = n.x - car.x;
+      const ry = n.y - car.y;
+      const ahead = rx * fx + ry * fy;
+      return ahead > 3 && ahead < 55 && Math.abs(-rx * fy + ry * fx) < 9 && Math.cos(n.heading - car.heading) < -0.6;
+    });
+  }
+
   /** Past the chequered line? (also when you stop right after it) */
   const routeEnd = world.route.at(world.route.length, {});
   function atFinish() {
@@ -1441,6 +1464,13 @@ export function createGame(world, opts = {}) {
     updateBlinkersAndStation(dt);
     updatePassenger(dt);
     checkCameras();
+    if (state.mode === 'learn' && oncomingDazzled()) {
+      state.glareHintT = (state.glareHintT || 0) + dt;
+      if (state.glareHintT > 1.5 && !(state.glareHintCool > state.time)) {
+        state.glareHintCool = state.time + 30;
+        emit('glare');
+      }
+    } else state.glareHintT = 0;
     if (state.mode === 'learn' && !state.learnDone && atFinish()) {
       state.learnDone = true;
       emit('levelDone', { learn: true, seconds: state.time - (state.learnStart || 0) });

@@ -47,6 +47,8 @@ const EXACT = {
   // sign library
   'Road Sign Library': 'Indicatoare rutiere',
   'Road sign library': 'Indicatoare rutiere',
+  'Search a sign, a rule or an exam trap': 'Caută un semn, o regulă sau o capcană de examen',
+  FREE: 'LIBER',
   'No sign matches that search.': 'Niciun semn nu se potrivește.',
   'Check the official text (OUG 195/2002, Annex 2) before relying on this for the exam.': 'Verifică textul oficial (OUG 195/2002, anexa 2) înainte de examen.',
   'Legal meaning': 'Ce spune legea',

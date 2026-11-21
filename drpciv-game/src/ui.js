@@ -976,7 +976,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
               <span class="lvm">${WEATHER[l.weather]} · ${l.boss && !done(LEVELS.find((x) => x.id === 'L15')) ? 'Locked: pass Level 15' : l.playable ? (done(l) ? 'Passed ✓' : 'Play') : 'Coming next'}</span></button>`;
           }).join('')}
         </div>
-        <p class="empty" style="text-align:left">The city is stylised: level names are Brașov districts, not real street maps. The Final Boss unlocks after Level 15.</p></div>
+        <p class="empty" style="text-align:left">${lang() === 'en' ? 'Streets are stylised, but every level has the real scenery of its Brașov district. The Final Boss unlocks after Level 15.' : 'Străzile sunt stilizate, dar fiecare nivel are peisajul real al cartierului din Brașov. Final Boss se deblochează după Nivelul 15.'}</p></div>
       </div>`);
     m.el.addEventListener('click', (e) => {
       const b = e.target.closest('[data-lv]');
@@ -1255,6 +1255,10 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
       showInfo(`${en ? 'Parked!' : 'Parcat corect!'} ${'★'.repeat(p.stars)}${'☆'.repeat(3 - p.stars)}`, en ? `${p.reverse ? 'Reverse parking' : 'Nose-in parking'}. ${p.stars === 3 ? 'Perfectly straight in the bay.' : 'Try to sit straighter in the middle of the bay.'}` : `${p.reverse ? 'Parcare cu spatele' : 'Parcare cu fața'}. ${p.stars === 3 ? 'Perfect, drept în mijlocul locului.' : 'Încearcă să stai mai drept, în mijlocul locului.'}`);
     });
     game.on('levelDone', (e) => levelDoneScreen(e));
+    game.on('glare', () => {
+      const en = lang() === 'en';
+      showInfo(en ? 'Dip your lights' : 'Treci pe faza scurtă', en ? 'A car is coming towards you: high beams dazzle its driver.' : 'Vine o mașină din față: faza lungă îl orbește pe șofer.');
+    });
     game.on('gaveWay', () => {
       if (st().mode !== 'learn') return;
       const en = lang() === 'en';

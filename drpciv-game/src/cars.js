@@ -56,7 +56,7 @@ export const CARS = {
     blurb: 'Heavy SUV with lots of torque. It is wide, it keeps rolling, and it needs much earlier braking and turning.',
     color: '#26292e',
     length: 4.86, width: 1.93, wheelbase: 2.82,
-    massKg: 2150, powerKw: 160, topKmh: 220, engineType: 'v8',
+    massKg: 2150, powerKw: 160, topKmh: 220, engineType: 'diesel',
     traction: 3.1, brake: 7.0, maxSteer: 0.52, gripLat: 6.0, steerTime: 0.42, steerReturn: 0.3,
     tankL: 93, l100: 10.8, redline: 4800, idle: 750,
     stats: { accel: 4, top: 4, handling: 1, braking: 1, economy: 1 },
