@@ -45,10 +45,12 @@ function runBot(levelId, kind, { carId = 'golf5', maxSeconds = 700, weather } = 
 
   const bot = makeBot(game, world, map, kind);
   let t = 0;
-  while (t < maxSeconds && !st.test.finished) {
+  while (t < maxSeconds && !st.test.finished && !st.test.failedExam) {
     bot.step();
     t += C.fixedStep;
   }
+  // the game ends a failed exam on the next tick; this loop never yields, so end it here
+  if (st.test.failedExam && !st.test.finished) game.endTest();
   return { game, st, t, log, summary: st.test.summary };
 }
 
