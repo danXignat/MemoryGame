@@ -212,7 +212,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const who = level.n % 2 ? 'dan' : 'petra';
     hideCard();
     toast.className = 'info';
-    toast.innerHTML = `<div class="toastrow">${pimg(who)}<div><div class="verdict" style="color:var(--accent)">${esc(PEOPLE[who].name)} ${lang() === 'en' ? 'says' : 'zice'}</div><div class="msg" style="font-weight:500">${esc(tr(level.tip, lang()))}</div>${mode === 'test' ? '<p class="rule">Test: follow the purple route. 21 penalty points means failed.</p>' : ''}</div></div>`;
+    toast.innerHTML = `<div class="toastrow">${pimg(who)}<div><div class="verdict" style="color:var(--accent)">${esc(PEOPLE[who].name)} ${lang() === 'en' ? 'says' : 'zice'}</div><div class="msg" style="font-weight:500">${esc(tr(level.tip, lang()))}</div>${mode === 'test' ? '<p class="rule">Test: follow the blue route. 21 penalty points means failed.</p>' : ''}</div></div>`;
     toast.hidden = false;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(hideToast, 7000);
@@ -380,7 +380,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     if (world.mission && s.pax) {
       const px = s.pax;
       if (px.phase === 'waiting') tasks.push({ s: world.mission.pickup.s, kind: 'pickup', en: 'pick up Alisia — stop at the pink circle', ro: 'ia-o pe Alisia — oprește la cercul roz' });
-      if (px.phase === 'in' && world.mission.destSpot) tasks.push({ s: world.mission.destSpot.s, kind: 'home', en: "Alisia's home — stop at the purple circle", ro: 'acasă la Alisia — oprește la cercul mov' });
+      if (px.phase === 'in' && world.mission.destSpot) tasks.push({ s: world.mission.destSpot.s, kind: 'home', en: "Alisia's home — stop at the blue circle", ro: 'acasă la Alisia — oprește la cercul albastru' });
     }
     if (world.refuel) tasks.push({ s: world.refuel.s - 35, kind: 'fuel', en: 'fuel station — stop at the pump, engine off, refuel', ro: 'benzinărie — oprește la pompă, motorul oprit, alimentează' });
     const tk = tasks.filter((q) => q.s - pr.s > -12 && q.s - pr.s < 240).sort((p1, p2) => p1.s - p2.s)[0];
@@ -1104,7 +1104,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
             <li><b>Wheel</b> (bottom left): drag it round with a finger. It springs back to centre when you let go.</li>
             <li><b>Gas</b> and <b>Brake / Reverse</b> are the pedals (bottom right). <b>Reset</b> puts the car back on the road.</li>
             <li><b>Blinkers</b> and <b>hazards</b> are the top buttons. Signal before every turn. They switch off by themselves after the turn.</li>
-            <li>The <b>purple line</b> and the <b>round map</b> show your route. The banner tells you the next turn.</li>
+            <li>The <b>blue line</b> and the <b>round map</b> show your route. The banner tells you the next turn.</li>
             <li><b>Learn</b>: drive anywhere, signs explain themselves. <b>Test</b>: exam rules with penalty points, 21 = failed.</li>
             <li>At night or in fog use <b>low beams</b>. Gas stations: stop in the bay, switch the engine off, refuel.</li>
           </ol>
@@ -1117,7 +1117,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     hideToast();
     hideCard();
     G.game.restart();
-    if (st().mode === 'test') showInfo('Test restarted', 'Follow the purple route and obey every sign. 21 penalty points means failed.');
+    if (st().mode === 'test') showInfo('Test restarted', 'Follow the blue route and obey every sign. 21 penalty points means failed.');
   }
 
   function applySteering() {
@@ -1188,7 +1188,7 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     settings.mode = mode;
     saveSettings();
     syncMode();
-    if (mode === 'test') showInfo('Test started', 'Follow the purple route and obey every sign. 21 penalty points means failed.');
+    if (mode === 'test') showInfo('Test started', 'Follow the blue route and obey every sign. 21 penalty points means failed.');
   }
 
   // ---------------------------------------------------- top buttons + keys

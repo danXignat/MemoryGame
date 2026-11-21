@@ -128,7 +128,7 @@ const EXACT = {
   // messages
   'Test restarted': 'Testul a început din nou',
   'Test started': 'Testul a început',
-  'Follow the purple route and obey every sign. 21 penalty points means failed.': 'Urmează traseul mov și respectă fiecare semn. La 21 de puncte de penalizare ești respins.',
+  'Follow the blue route and obey every sign. 21 penalty points means failed.': 'Urmează traseul albastru și respectă fiecare semn. La 21 de puncte de penalizare ești respins.',
   'Low fuel': 'Rezervă',
   'Head for the nearest fuel station (green pin on the map).': 'Mergi la cea mai apropiată benzinărie (pinul verde de pe hartă).',
   'Engine stopped': 'Motorul s-a oprit',
@@ -149,7 +149,7 @@ const PARTS = [
   ['Start the engine to leave.', 'Pornește motorul ca să pleci.'],
   ['Fuel bay.', 'Locul de alimentare.'],
   ['Switch the engine off with the power button to refuel.', 'Oprește motorul din butonul de pornire ca să alimentezi.'],
-  ['Test: follow the purple route. 21 penalty points means failed.', 'Test: urmează traseul mov. La 21 de puncte de penalizare ești respins.'],
+  ['Test: follow the blue route. 21 penalty points means failed.', 'Test: urmează traseul albastru. La 21 de puncte de penalizare ești respins.'],
   ['Day ·', 'Zi ·'],
   ['Night ·', 'Noapte ·'],
   ['Rain ·', 'Ploaie ·'],
@@ -188,7 +188,7 @@ export const HELP_RO = `
     <li><b>Săgețile</b> sau <b>volanul</b> (stânga jos) virează. Volanul se întoarce singur la mijloc când îl lași.</li>
     <li><b>Accel.</b> și <b>Frână / înapoi</b> sunt pedalele (dreapta jos). Ține frâna apăsată când stai pe loc ca să mergi cu spatele. <b>Reset</b> te pune înapoi pe drum.</li>
     <li><b>Semnalizarea</b> și <b>avariile</b> sunt butoanele de sus. Semnalizează înainte de fiecare viraj; se opresc singure după viraj.</li>
-    <li><b>Linia mov</b> și <b>harta rotundă</b> îți arată traseul. Banda de sus îți spune ce urmează.</li>
+    <li><b>Linia albastră</b> și <b>harta rotundă</b> îți arată traseul. Banda de sus îți spune ce urmează.</li>
     <li><b>Învățare</b>: semnele se explică singure. <b>Test</b>: reguli de examen cu puncte de penalizare; la 21 ești respins.</li>
     <li>Noaptea și pe ceață aprinde <b>faza scurtă</b>. La benzinărie: oprești în loc, oprești motorul, alimentezi.</li>
     <li>În parcările de lângă blocuri locurile libere se aprind verde: intră drept și oprește ca să parchezi.</li>

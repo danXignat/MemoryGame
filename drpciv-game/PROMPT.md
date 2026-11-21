@@ -64,7 +64,7 @@ Photos go in `public/assets/` (`naty`, `alisia`, `dan`, `petra` as .jpeg/.jpg/.p
 HUD, kept airy:
 - top-left: Naty's avatar, score (+ "Pen x/21" in Test), fuel gauge, level pill "L6 · Calea București ✓ 2/5" (progress), passenger badge;
 - top-centre: one slim capsule with left blinker, hazards, right blinker, lights (OFF/LOW/HIGH), engine start/stop;
-- top-right: ☰ menu button and a round Waze-style minimap (north-up, purple route);
+- top-right: ☰ menu button and a round Waze-style minimap (north-up, blue route);
 - purple navigation banner with the next turn ("Peste 70 m virează la stânga — semnalizează");
 - bottom: arrows (left), speedometer with gear and rpm arc, pedals (right);
 - bottom-centre "dock": the sign indication card, toasts, tips;
@@ -122,7 +122,7 @@ Roads are built like turtle graphics: `line`, `turn`, `junction` (90° turn with
 | L15 | DRPCIV (night) | final exam; passing unlocks the Final Boss |
 | Final Boss | Livada Poștei → Sânpetru | pick up Alisia at Livada Poștei, drive her home to Str. Sfinții Constantin și Elena 41, Sânpetru; then the ending (driving licence card with Naty and Alisia, "Developed by Naty") |
 
-Final Boss passenger flow: a purple stop circle at the pickup; stop, Alisia walks to the car and gets in on the right; she reacts if you brake hard or speed; at her house you stop at the circle, she gets out and walks home.
+Final Boss passenger flow: a blue stop circle at the pickup; stop, Alisia walks to the car and gets in on the right; she reacts if you brake hard or speed; at her house you stop at the circle, she gets out and walks home.
 
 Every level ends with a **celebration**: confetti, trophy, fanfare, vibration, "Felicitări! Ai completat acest nivel!" / "Congratulations! You completed this level!", level name, time and stats, then buttons (Next level / Try it in Test mode / Play again, or See results in Test). The finish counts as soon as you pass the chequered line, even if you stop right after it.
 

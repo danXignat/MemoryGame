@@ -3153,3 +3153,234 @@ p {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* =====================================================================
+   IMPECCABLE PASS — instrument-cluster look (kept last, overrides above)
+   Graphite panels with hairlines, one navigation blue, signal amber for
+   things that blink, condensed display type, tabular numbers, 8px grid.
+   ===================================================================== */
+:root {
+  --ink-1: #f3f5f6; /* primary text on dark */
+  --ink-2: #aeb7be; /* secondary text on dark */
+  --panel: rgba(15, 19, 23, 0.84);
+  --panel-2: rgba(22, 27, 33, 0.92);
+  --hair: rgba(255, 255, 255, 0.1);
+  --hair-2: rgba(255, 255, 255, 0.2);
+  --route: #3884ff;
+  --amber: #ffb020;
+  --r-hud: 8px;
+  --r-btn: 10px;
+  --r-sheet: 14px;
+  --glass: var(--panel);
+  --glass-line: var(--hair);
+  --glass-fg: var(--ink-1);
+}
+
+/* HUD is a control surface: nothing to select, no grey tap flash */
+#hud,
+#bl,
+#br,
+#overlays .btn,
+#overlays button {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ---- panels: hairline, no blur shadows, tight radius ---- */
+.pill,
+#tl .pill,
+.tb,
+#bMenu {
+  border-radius: var(--r-hud);
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  box-shadow: none;
+}
+#tc {
+  border-radius: 12px;
+  border: 1px solid var(--hair);
+  background: var(--panel);
+  box-shadow: none;
+  padding: 4px;
+  gap: 0;
+}
+#tc .tb {
+  border-color: transparent;
+}
+#tl,
+#tr {
+  gap: 8px;
+}
+
+/* ---- navigation banner: graphite with a blue lead bar, not a violet blob ---- */
+#nav {
+  background: var(--panel-2);
+  border: 1px solid var(--hair);
+  border-left: 3px solid var(--route);
+  border-radius: var(--r-hud);
+  box-shadow: none;
+  padding: 8px 16px 8px 8px;
+  gap: 8px;
+  color: var(--ink-1);
+}
+#nav svg {
+  color: var(--route);
+}
+
+/* ---- minimap: hairline ring, no glow ---- */
+#minimap {
+  border: 2px solid var(--hair-2);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+}
+
+/* ---- numbers never jitter ---- */
+#pts,
+#progTxt,
+#fuelTxt,
+#limNum,
+.pill b,
+.thbar b,
+.cel-stats b,
+.stat b,
+.stats b {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+/* ---- hierarchy: condensed display headings, quieter metadata ---- */
+.sheet-head h2,
+.celebrate h2,
+.thres h2,
+.bk-title h2 {
+  font-family: var(--font-num);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.sheet-head h2 {
+  font-size: 22px;
+}
+.pill .k,
+.thbar small,
+.cel-stats small,
+.btn small,
+.sheet-head + .sheet-body small {
+  color: inherit;
+  opacity: 0.7;
+}
+
+/* ---- sheets and cards: less rounding, hairline instead of a heavy shadow ---- */
+.sheet {
+  border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  border: 1px solid var(--line);
+}
+.overlay.center .sheet {
+  border-radius: var(--r-sheet);
+}
+.x,
+.bk-x {
+  border-radius: var(--r-hud);
+}
+#card,
+#toast {
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+}
+.btn {
+  border-radius: var(--r-btn);
+}
+.mtile,
+.thopt,
+.thbar > span,
+.thresume,
+.thask,
+.cel-stats > div {
+  border-radius: var(--r-btn);
+}
+.mtile {
+  border-width: 1px;
+}
+
+/* answer options: selection without a border-width jump (no layout shift) */
+.thopt {
+  border: 1px solid var(--line);
+  box-shadow: none;
+}
+.thopt.on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.thopt.right {
+  box-shadow: inset 0 0 0 1px #1f9d55;
+}
+.thopt.wrong {
+  box-shadow: inset 0 0 0 1px #d64545;
+}
+
+/* ---- tactile controls: luminance + edge on press, never a size change ---- */
+.ctl {
+  border: 1px solid var(--hair-2);
+  box-shadow: none;
+  transition: background 0.05s, border-color 0.05s;
+}
+.ctl.down,
+.ctl:active,
+.tb:active,
+#bMenu:active,
+.btn:active,
+.mtile:active {
+  transform: none;
+}
+.ctl.down,
+.ctl:active,
+.tb:active,
+#bMenu:active {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+.btn:active,
+.mtile:active {
+  filter: brightness(0.92);
+}
+.pedal {
+  border-radius: 14px;
+}
+.pedal.gas.down {
+  background: rgba(31, 157, 85, 0.45);
+  border-color: #46c57e;
+}
+.pedal.brake.down {
+  background: rgba(211, 58, 49, 0.45);
+  border-color: #ff6f62;
+}
+.arw {
+  border-radius: 14px;
+}
+
+/* blinkers and hazards: signal amber, a flat fill instead of a glow */
+#tc .tb.sig.on.blink,
+#tc .tb.haz.on.blink {
+  background: var(--amber);
+  color: #1d1400;
+  box-shadow: none;
+}
+/* narrow screens: a setting's buttons go under its label, full width */
+@media (max-width: 520px) {
+  .sheet-body .row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sheet-body .row > span {
+    flex: 1 1 100%;
+  }
+  .sheet-body .row .seg2 {
+    width: 100%;
+    display: flex;
+  }
+  .sheet-body .row .seg2 button {
+    flex: 1;
+  }
+}

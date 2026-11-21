@@ -28,7 +28,7 @@ const COL = {
   tree: ['#2f7d3a', '#3a8c43', '#27703a'],
   treeLight: 'rgba(255,255,255,0.12)',
   shadow: 'rgba(0,0,0,0.22)',
-  route: '#8f5bff',
+  route: '#3884ff', // navigation blue (reads on grey asphalt, like a car's sat-nav)
 };
 
 function buildPaths(world) {
@@ -498,15 +498,15 @@ export function createRenderer(canvas, initialWorld) {
     ctx.setLineDash([]);
   }
 
-  /** the glowing purple navigation line (Waze style) */
+  /** the blue navigation line, sat-nav style */
   function drawRoute(alpha) {
     if (!paths.length) return;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
-    ctx.strokeStyle = `rgba(143,91,255,${0.28 * alpha})`;
+    ctx.strokeStyle = `rgba(14,52,120,${0.55 * alpha})`;
     ctx.lineWidth = 3.4;
     ctx.stroke(paths[0].path);
-    ctx.strokeStyle = `rgba(160,120,255,${0.92 * alpha})`;
+    ctx.strokeStyle = `rgba(64,140,255,${0.95 * alpha})`;
     ctx.lineWidth = 1.2;
     ctx.stroke(paths[0].path);
   }
@@ -1188,7 +1188,7 @@ export function createRenderer(canvas, initialWorld) {
       ctx.setLineDash([]);
     }
     if (p.phase === 'in' && m.destSpot && Math.hypot(state.car.x - m.destSpot.x, state.car.y - m.destSpot.y) < 80) {
-      ctx.strokeStyle = 'rgba(160,120,255,0.95)';
+      ctx.strokeStyle = 'rgba(64,140,255,0.95)';
       ctx.lineWidth = 0.35;
       ctx.setLineDash([1.2, 0.9]);
       ctx.beginPath();
@@ -1359,7 +1359,7 @@ export function createRenderer(canvas, initialWorld) {
 
   // ------------------------------------------------------------- map pins
   function pinColor(type) {
-    return { station: '#12b5a6', camera: '#e5484d', hazard: '#ff9f1c', breakdown: '#ff9f1c', roadwork: '#f08c00', police: '#3b5bdb', pickup: '#ff5fa2', home: '#8f5bff', crosswalk: '#3b82f6' }[type] || '#3b82f6';
+    return { station: '#12b5a6', camera: '#e5484d', hazard: '#ff9f1c', breakdown: '#ff9f1c', roadwork: '#f08c00', police: '#3b5bdb', pickup: '#ff5fa2', home: '#2f7cf6', crosswalk: '#3b82f6' }[type] || '#3b82f6';
   }
   function drawPins(R) {
     for (const p of world.pins) {
@@ -1582,7 +1582,7 @@ export function createRenderer(canvas, initialWorld) {
   }
 
   // ------------------------------------------------------------- minimap
-  /** The round Waze-style map: roads, purple route, pins, other cars. Heading up. */
+  /** The round Waze-style map: roads, blue route, pins, other cars. Heading up. */
   function drawMinimap(mc, size, state) {
     const k = 0.78; // pixels per metre
     const car = state.car;
@@ -1612,12 +1612,12 @@ export function createRenderer(canvas, initialWorld) {
     c.strokeStyle = '#46576d';
     c.lineWidth = world.roadWidth;
     for (const p of paths) c.stroke(p.path);
-    // purple route
+    // blue route
     if (paths.length) {
-      c.strokeStyle = 'rgba(143,91,255,0.35)';
+      c.strokeStyle = 'rgba(14,52,120,0.6)';
       c.lineWidth = 8 / k;
       c.stroke(paths[0].path);
-      c.strokeStyle = '#a98bff';
+      c.strokeStyle = '#5c9dff';
       c.lineWidth = 4 / k;
       c.stroke(paths[0].path);
     }
