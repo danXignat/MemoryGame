@@ -68,6 +68,18 @@ export const sfx = {
     tone(1047, 0.5, 0.5, 'triangle', 0.14);
     tone(1319, 0.5, 0.5, 'sine', 0.08);
   },
+  park() {
+    // handbrake ratchet (three quick clicks) then a soft rising chime
+    for (let i = 0; i < 3; i++) tone(2400 - i * 300, i * 0.035, 0.025, 'square', 0.05);
+    [659, 880, 1175].forEach((f, i) => tone(f, 0.16 + i * 0.09, 0.28, 'sine', 0.12));
+  },
+  crank() {
+    // starter motor: a few low pulses, then the engine catches
+    for (let i = 0; i < 5; i++) tone(70 + i * 6, i * 0.11, 0.08, 'sawtooth', 0.07);
+  },
+  click() {
+    tone(1800, 0, 0.018, 'square', 0.045);
+  },
   penalty() {
     tone(220, 0, 0.16, 'square', 0.09, 160);
     tone(150, 0.14, 0.24, 'square', 0.08, 110);
@@ -164,6 +176,39 @@ export function squealSound(amount, paused) {
     const a = enabled && !paused ? Math.max(0, Math.min(1, amount)) : 0;
     sq.g.gain.setTargetAtTime(a * 0.05, t, a > 0 ? 0.04 : 0.09);
     sq.bp.frequency.setTargetAtTime(1500 + a * 900, t, 0.1);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// ---------------------------------------------------------------- park assist
+//  Beeps faster as the gap shrinks; a steady tone under 30 cm. Silent when far.
+let nextBeep = 0;
+let steady = null;
+export function parkSensor(gap, paused) {
+  if (!ac || !enabled) return;
+  try {
+    const t = ac.currentTime;
+    const on = !paused && gap < 2.5;
+    if (on && gap < 0.3) {
+      if (!steady) {
+        steady = ac.createOscillator();
+        const g = ac.createGain();
+        g.gain.value = 0.05;
+        steady.type = 'sine';
+        steady.frequency.value = 1350;
+        steady.connect(g).connect(ac.destination);
+        steady.start();
+      }
+      return;
+    }
+    if (steady) {
+      steady.stop();
+      steady = null;
+    }
+    if (!on || t < nextBeep) return;
+    tone(1350, 0, 0.07, 'sine', 0.06);
+    nextBeep = t + 0.08 + Math.min(0.6, gap * 0.25);
   } catch (e) {
     /* ignore */
   }

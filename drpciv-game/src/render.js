@@ -257,7 +257,7 @@ export function createRenderer(canvas, initialWorld) {
       plife[i] -= dt;
       px[i] += pvx[i] * dt;
       py[i] += pvy[i] * dt;
-      const drag = pkind[i] === 2 ? 0.86 : 0.94;
+      const drag = pkind[i] === 1 ? 0.94 : 0.86;
       pvx[i] *= drag;
       pvy[i] *= drag;
     }
@@ -287,6 +287,12 @@ export function createRenderer(canvas, initialWorld) {
         ctx.fillStyle = '#d2d4d6';
         ctx.beginPath();
         ctx.arc(px[i], py[i], 0.4 + t * 1.6, 0, TAU);
+        ctx.fill();
+      } else if (pkind[i] === 3) {
+        ctx.globalAlpha = 1 - t;
+        ctx.fillStyle = t < 0.4 ? '#c8ffd9' : '#2ecc71';
+        ctx.beginPath();
+        ctx.arc(px[i], py[i], 0.16 * (1 - t) + 0.05, 0, TAU);
         ctx.fill();
       } else {
         ctx.globalAlpha = 1 - t;
@@ -1134,6 +1140,7 @@ export function createRenderer(canvas, initialWorld) {
   // ---------------------------------------------------------- pedestrians
   // free parking bays light up when you are near a car park and slow
   function drawBays(state, time) {
+    drawParkFx(state, time);
     if (!state.bayNear || Math.abs(state.car.v) > 6) return;
     const pulse = 0.55 + 0.3 * Math.sin(time * 4);
     for (const l of world.lots || []) {
@@ -1158,6 +1165,88 @@ export function createRenderer(canvas, initialWorld) {
         ctx.textBaseline = 'middle';
         ctx.fillText('P', 0, 0);
         ctx.restore();
+      }
+    }
+  }
+
+  // parking: corner brackets that close in as you line up, a ring and sparkles when you park
+  let lastParkedAt = -1;
+  let ringStart = -1;
+  let ringFor = null;
+  function drawParkFx(state, time) {
+    const b = state.bayAim;
+    if (b && !state.parkedBay && Math.abs(state.car.v) < 4) {
+      const f = state.bayAimFit;
+      const gap = 1.2 * (1 - f); // brackets sit on the bay when the fit is perfect
+      ctx.save();
+      ctx.translate(b.x, b.y);
+      ctx.rotate(b.angle);
+      ctx.strokeStyle = f > 0.85 ? '#2ecc71' : f > 0.6 ? '#ffd166' : '#ffffff';
+      ctx.globalAlpha = 0.55 + 0.45 * f;
+      ctx.lineWidth = 0.22;
+      ctx.lineCap = 'round';
+      const hx = 2.5 + gap;
+      const hy = 1.3 + gap;
+      ctx.beginPath();
+      for (let sx = -1; sx <= 1; sx += 2)
+        for (let sy = -1; sy <= 1; sy += 2) {
+          ctx.moveTo(sx * hx, sy * (hy - 0.7));
+          ctx.lineTo(sx * hx, sy * hy);
+          ctx.lineTo(sx * (hx - 0.9), sy * hy);
+        }
+      ctx.stroke();
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    }
+    // sensor arcs behind / in front of the car, like a dashboard park assist
+    const d = state.parkDist;
+    if (d < 2.5) {
+      const car = state.car;
+      const half = state.spec.length / 2 + 0.4;
+      const level = d < 0.5 ? 3 : d < 1.2 ? 2 : 1;
+      ctx.save();
+      ctx.translate(car.x, car.y);
+      ctx.rotate(car.heading);
+      ctx.lineWidth = 0.18;
+      ctx.lineCap = 'round';
+      for (let e = -1; e <= 1; e += 2) {
+        for (let k = 1; k <= level; k++) {
+          ctx.strokeStyle = k === 3 ? '#ff4d4d' : k === 2 ? '#ffb020' : '#2ecc71';
+          ctx.beginPath();
+          ctx.arc(e * (half - 0.6), 0, 0.6 + k * 0.45, e > 0 ? -0.7 : Math.PI - 0.7, e > 0 ? 0.7 : Math.PI + 0.7);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    // just parked: an expanding ring and a burst of green sparkles (pooled)
+    if (state.parkedBay && state.parkedAt != null) {
+      if (state.parkedAt !== lastParkedAt) {
+        lastParkedAt = state.parkedAt;
+        const pb = state.parkedBay;
+        for (let i = 0; i < 26; i++) {
+          const a = (i / 26) * TAU;
+          const sp = 3 + Math.random() * 3;
+          emit(3, pb.x + Math.cos(a) * 1.2, pb.y + Math.sin(a) * 0.8, Math.cos(a) * sp, Math.sin(a) * sp, 0.6 + Math.random() * 0.3);
+        }
+      }
+      if (ringStart < 0 || state.parkedAt !== ringFor) {
+        ringFor = state.parkedAt;
+        ringStart = time;
+      }
+      const t = (time - ringStart) / 0.7;
+      if (t < 1) {
+        const pb = state.parkedBay;
+        ctx.save();
+        ctx.translate(pb.x, pb.y);
+        ctx.rotate(pb.angle);
+        ctx.globalAlpha = 1 - t;
+        ctx.strokeStyle = '#2ecc71';
+        ctx.lineWidth = 0.3 * (1 - t) + 0.05;
+        const g = 1 + t * 1.6; // eases out because t is linear and the alpha falls with it
+        ctx.strokeRect(-2.5 * g, -1.3 * g, 5 * g, 2.6 * g);
+        ctx.restore();
+        ctx.globalAlpha = 1;
       }
     }
   }

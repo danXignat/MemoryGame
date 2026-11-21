@@ -281,10 +281,30 @@ export function createGame(world, opts = {}) {
     lotsNear.length = 0;
     for (const l of world.lots || []) if (Math.hypot(l.x - car.x, l.y - car.y) < l.w / 2 + 14) lotsNear.push(l);
     // parked cars are solid
-    for (const pc of world.parked || []) if (Math.abs(pc.x - car.x) < 7 && Math.abs(pc.y - car.y) < 7) pushOutOfTraffic(car, { ...pc, v: 0 });
+    // parked cars are solid; the parking sensor measures the gap to the nearest one
+    const hc = Math.cos(car.heading);
+    const hs = Math.sin(car.heading);
+    const half = state.spec.length / 2;
+    let gap = Infinity;
+    for (const pc of world.parked || []) {
+      if (Math.abs(pc.x - car.x) > 9 || Math.abs(pc.y - car.y) > 9) continue;
+      pc.v = 0;
+      if (Math.abs(pc.x - car.x) < 7 && Math.abs(pc.y - car.y) < 7) pushOutOfTraffic(car, pc);
+      // like real park assist: only what is ahead of the front or behind the rear bumper
+      const dx = pc.x - car.x;
+      const dy = pc.y - car.y;
+      const lateral = Math.abs(-dx * hs + dy * hc);
+      if (lateral > 1.8) continue;
+      const d = Math.abs(dx * hc + dy * hs) - half - 1.0;
+      if (d < gap) gap = d;
+    }
+    state.parkDist = lotsNear.length && Math.abs(car.v) < 4 && !state.parkedBay ? Math.max(0, gap) : Infinity;
     // in a free bay, straight (nose or tail first), stopped?
     let bay = null;
     let quality = 0;
+    // the free bay you are lining up with, and how well (0..1), for the on-road guide
+    let aim = null;
+    let aimFit = 0;
     for (const l of lotsNear)
       for (const b of l.bays) {
         if (!b.free) continue;
@@ -293,17 +313,24 @@ export function createGame(world, opts = {}) {
         const along = (car.x - b.x) * cs - (car.y - b.y) * sn; // into the bay
         const across = (car.x - b.x) * sn + (car.y - b.y) * cs;
         const straight = Math.abs(Math.cos(car.heading - b.angle));
+        if (Math.abs(along) < 4 && Math.abs(across) < 2) {
+          const fit = Math.max(0, 1 - Math.abs(along) / 4) * 0.35 + Math.max(0, 1 - Math.abs(across) / 2) * 0.35 + Math.max(0, (straight - 0.8) / 0.2) * 0.3;
+          if (fit > aimFit) (aimFit = fit), (aim = b);
+        }
         if (Math.abs(along) < 1.0 && Math.abs(across) < 0.55 && straight > 0.97) {
           bay = b;
           quality = Math.max(0, 1 - Math.abs(across) / 0.55) * 0.5 + Math.max(0, (straight - 0.97) / 0.03) * 0.5;
         }
       }
     state.bayNear = lotsNear.length > 0;
+    state.bayAim = aim;
+    state.bayAimFit = aimFit;
     if (bay && Math.abs(car.v) < 0.15) {
       state.parkT = (state.parkT || 0) + dt;
       if (state.parkT > 0.8 && state.parkedBay !== bay) {
         state.parkedBay = bay;
         const stars = quality > 0.75 ? 3 : quality > 0.4 ? 2 : 1;
+        state.parkedAt = state.time;
         emit('parked', { stars, reverse: Math.cos(car.heading - bay.angle) < 0 });
       }
     } else {

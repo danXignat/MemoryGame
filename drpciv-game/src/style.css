@@ -3574,3 +3574,84 @@ p {
     animation: none !important;
   }
 }
+
+/* ---------- game feel: interface ---------- */
+/* score and penalty pop when they go up */
+#pts.bump,
+#pen.bump {
+  animation: bump 0.42s var(--ease-spring);
+  display: inline-block;
+}
+#pen.bump {
+  color: #ff7b72;
+}
+@keyframes bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+/* the fuel bar slides instead of jumping */
+#pillFuel .fbar i {
+  transition: width 0.45s var(--ease-out), background-color 0.3s;
+}
+/* menu tiles cascade in */
+.mtiles .mtile {
+  animation: tileIn 0.32s var(--ease-out) both;
+}
+.mtiles .mtile:nth-child(2) { animation-delay: 0.03s; }
+.mtiles .mtile:nth-child(3) { animation-delay: 0.06s; }
+.mtiles .mtile:nth-child(4) { animation-delay: 0.09s; }
+.mtiles .mtile:nth-child(5) { animation-delay: 0.12s; }
+.mtiles .mtile:nth-child(6) { animation-delay: 0.15s; }
+@keyframes tileIn {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+/* segmented switches: the selected fill fades across instead of snapping */
+.seg2 button,
+.seg button {
+  transition: background-color 0.18s var(--ease-out), color 0.18s var(--ease-out);
+}
+/* HUD toggles: lights and engine colour changes ease in */
+.tb {
+  transition: background-color 0.12s, color 0.18s, border-color 0.12s;
+}
+/* parking stars pop in one after another */
+#toast.parked .stars {
+  margin-left: 6px;
+  letter-spacing: 2px;
+}
+#toast.parked .star {
+  font-style: normal;
+  display: inline-block;
+  color: var(--line);
+  animation: starIn 0.4s var(--ease-spring) both;
+}
+#toast.parked .star.on {
+  color: #f5b301;
+}
+@keyframes starIn {
+  from {
+    transform: scale(0) rotate(-40deg);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #pts.bump,
+  #pen.bump,
+  .mtiles .mtile,
+  #toast.parked .star {
+    animation: none !important;
+  }
+  #pillFuel .fbar i {
+    transition: none;
+  }
+}

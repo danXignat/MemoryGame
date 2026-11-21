@@ -234,6 +234,18 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     toastTimer = setTimeout(hideToast, 6000);
   }
 
+  function showParked(p, en) {
+    hideCard();
+    toast.className = 'info parked';
+    const stars = [0, 1, 2].map((i) => `<i class="star ${i < p.stars ? 'on' : ''}" style="animation-delay:${0.15 + i * 0.12}s">★</i>`).join('');
+    const how = en ? (p.reverse ? 'Reverse parking' : 'Nose-in parking') : p.reverse ? 'Parcare cu spatele' : 'Parcare cu fața';
+    const tip = p.stars === 3 ? (en ? 'Perfectly straight in the bay.' : 'Perfect, drept în mijlocul locului.') : en ? 'Sit straighter in the middle of the bay for 3 stars.' : 'Stai mai drept, în mijlocul locului, pentru 3 stele.';
+    toast.innerHTML = `<div class="toastrow noimg"><div><div class="verdict" style="color:var(--ok)">${en ? 'Parked!' : 'Parcat corect!'} <span class="stars">${stars}</span></div><div class="msg" style="font-weight:500">${esc(how)}. ${esc(tip)}</div></div></div>`;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(hideToast, 5000);
+  }
+
   function showInfo(title, text) {
     hideCard();
     toast.className = 'info';
@@ -252,15 +264,44 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     station: $('#station'), speedoCv: $('#speedoCv'), miniCv: $('#minimapCv'), rotate: $('#rotate'),
   };
 
+  // counters roll to their new value and pop, so a change is felt, not just read
+  const shown = { pts: 0, pen: 0 };
+  let rollRaf = 0;
+  function bump(el) {
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+  function roll() {
+    const t = st().test;
+    const test = st().mode === 'test' && t;
+    const goalPts = test ? t.score : 0;
+    const goalPen = test ? t.penalty : 0;
+    let moving = false;
+    for (const k of ['pts', 'pen']) {
+      const goal = k === 'pts' ? goalPts : goalPen;
+      if (shown[k] !== goal) {
+        const step = Math.max(1, Math.ceil(Math.abs(goal - shown[k]) / 6));
+        shown[k] += Math.sign(goal - shown[k]) * step;
+        moving = true;
+      }
+    }
+    E.pts.textContent = shown.pts;
+    if (test) E.pen.textContent = `Pen ${shown.pen}/${C.exam.failAt}`;
+    rollRaf = moving ? requestAnimationFrame(roll) : 0;
+  }
   function updateScore() {
     const t = st().test;
     const test = st().mode === 'test' && t;
     E.pen.hidden = !test;
-    E.pts.textContent = test ? t.score : 0;
-    if (test) {
-      E.pen.textContent = `Pen ${t.penalty}/${C.exam.failAt}`;
-      E.pen.classList.toggle('bad', t.penalty >= 15);
-    }
+    const goalPts = test ? t.score : 0;
+    const goalPen = test ? t.penalty : 0;
+    if (goalPts > shown.pts) bump(E.pts);
+    if (goalPen > shown.pen) bump(E.pen);
+    if (goalPts < shown.pts) shown.pts = goalPts; // restart: no rolling down
+    if (goalPen < shown.pen) shown.pen = goalPen;
+    if (test) E.pen.classList.toggle('bad', t.penalty >= 15);
+    if (!rollRaf) rollRaf = requestAnimationFrame(roll);
   }
 
   // --- circular arc speedometer + gear indicator
@@ -1206,9 +1247,14 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     const g = G.game;
     if (name === 'signalLeft') g.toggleSignal('left');
     else if (name === 'signalRight') g.toggleSignal('right');
-    else if (name === 'hazard') g.toggleHazard();
-    else if (name === 'lights') g.cycleLights();
-    else if (name === 'engine') g.toggleEngine();
+    else if (name === 'hazard') (g.toggleHazard(), sfx.click());
+    else if (name === 'lights') (g.cycleLights(), sfx.click());
+    else if (name === 'engine') {
+      const was = g.state.car.engineOn;
+      g.toggleEngine();
+      if (!was && g.state.car.starting > 0) sfx.crank();
+      else sfx.click();
+    }
   }
   E.sigL.addEventListener('click', () => act('signalLeft'));
   E.sigR.addEventListener('click', () => act('signalRight'));
@@ -1259,8 +1305,9 @@ export function createUI({ settings, saveSettings, controls, renderer, actions }
     });
     game.on('parked', (p) => {
       const en = lang() === 'en';
-      sfx.ok();
-      showInfo(`${en ? 'Parked!' : 'Parcat corect!'} ${'★'.repeat(p.stars)}${'☆'.repeat(3 - p.stars)}`, en ? `${p.reverse ? 'Reverse parking' : 'Nose-in parking'}. ${p.stars === 3 ? 'Perfectly straight in the bay.' : 'Try to sit straighter in the middle of the bay.'}` : `${p.reverse ? 'Parcare cu spatele' : 'Parcare cu fața'}. ${p.stars === 3 ? 'Perfect, drept în mijlocul locului.' : 'Încearcă să stai mai drept, în mijlocul locului.'}`);
+      sfx.park();
+      vibrate([20, 30, 20]);
+      showParked(p, en);
     });
     game.on('levelDone', (e) => levelDoneScreen(e));
     game.on('glare', () => {

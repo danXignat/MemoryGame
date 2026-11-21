@@ -167,6 +167,8 @@ Every level ends with a small party: confetti, a trophy, a fanfare and a buzz of
 - Hard braking at speed leaves skid marks that fade over about 14 seconds and puffs a little tyre smoke, with a tyre squeal made in code. A crash throws sparks from the front and shakes the camera with a smooth wobble that dies out, not random jitter.
 - A real exam mistake (5 points or more) flashes the screen edges red once, plays a low buzz and vibrates longer. Small mistakes keep the soft chime.
 - Cards, messages, the navigation banner and menus slide or spring in with ease-out curves. The speed-limit badge pulses when you're over instead of blinking. All of it switches off for people who ask their phone for reduced motion.
+- Parking: when you line up with a free bay, four corner brackets close in on it and turn white, then amber, then green as you get straighter. A park-assist sensor looks only ahead and behind, shows green/amber/red arcs at the bumpers and beeps faster as the gap shrinks (a steady tone under 30 cm). Parking well gives a handbrake click and a short chime, a green ring that grows out of the bay, a burst of sparkles and stars that pop in one by one.
+- Interface: the score and penalty counters roll to their new value and pop when they go up. The fuel bar slides. Menu tiles cascade in. Switches fade between states. Lights and hazards click; the engine button plays a starter crank.
 - Particles and skid marks live in fixed-size pools, so nothing new is created while the game runs.
 
 ### Look and feel
