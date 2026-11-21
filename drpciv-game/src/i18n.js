@@ -144,6 +144,10 @@ const EXACT = {
 const PARTS = [
   ['Locked: pass Level 15', 'Blocat: treci Nivelul 15'],
   ['Coming next', 'Urmează'],
+  [' hp turbo petrol', ' CP turbo benzină'],
+  [' hp petrol', ' CP benzină'],
+  [' hp diesel', ' CP diesel'],
+  [' hp ·', ' CP ·'],
   ['Passed ✓', 'Trecut ✓'],
   [' · Play', ' · Joacă'],
   ['Tank is full.', 'Rezervorul e plin.'],

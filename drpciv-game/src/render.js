@@ -364,6 +364,7 @@ export function createRenderer(canvas, initialWorld) {
     drawPins(R);
     drawSigns(state, R, time);
     lastCar = state.car;
+    drawSignFx(state);
     drawGeoLabels(R);
 
     if (weather === 'fog') drawFog(state);
@@ -564,6 +565,49 @@ export function createRenderer(canvas, initialWorld) {
         ctx.restore();
       }
     }
+  }
+
+  // a tick or cross pops out of the sign you just passed: overshoots, settles, floats, fades
+  function drawSignFx(state) {
+    const f = state.signFx;
+    if (!f || !f.sign) return;
+    const t = (state.time - f.at) / 1.3;
+    if (t < 0 || t > 1) return;
+    const s = f.sign;
+    const k = Math.min(1, t / 0.25);
+    const pop = 1 + 0.35 * Math.sin(k * Math.PI) * (1 - k * 0.4); // springy overshoot
+    const scale = (0.4 + 0.6 * k) * pop;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(-cam.angle);
+    ctx.scale(1 / cam.scale, 1 / cam.scale);
+    ctx.translate(16, -16 - t * 10); // a badge on the sign's top-right corner
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.3;
+    ctx.fillStyle = f.ok ? '#1f9d55' : '#d62828';
+    ctx.beginPath();
+    ctx.arc(0, 0, 13, 0, TAU);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    if (f.ok) {
+      ctx.moveTo(-6.5, 0.5);
+      ctx.lineTo(-2, 5);
+      ctx.lineTo(7, -5);
+    } else {
+      ctx.moveTo(-5.5, -5.5);
+      ctx.lineTo(5.5, 5.5);
+      ctx.moveTo(5.5, -5.5);
+      ctx.lineTo(-5.5, 5.5);
+    }
+    ctx.stroke();
+    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   let lastCar = null;

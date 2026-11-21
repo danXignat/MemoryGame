@@ -534,7 +534,9 @@ export function createGame(world, opts = {}) {
       if (!mustYieldTo(n) || n.def.mapNpc) return false;
       if (n.def.oncoming && !cf.left) return false; // going straight or right: the other lane is not in your way
       const d = Math.hypot(n.x - cf.x, n.y - cf.y);
-      if (n.v >= 1 && d < cf.r + extra) return true;
+      // a car still coming towards the junction (or right in it) is in your way; one driving away is not
+      const coming = (cf.x - n.x) * Math.cos(n.heading) + (cf.y - n.y) * Math.sin(n.heading) > 0;
+      if (n.v >= 1 && d < cf.r + extra && (coming || d < 5)) return true;
       // (for planning) a car heading this way that will be there within `horizon` seconds
       if (horizon > 0 && n.v > 1 && (cf.x - n.x) * Math.cos(n.heading) + (cf.y - n.y) * Math.sin(n.heading) > 0 && d - n.v * horizon < cf.r) return true;
       if (horizon > 0 && n.def.feeder && n.cleared && d < cf.r + extra) return true;
@@ -805,6 +807,12 @@ export function createGame(world, opts = {}) {
     t.status = 'done';
     t.ok = ok;
     t.reason = reason;
+    // the sign on the road answers with a tick or a cross (one slot, reused)
+    if (t.sign && t.sign.x != null && !t.sign.def.hidden) {
+      state.signFx.sign = t.sign;
+      state.signFx.ok = ok;
+      state.signFx.at = state.time;
+    }
     const test = state.test;
     const pen = ok ? 0 : t.p.penalty ?? C.exam.penalty[reason] ?? C.exam.penalty[t.type] ?? 5;
     test.score += ok ? T.pointsPerSign : 0;
@@ -1535,6 +1543,7 @@ export function createGame(world, opts = {}) {
     spawned.clear();
     state.quiz = null;
     state.speedLimit = null;
+    state.signFx = { sign: null, ok: true, at: -9 };
     state.wrongWay = false;
     state.shake = 0;
     state.activeSign = null;

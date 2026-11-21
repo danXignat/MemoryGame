@@ -77,6 +77,29 @@ export const sfx = {
     // starter motor: a few low pulses, then the engine catches
     for (let i = 0; i < 5; i++) tone(70 + i * 6, i * 0.11, 0.08, 'sawtooth', 0.07);
   },
+  page() {
+    // paper: a short burst of filtered noise that sweeps down
+    if (!ac || !enabled) return;
+    try {
+      const t0 = ac.currentTime;
+      const len = Math.floor(ac.sampleRate * 0.18);
+      const buf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2);
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      const f = ac.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.setValueAtTime(3200, t0);
+      f.frequency.exponentialRampToValueAtTime(900, t0 + 0.18);
+      const g = ac.createGain();
+      g.gain.value = 0.18;
+      src.connect(f).connect(g).connect(ac.destination);
+      src.start(t0);
+    } catch (e) {
+      /* ignore */
+    }
+  },
   click() {
     tone(1800, 0, 0.018, 'square', 0.045);
   },
@@ -209,6 +232,35 @@ export function parkSensor(gap, paused) {
     if (!on || t < nextBeep) return;
     tone(1350, 0, 0.07, 'sine', 0.06);
     nextBeep = t + 0.08 + Math.min(0.6, gap * 0.25);
+  } catch (e) {
+    /* ignore */
+  }
+}
+
+// ------------------------------------------------------------------ rain
+//  Soft low-passed noise while it rains (made once, faded in and out).
+let rainNode = null;
+export function rainSound(on, paused) {
+  if (!ac) return;
+  try {
+    if (!rainNode) {
+      const len = ac.sampleRate * 2;
+      const buf = ac.createBuffer(1, len, ac.sampleRate);
+      const d = buf.getChannelData(0);
+      for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+      const src = ac.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const lp = ac.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1400;
+      const g = ac.createGain();
+      g.gain.value = 0;
+      src.connect(lp).connect(g).connect(ac.destination);
+      src.start();
+      rainNode = g;
+    }
+    rainNode.gain.setTargetAtTime(enabled && on && !paused ? 0.035 : 0, ac.currentTime, 0.6);
   } catch (e) {
     /* ignore */
   }

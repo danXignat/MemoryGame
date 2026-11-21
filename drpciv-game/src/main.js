@@ -10,7 +10,7 @@ import { createGame } from './game.js';
 import { createRenderer } from './render.js';
 import { createControls } from './controls.js';
 import { createUI } from './ui.js';
-import { setEnabled as setSound, unlock, engineSound, squealSound, parkSensor } from './audio.js';
+import { setEnabled as setSound, unlock, engineSound, squealSound, parkSensor, rainSound } from './audio.js';
 import { loadSettings, saveSettings as persist, addMistake } from './storage.js';
 import { CARS } from './cars.js';
 import { initPortraits } from './portraits.js';
@@ -110,6 +110,7 @@ function frame(now) {
     const v = Math.abs(st.car.v);
     const slide = st.car.brakeP > 0.8 && v > 7 ? Math.min(1, (v - 7) / 8) : Math.abs(st.car.steer || 0) > 0.45 && v > 13 ? 0.6 : 0;
     squealSound(slide, ui.isBlocking() || document.hidden);
+    rainSound(st.weather === 'rain', document.hidden);
     parkSensor(st.parkDist ?? Infinity, ui.isBlocking() || document.hidden || !st.car.engineOn);
   }
   renderer.updateCamera(current.game.state, dt, settings);

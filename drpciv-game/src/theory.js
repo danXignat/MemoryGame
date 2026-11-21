@@ -167,7 +167,7 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
       } else if (pI > 0) pI--;
       else if (chI > 0) (chI--, (pI = CHAPTERS[chI].pages.length - 1));
       else chI = -1;
-      sfx.tap();
+      sfx.page ? sfx.page() : sfx.tap();
       render(step);
     }
 
@@ -327,6 +327,8 @@ export function createTheory({ openModal, head, signImg, sfx, esc, celebrate = n
         const i = +b.dataset.i;
         b.classList.toggle('right', q.ok.includes(i));
         b.classList.toggle('wrong', pick.includes(i) && !q.ok.includes(i));
+        b.classList.toggle('nudge', pick.includes(i) && !q.ok.includes(i));
+        b.classList.toggle('pulse', q.ok.includes(i));
       }
       const why = body.querySelector('.thwhy');
       why.hidden = false;

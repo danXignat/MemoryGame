@@ -3655,3 +3655,113 @@ p {
     transition: none;
   }
 }
+
+/* ---- impeccable, pass 3: car picker, sign library, quiz answers ---- */
+/* car picker: hairline cards, selection is a blue edge, stats are thin segments */
+.carcard {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: none;
+}
+.carcard.sel {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent), 0 0 0 3px rgba(29, 111, 209, 0.12);
+}
+.carcard:active {
+  background: var(--surface-2);
+}
+.carcard .diff {
+  border-radius: 4px;
+  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  padding: 2px 6px;
+}
+.cstats {
+  gap: 6px 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.sb {
+  gap: 2px;
+}
+.sb i {
+  height: 4px;
+  border-radius: 1px;
+  max-width: 22px;
+}
+/* sign library: the category is a thin rule, not a fat rounded band */
+.tile {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: none;
+  background: var(--surface);
+  border-top: 3px solid var(--cat, var(--line));
+}
+.tile::before {
+  display: none !important;
+}
+.tile:active {
+  background: var(--surface-2);
+}
+.chips button {
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+/* quiz answers: the letter badge says it all (blue chosen, green right, red wrong) */
+.thopt.wrong i {
+  background: #d64545;
+  color: #fff;
+}
+.thopt.right i {
+  background: #1f9d55;
+  color: #fff;
+}
+.thopt.wrong.on {
+  box-shadow: inset 0 0 0 1px #d64545;
+  border-color: #d64545;
+}
+/* quiz answers: the wrong pick shakes no, the right one breathes once */
+.thopt.nudge {
+  animation: nudge 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes nudge {
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+.thopt.pulse {
+  animation: okPulse 0.5s var(--ease-out);
+}
+@keyframes okPulse {
+  0% { box-shadow: inset 0 0 0 1px #1f9d55, 0 0 0 0 rgba(31, 157, 85, 0.45); }
+  100% { box-shadow: inset 0 0 0 1px #1f9d55, 0 0 0 10px rgba(31, 157, 85, 0); }
+}
+.thopt {
+  transition: background-color 0.15s var(--ease-out), border-color 0.15s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .thopt.nudge,
+  .thopt.pulse {
+    animation: none;
+  }
+}
+.tile {
+  border-radius: 6px;
+}
+/* celebration stats: hairline columns, not boxes */
+.cel-stats {
+  gap: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.cel-stats > div {
+  background: none;
+  border-radius: 0;
+  padding: 10px 8px;
+}
+.cel-stats > div + div {
+  border-left: 1px solid var(--line);
+}

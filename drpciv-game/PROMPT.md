@@ -139,7 +139,7 @@ Every level ends with a small party: confetti, a trophy, a fanfare and a buzz of
 ## 9. Traffic, pedestrians, police, parking
 
 - Cars come the other way on every level except one-way roads, in random colours. Every fourth one is a police car with a flashing blue and red light bar.
-- Every level has side streets, placed on long straights and at junctions. Cars pull out of them. If you have priority they wait for you (in Learn a hint says "Ai prioritate"), then they join your lane or the other one. At your own STOP or give-way they have priority, and pulling out in front of a moving car counts as not giving way.
+- Every level has side streets, placed on long straights and at junctions. Cars pull out of them. If you have priority they wait for you (in Learn a hint says "Ai prioritate"), then they join your lane or the other one. At your own STOP or give-way they have priority. Pulling out in front of a car that is still coming towards the junction counts as not giving way; one that has already gone through and is driving away doesn't.
 - Some cars drive in your lane at 50–70 % of the limit, so you either queue behind them or overtake where it's allowed. They stop at STOP, slow down in roundabouts and bends, wait for pedestrians, and turn off into a side street before the spots the exam needs clear (a stopped car, the fuel stop, the pickup, the finish).
 - Computer cars keep their distance, check their own path for you (so it works in bends), sort out stand-offs and never crash into each other.
 - Pedestrians cross at zebra crossings, with an orange ring around them while they wait. Plenty more walk along the pavements and never step onto the road.
@@ -169,6 +169,8 @@ Every level ends with a small party: confetti, a trophy, a fanfare and a buzz of
 - Cards, messages, the navigation banner and menus slide or spring in with ease-out curves. The speed-limit badge pulses when you're over instead of blinking. All of it switches off for people who ask their phone for reduced motion.
 - Parking: when you line up with a free bay, four corner brackets close in on it and turn white, then amber, then green as you get straighter. A park-assist sensor looks only ahead and behind, shows green/amber/red arcs at the bumpers and beeps faster as the gap shrinks (a steady tone under 30 cm). Parking well gives a handbrake click and a short chime, a green ring that grows out of the bay, a burst of sparkles and stars that pop in one by one.
 - Interface: the score and penalty counters roll to their new value and pop when they go up. The fuel bar slides. Menu tiles cascade in. Switches fade between states. Lights and hazards click; the engine button plays a starter crank.
+- Every sign you pass in Test answers back: a green tick or a red cross pops onto its corner with a little spring, floats up and fades.
+- Chestionare: a wrong pick shakes "no", the right answer gives one soft green pulse. Book pages make a paper sound when they turn. Rain has its own quiet sound under the engine.
 - Particles and skid marks live in fixed-size pools, so nothing new is created while the game runs.
 
 ### Look and feel
@@ -177,6 +179,7 @@ Every level ends with a small party: confetti, a trophy, a fanfare and a buzz of
 - Type: Barlow Condensed for headings and every number, with tabular figures so scores, speed and timers don't jump around. Inter for body text. Details are smaller and lighter than titles.
 - Shape: small corner radii (8–14px). Hairlines and slight changes in brightness instead of heavy shadows. Lists are rows with dividers, not stacks of cards.
 - Touch: a pressed button gets brighter and gains a sharp edge, but never changes size. HUD text can't be selected by accident. Respect the safe areas and keep to an 8px grid.
+- Car picker and sign library: hairline cards. The chosen car gets a blue edge, the stats are thin segments, the sign's category is a thin coloured rule on top. Engine data reads in Romanian (CP benzină, CP diesel).
 - Results: one verdict (ADMIS or RESPINS). Stats sit between hairlines. Category bars are coloured by how you did (green when full, amber around half, red when low), with the category's own colour as a small dot.
 
 ## 12. Brașov, district by district
@@ -197,7 +200,7 @@ Place names are written on the map and slide along beside the car, so you can re
 
 ## 13. Theory: Chestionare and the book
 
-- Chestionare follows the DRPCIV format: 26 random questions in 30 minutes, three answers each, one or more of them right. 22 correct answers and you pass; the fifth wrong one ends it. The buttons are "Răspunde mai târziu", "Șterge răspunsul" and "Trimite răspunsul". Counters show how many you started with, how many are left, right, wrong, and the time. You can take it as an exam (result at the end) or as practice (the right answer and a short explanation after each question). The results list your mistakes with explanations. There are about 60 questions, written from the traffic code rather than copied from the official bank, and each one belongs to a chapter of the book.
+- Chestionare follows the DRPCIV format: 26 random questions in 30 minutes, three answers each, one or more of them right. 22 correct answers and you pass; the fifth wrong one ends it. The buttons are "Răspunde mai târziu", "Șterge răspunsul" and "Trimite răspunsul". Counters show how many you started with, how many are left, right, wrong, and the time. You can take it as an exam (result at the end) or as practice (the right answer and a short explanation after each question). The results list your mistakes with explanations. The questions keep the formal exam wording ("dumneavoastră"), but every explanation talks like the book's instructor, in plain "tu" Romanian. There are about 60 questions, written from the traffic code rather than copied from the official bank, and each one belongs to a chapter of the book.
 - Nothing should interrupt it. Every answer is saved, so you can carry on after a reload or a phone call. The clock stops while the app is in the background. Leaving asks you on the page itself, not with a browser dialog. No other screen ever covers it.
 - Cartea șoferului, the book, has eight chapters written the way a friendly instructor talks: Indicatoarele, Viteza, Cine trece primul, Semafoare și linii pe asfalt, Depășit, oprit, parcat, Tu, mașina și actele, Când ceva merge prost, and Cum să nu ai nevoie de capitolul de dinainte. It looks like paper, pages flip with an animation or a swipe, and it remembers where you stopped. Each chapter ends with a short test. Score 80 % or more and the lesson gets a ✓ and a small celebration.
 
